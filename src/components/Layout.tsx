@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Heart } from "lucide-react";
+import { Menu, X, Heart, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
 const navLinks = [
@@ -86,42 +87,64 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Mobile nav */}
-        {mobileOpen && (
-          <nav className="lg:hidden bg-primary border-t border-primary-foreground/10 px-4 pb-4">
-            {navLinks.map((link) =>
-              link.children ? (
-                <div key={link.label}>
-                  <button
-                    onClick={() => setSantuariOpen(!santuariOpen)}
-                    className="w-full text-left py-3 text-primary-foreground/80 font-body text-sm font-medium"
-                  >
-                    {link.label} {santuariOpen ? "−" : "+"}
-                  </button>
-                  {santuariOpen &&
-                    link.children.map((child) => (
-                      <Link
-                        key={child.to}
-                        to={child.to}
-                        onClick={() => setMobileOpen(false)}
-                        className="block py-2 pl-4 text-primary-foreground/70 text-sm font-body"
+        <AnimatePresence>
+          {mobileOpen && (
+            <motion.nav
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="lg:hidden bg-primary border-t border-primary-foreground/10 px-4 overflow-hidden"
+            >
+              <div className="pb-4">
+                {navLinks.map((link) =>
+                  link.children ? (
+                    <div key={link.label}>
+                      <button
+                        onClick={() => setSantuariOpen(!santuariOpen)}
+                        className="w-full text-left py-3 text-primary-foreground/80 font-body text-sm font-medium flex items-center justify-between"
                       >
-                        {child.label}
-                      </Link>
-                    ))}
-                </div>
-              ) : (
-                <Link
-                  key={link.to}
-                  to={link.to!}
-                  onClick={() => setMobileOpen(false)}
-                  className="block py-3 text-primary-foreground/80 font-body text-sm font-medium"
-                >
-                  {link.label}
-                </Link>
-              )
-            )}
-          </nav>
-        )}
+                        {link.label}
+                        <ChevronDown className={`w-4 h-4 transition-transform ${santuariOpen ? "rotate-180" : ""}`} />
+                      </button>
+                      <AnimatePresence>
+                        {santuariOpen && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            {link.children.map((child) => (
+                              <Link
+                                key={child.to}
+                                to={child.to}
+                                onClick={() => setMobileOpen(false)}
+                                className="block py-2 pl-4 text-primary-foreground/70 text-sm font-body"
+                              >
+                                {child.label}
+                              </Link>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ) : (
+                    <Link
+                      key={link.to}
+                      to={link.to!}
+                      onClick={() => setMobileOpen(false)}
+                      className="block py-3 text-primary-foreground/80 font-body text-sm font-medium"
+                    >
+                      {link.label}
+                    </Link>
+                  )
+                )}
+              </div>
+            </motion.nav>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* Main */}
