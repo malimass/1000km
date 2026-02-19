@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { Heart, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
+import AnimatedSection from "@/components/AnimatedSection";
+import { motion } from "framer-motion";
 
 export default function Dona() {
   return (
@@ -15,46 +17,58 @@ export default function Dona() {
 
       <section className="section-padding bg-background">
         <div className="container-narrow max-w-2xl text-center">
-          <div className="bg-card rounded-lg p-8 md:p-12 shadow-sm border border-border">
-            <Heart className="w-16 h-16 text-dona mx-auto mb-6" />
-            <h2 className="font-heading text-2xl font-bold text-foreground mb-4">Sostieni Komen Italia</h2>
-            <p className="text-muted-foreground font-body leading-relaxed mb-8">
-              La raccolta fondi è interamente destinata a <strong className="text-dona">Komen Italia</strong> per la lotta contro i tumori al seno. Ogni donazione sarà rendicontata pubblicamente con la massima trasparenza.
-            </p>
+          <AnimatedSection>
+            <div className="bg-card rounded-lg p-8 md:p-12 shadow-sm border border-border">
+              <Heart className="w-16 h-16 text-dona mx-auto mb-6" />
+              <h2 className="font-heading text-2xl font-bold text-foreground mb-4">Sostieni Komen Italia</h2>
+              <p className="text-muted-foreground font-body leading-relaxed mb-8">
+                La raccolta fondi è interamente destinata a <strong className="text-dona">Komen Italia</strong> per la lotta contro i tumori al seno. Ogni donazione sarà rendicontata pubblicamente con la massima trasparenza.
+              </p>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              {["€ 10", "€ 25", "€ 50", "€ 100"].map((amount) => (
-                <button
-                  key={amount}
-                  className="rounded-lg border-2 border-dona/30 hover:border-dona bg-dona/5 hover:bg-dona/10 py-4 font-heading text-xl font-bold text-foreground transition-colors"
-                >
-                  {amount}
-                </button>
-              ))}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                {["€ 10", "€ 25", "€ 50", "€ 100"].map((amount) => (
+                  <motion.button
+                    key={amount}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="rounded-lg border-2 border-dona/30 hover:border-dona bg-dona/5 hover:bg-dona/10 py-4 font-heading text-xl font-bold text-foreground transition-colors"
+                  >
+                    {amount}
+                  </motion.button>
+                ))}
+              </div>
+
+              <p className="text-muted-foreground/60 font-body text-sm mb-8">
+                La piattaforma di pagamento sarà attivata a breve. Per donazioni immediate, contattaci direttamente.
+              </p>
+
+              <Button asChild variant="outline">
+                <Link to="/contatti">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Contattaci per donare
+                </Link>
+              </Button>
             </div>
-
-            <p className="text-muted-foreground/60 font-body text-sm mb-8">
-              La piattaforma di pagamento sarà attivata a breve. Per donazioni immediate, contattaci direttamente.
-            </p>
-
-            <Button asChild variant="outline">
-              <Link to="/contatti">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Contattaci per donare
-              </Link>
-            </Button>
-          </div>
+          </AnimatedSection>
 
           {/* Progress bar */}
-          <div className="mt-12">
-            <div className="flex justify-between text-sm font-body mb-2">
-              <span className="text-muted-foreground">Raccolta fondi</span>
-              <span className="text-dona font-bold">€ 2.500 / € 50.000</span>
+          <AnimatedSection delay={0.2}>
+            <div className="mt-12">
+              <div className="flex justify-between text-sm font-body mb-2">
+                <span className="text-muted-foreground">Raccolta fondi</span>
+                <span className="text-dona font-bold">€ 2.500 / € 50.000</span>
+              </div>
+              <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-dona rounded-full"
+                  initial={{ width: 0 }}
+                  whileInView={{ width: "5%" }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 1.5, delay: 0.3, ease: "easeOut" }}
+                />
+              </div>
             </div>
-            <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
-              <div className="h-full bg-dona rounded-full" style={{ width: "5%" }} />
-            </div>
-          </div>
+          </AnimatedSection>
         </div>
       </section>
       <div className="h-16 lg:hidden" />

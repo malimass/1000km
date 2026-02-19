@@ -2,7 +2,9 @@ import { Link } from "react-router-dom";
 import { Heart, MapPin, ArrowRight, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
+import AnimatedSection from "@/components/AnimatedSection";
 import percorsoHero from "@/assets/percorso-hero.jpg";
+import { motion } from "framer-motion";
 
 const tappe = [
   { giorno: 1, da: "Bologna", a: "Modena", km: 60, data: "18 aprile" },
@@ -29,44 +31,52 @@ export default function Percorso() {
         <img src={percorsoHero} alt="Percorso aereo campagna italiana" className="absolute inset-0 w-full h-full object-cover" />
         <div className="hero-overlay absolute inset-0" />
         <div className="relative z-10 text-center px-4">
-          <h1 className="font-heading text-4xl md:text-5xl font-bold text-primary-foreground mb-4">Il Percorso</h1>
-          <p className="font-body text-primary-foreground/80 text-lg">1000 km dal cuore dell'Emilia al cuore della Calabria</p>
+          <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}
+            className="font-heading text-4xl md:text-5xl font-bold text-primary-foreground mb-4">Il Percorso</motion.h1>
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
+            className="font-body text-primary-foreground/80 text-lg">1000 km dal cuore dell'Emilia al cuore della Calabria</motion.p>
         </div>
       </section>
 
       {/* Mappa placeholder */}
       <section className="section-padding bg-secondary">
         <div className="container-narrow">
-          <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-8 text-center">Mappa del percorso</h2>
-          <div className="bg-card rounded-lg shadow-sm p-8 flex items-center justify-center min-h-[300px] border border-border">
-            <div className="text-center">
-              <MapPin className="w-12 h-12 text-dona mx-auto mb-4" />
-              <p className="text-muted-foreground font-body">Mappa interattiva in arrivo</p>
-              <p className="text-muted-foreground/60 font-body text-sm mt-2">Bologna → Terranova Sappo Minulio</p>
+          <AnimatedSection>
+            <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-8 text-center">Mappa del percorso</h2>
+            <div className="bg-card rounded-lg shadow-sm p-8 flex items-center justify-center min-h-[300px] border border-border">
+              <div className="text-center">
+                <MapPin className="w-12 h-12 text-dona mx-auto mb-4" />
+                <p className="text-muted-foreground font-body">Mappa interattiva in arrivo</p>
+                <p className="text-muted-foreground/60 font-body text-sm mt-2">Bologna → Terranova Sappo Minulio</p>
+              </div>
             </div>
-          </div>
+          </AnimatedSection>
         </div>
       </section>
 
       {/* Timeline */}
       <section className="section-padding bg-background">
         <div className="container-narrow">
-          <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-8 text-center">Le 14 tappe</h2>
+          <AnimatedSection>
+            <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-8 text-center">Le 14 tappe</h2>
+          </AnimatedSection>
           <div className="space-y-4 max-w-3xl mx-auto">
-            {tappe.map((t) => (
-              <div key={t.giorno} className="flex items-start gap-4 bg-card rounded-lg p-4 shadow-sm border border-border">
-                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-dona/10 text-dona flex items-center justify-center font-heading font-bold text-lg">
-                  {t.giorno}
-                </div>
-                <div className="flex-1">
-                  <div className="font-body font-semibold text-foreground">
-                    {t.da} → {t.a}
+            {tappe.map((t, i) => (
+              <AnimatedSection key={t.giorno} delay={i * 0.05}>
+                <div className="flex items-start gap-4 bg-card rounded-lg p-4 shadow-sm border border-border hover:shadow-md transition-shadow">
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-dona/10 text-dona flex items-center justify-center font-heading font-bold text-lg">
+                    {t.giorno}
                   </div>
-                  <div className="text-muted-foreground text-sm font-body">
-                    {t.data} · {t.km} km
+                  <div className="flex-1">
+                    <div className="font-body font-semibold text-foreground">
+                      {t.da} → {t.a}
+                    </div>
+                    <div className="text-muted-foreground text-sm font-body">
+                      {t.data} · {t.km} km
+                    </div>
                   </div>
                 </div>
-              </div>
+              </AnimatedSection>
             ))}
           </div>
         </div>
@@ -75,17 +85,19 @@ export default function Percorso() {
       {/* Segui in diretta */}
       <section className="section-padding bg-primary text-primary-foreground">
         <div className="container-narrow text-center">
-          <Radio className="w-12 h-12 text-dona mx-auto mb-6" />
-          <h2 className="font-heading text-2xl md:text-3xl font-bold mb-4">Segui in diretta</h2>
-          <p className="font-body text-primary-foreground/70 mb-8 max-w-xl mx-auto">
-            Dal 18 aprile al 1 maggio 2026, segui ogni tappa in tempo reale sui nostri canali social.
-          </p>
-          <Button asChild variant="dona" size="lg">
-            <Link to="/dona">
-              <Heart className="w-4 h-4 mr-2" />
-              DONA ORA
-            </Link>
-          </Button>
+          <AnimatedSection>
+            <Radio className="w-12 h-12 text-dona mx-auto mb-6" />
+            <h2 className="font-heading text-2xl md:text-3xl font-bold mb-4">Segui in diretta</h2>
+            <p className="font-body text-primary-foreground/70 mb-8 max-w-xl mx-auto">
+              Dal 18 aprile al 1 maggio 2026, segui ogni tappa in tempo reale sui nostri canali social.
+            </p>
+            <Button asChild variant="dona" size="lg">
+              <Link to="/dona">
+                <Heart className="w-4 h-4 mr-2" />
+                DONA ORA
+              </Link>
+            </Button>
+          </AnimatedSection>
         </div>
       </section>
       <div className="h-16 lg:hidden" />
