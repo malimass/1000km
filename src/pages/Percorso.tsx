@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Heart, MapPin, Radio, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -116,6 +116,15 @@ function LiveTrackingSection() {
 }
 
 export default function Percorso() {
+  // Indice del waypoint selezionato (tappa i → waypoint i+1, cioè la destinazione)
+  const [selectedWaypoint, setSelectedWaypoint] = useState<number | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+
+  function handleTappaClick(waypointIndex: number) {
+    setSelectedWaypoint(waypointIndex);
+    mapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   return (
     <Layout>
       {/* Hero */}
@@ -154,20 +163,22 @@ export default function Percorso() {
               Mappa del percorso
             </h2>
             <p className="text-center text-muted-foreground font-body text-sm mb-8">
-              Clicca sui marker per vedere i dettagli di ogni tappa
+              Clicca su una tappa per centrarla nella mappa
             </p>
-            <Suspense
-              fallback={
-                <div className="flex items-center justify-center rounded-xl bg-card border border-border" style={{ height: 480 }}>
-                  <div className="text-center">
-                    <MapPin className="w-10 h-10 text-dona mx-auto mb-3 animate-bounce" />
-                    <p className="text-muted-foreground font-body text-sm">Caricamento mappa…</p>
+            <div ref={mapRef}>
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center rounded-xl bg-card border border-border" style={{ height: 480 }}>
+                    <div className="text-center">
+                      <MapPin className="w-10 h-10 text-dona mx-auto mb-3 animate-bounce" />
+                      <p className="text-muted-foreground font-body text-sm">Caricamento mappa…</p>
+                    </div>
                   </div>
-                </div>
-              }
-            >
-              <RouteMap />
-            </Suspense>
+                }
+              >
+                <RouteMap selectedIndex={selectedWaypoint} />
+              </Suspense>
+            </div>
 
             {/* Legenda */}
             <div className="flex flex-wrap items-center justify-center gap-6 mt-6 text-sm font-body text-muted-foreground">
@@ -188,32 +199,49 @@ export default function Percorso() {
         </div>
       </section>
 
-      {/* Timeline tappe */}
+      {/* Timeline tappe — cliccabili */}
       <section className="section-padding bg-background">
         <div className="container-narrow">
           <AnimatedSection>
-            <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-8 text-center">
+            <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-2 text-center">
               Le 14 tappe
             </h2>
+            <p className="text-center text-muted-foreground font-body text-sm mb-8">
+              Clicca per vedere la tappa sulla mappa
+            </p>
           </AnimatedSection>
           <div className="space-y-4 max-w-3xl mx-auto">
-            {tappe.map((t, i) => (
-              <AnimatedSection key={t.giorno} delay={i * 0.05}>
-                <div className="flex items-start gap-4 bg-card rounded-lg p-4 shadow-sm border border-border hover:shadow-md transition-shadow">
-                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-dona/10 text-dona flex items-center justify-center font-heading font-bold text-lg">
-                    {t.giorno}
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-body font-semibold text-foreground">
-                      {t.da} → {t.a}
+            {tappe.map((t, i) => {
+              // waypoint i+1 è la destinazione della tappa i
+              const wpIndex = i + 1;
+              const isSelected = selectedWaypoint === wpIndex;
+              return (
+                <AnimatedSection key={t.giorno} delay={i * 0.05}>
+                  <button
+                    onClick={() => handleTappaClick(wpIndex)}
+                    className={`w-full flex items-start gap-4 bg-card rounded-lg p-4 shadow-sm border transition-all text-left cursor-pointer
+                      ${isSelected
+                        ? "border-dona ring-2 ring-dona/30 shadow-md"
+                        : "border-border hover:shadow-md hover:border-dona/50"
+                      }`}
+                  >
+                    <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center font-heading font-bold text-lg transition-colors
+                      ${isSelected ? "bg-dona text-white" : "bg-dona/10 text-dona"}`}>
+                      {t.giorno}
                     </div>
-                    <div className="text-muted-foreground text-sm font-body">
-                      {t.data} · {t.km} km
+                    <div className="flex-1">
+                      <div className="font-body font-semibold text-foreground">
+                        {t.da} → {t.a}
+                      </div>
+                      <div className="text-muted-foreground text-sm font-body">
+                        {t.data} · {t.km} km
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </AnimatedSection>
-            ))}
+                    <MapPin className={`w-4 h-4 mt-1 flex-shrink-0 transition-colors ${isSelected ? "text-dona" : "text-muted-foreground/40"}`} />
+                  </button>
+                </AnimatedSection>
+              );
+            })}
           </div>
         </div>
       </section>
