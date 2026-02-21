@@ -2,40 +2,40 @@ import { MapContainer, TileLayer, Polyline, Marker, Popup, ZoomControl } from "r
 import { Icon, divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Coordinate delle 15 tappe (Bologna → Terranova Sappo Minulio)
+// Coordinate delle 15 tappe (Bologna → Via Emilia → SS16 Adriatica → interno Sud → SS18 Tirrenica → Terranova)
 const waypoints: [number, number][] = [
-  [44.4949, 11.3426], // Bologna
-  [44.6471, 10.9252], // Modena
-  [44.6989, 10.6297], // Reggio Emilia
-  [44.8015, 10.3279], // Parma
-  [44.3764,  9.8813], // Pontremoli
-  [44.1024,  9.8240], // La Spezia
-  [43.8376, 10.4950], // Lucca
-  [43.7696, 11.2558], // Firenze
-  [43.4633, 11.8788], // Arezzo
-  [43.1122, 12.3888], // Perugia
-  [42.5636, 12.6427], // Terni
-  [42.4012, 12.8565], // Rieti
-  [41.0739, 14.3325], // Caserta
-  [39.3088, 16.2520], // Cosenza
+  [44.4949, 11.3426], // Bologna – Santuario S. Luca
+  [44.2887, 11.8826], // Faenza
+  [44.0595, 12.5683], // Rimini
+  [43.6234, 13.5086], // Ancona
+  [43.1775, 13.7963], // Porto San Giorgio
+  [42.4610, 14.2148], // Pescara
+  [42.1130, 14.7069], // Vasto
+  [41.5620, 14.6580], // Campobasso
+  [40.9143, 14.7903], // Avellino
+  [40.4053, 15.5929], // Sala Consilina
+  [39.8137, 15.7920], // Scalea
+  [39.3583, 16.0325], // Paola
+  [38.7396, 16.1619], // Pizzo Calabro
+  [38.4878, 15.9832], // Rosarno
   [38.3397, 16.1152], // Terranova Sappo Minulio
 ];
 
 const labels = [
-  "Bologna", "Modena", "Reggio Emilia", "Parma", "Pontremoli",
-  "La Spezia", "Lucca", "Firenze", "Arezzo", "Perugia",
-  "Terni", "Rieti", "Caserta", "Cosenza", "Terranova Sappo Minulio",
+  "Bologna", "Faenza", "Rimini", "Ancona", "Porto San Giorgio",
+  "Pescara", "Vasto", "Campobasso", "Avellino", "Sala Consilina",
+  "Scalea", "Paola", "Pizzo Calabro", "Rosarno", "Terranova Sappo Minulio",
 ];
 
 const dates = [
-  "18 apr", "19 apr", "20 apr", "21 apr", "22 apr",
-  "23 apr", "24 apr", "25 apr", "26 apr", "27 apr",
-  "28 apr", "29 apr", "30 apr", "1 mag", "1 mag",
+  "18 apr", "18 apr", "19 apr", "20 apr", "21 apr",
+  "22 apr", "23 apr", "24 apr", "25 apr", "26 apr",
+  "27 apr", "28 apr", "29 apr", "30 apr", "1 mag",
 ];
 
 const km = [
-  0, 60, 110, 165, 245, 310, 385, 465, 550, 625,
-  705, 765, 855, 940, 1000,
+  0, 55, 125, 215, 280, 365, 440, 530, 620, 690,
+  775, 830, 895, 960, 1000,
 ];
 
 function makeIcon(color: string, size = 10) {
@@ -58,8 +58,8 @@ const endIcon   = makeIcon("#e11d48", 16);
 const midIcon   = makeIcon("#f97316", 10);
 
 export default function RouteMap() {
-  // Centro mappa: circa metà Italia
-  const center: [number, number] = [42.5, 12.5];
+  // Centro mappa spostato per coprire il percorso reale (adriatica + tirrenica)
+  const center: [number, number] = [41.5, 14.0];
 
   return (
     <div className="w-full rounded-xl overflow-hidden shadow-lg border border-border" style={{ height: 480 }}>

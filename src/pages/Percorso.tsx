@@ -19,20 +19,20 @@ const CAMMINO_START = new Date("2026-04-18T06:00:00");
 const CAMMINO_END   = new Date("2026-05-01T23:59:00");
 
 const tappe = [
-  { giorno: 1,  da: "Bologna",         a: "Modena",                    km: 60,  data: "18 aprile" },
-  { giorno: 2,  da: "Modena",          a: "Reggio Emilia",             km: 50,  data: "19 aprile" },
-  { giorno: 3,  da: "Reggio Emilia",   a: "Parma",                     km: 55,  data: "20 aprile" },
-  { giorno: 4,  da: "Parma",           a: "Pontremoli",                km: 80,  data: "21 aprile" },
-  { giorno: 5,  da: "Pontremoli",      a: "La Spezia",                 km: 65,  data: "22 aprile" },
-  { giorno: 6,  da: "La Spezia",       a: "Lucca",                     km: 75,  data: "23 aprile" },
-  { giorno: 7,  da: "Lucca",           a: "Firenze",                   km: 80,  data: "24 aprile" },
-  { giorno: 8,  da: "Firenze",         a: "Arezzo",                    km: 85,  data: "25 aprile" },
-  { giorno: 9,  da: "Arezzo",          a: "Perugia",                   km: 75,  data: "26 aprile" },
-  { giorno: 10, da: "Perugia",         a: "Terni",                     km: 80,  data: "27 aprile" },
-  { giorno: 11, da: "Terni",           a: "Rieti",                     km: 60,  data: "28 aprile" },
-  { giorno: 12, da: "Rieti",           a: "Caserta",                   km: 90,  data: "29 aprile" },
-  { giorno: 13, da: "Caserta",         a: "Cosenza",                   km: 85,  data: "30 aprile" },
-  { giorno: 14, da: "Cosenza",         a: "Terranova Sappo Minulio",   km: 60,  data: "1 maggio"  },
+  { giorno: 1,  da: "Bologna",              a: "Faenza",                   km: 55,  data: "18 aprile" },
+  { giorno: 2,  da: "Faenza",               a: "Rimini",                   km: 70,  data: "19 aprile" },
+  { giorno: 3,  da: "Rimini",               a: "Ancona",                   km: 90,  data: "20 aprile" },
+  { giorno: 4,  da: "Ancona",               a: "Porto San Giorgio",        km: 65,  data: "21 aprile" },
+  { giorno: 5,  da: "Porto San Giorgio",    a: "Pescara",                  km: 85,  data: "22 aprile" },
+  { giorno: 6,  da: "Pescara",              a: "Vasto",                    km: 75,  data: "23 aprile" },
+  { giorno: 7,  da: "Vasto",               a: "Campobasso",                km: 90,  data: "24 aprile" },
+  { giorno: 8,  da: "Campobasso",           a: "Avellino",                 km: 90,  data: "25 aprile" },
+  { giorno: 9,  da: "Avellino",             a: "Sala Consilina",           km: 70,  data: "26 aprile" },
+  { giorno: 10, da: "Sala Consilina",       a: "Scalea",                   km: 85,  data: "27 aprile" },
+  { giorno: 11, da: "Scalea",               a: "Paola",                    km: 55,  data: "28 aprile" },
+  { giorno: 12, da: "Paola",                a: "Pizzo Calabro",            km: 65,  data: "29 aprile" },
+  { giorno: 13, da: "Pizzo Calabro",        a: "Rosarno",                  km: 65,  data: "30 aprile" },
+  { giorno: 14, da: "Rosarno",              a: "Terranova Sappo Minulio",  km: 40,  data: "1 maggio"  },
 ];
 
 function LiveTrackingSection() {
@@ -141,7 +141,7 @@ export default function Percorso() {
             transition={{ delay: 0.3 }}
             className="font-body text-primary-foreground/80 text-lg"
           >
-            1000 km dal cuore dell'Emilia al cuore della Calabria
+            1000 km · Via Emilia → Costa Adriatica → SS18 Tirrenica → Calabria
           </motion.p>
         </div>
       </section>
