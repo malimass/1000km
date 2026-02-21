@@ -13,6 +13,7 @@ const CrocifissoNero = lazy(() => import("./pages/CrocifissoNero"));
 const Sponsor = lazy(() => import("./pages/Sponsor"));
 const Contatti = lazy(() => import("./pages/Contatti"));
 const Dona = lazy(() => import("./pages/Dona"));
+const AdminLive = lazy(() => import("./pages/AdminLive"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/sponsor" element={<Sponsor />} />
           <Route path="/contatti" element={<Contatti />} />
           <Route path="/dona" element={<Dona />} />
+          <Route path="/admin-live" element={<AdminLive />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>

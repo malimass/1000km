@@ -1,5 +1,6 @@
-import { MapContainer, TileLayer, Polyline, Marker, Popup, ZoomControl } from "react-leaflet";
-import { Icon, divIcon } from "leaflet";
+import { useEffect } from "react";
+import { MapContainer, TileLayer, Polyline, Marker, Popup, ZoomControl, useMap } from "react-leaflet";
+import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 // Coordinate delle 15 tappe (Bologna → Via Emilia → SS16 Adriatica → interno Sud → SS18 Tirrenica → Terranova)
@@ -38,6 +39,17 @@ const km = [
   775, 830, 895, 960, 1000,
 ];
 
+// Vola verso il waypoint selezionato
+function MapController({ selectedIndex }: { selectedIndex: number | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (selectedIndex !== null) {
+      map.flyTo(waypoints[selectedIndex], 10, { duration: 1.2 });
+    }
+  }, [selectedIndex, map]);
+  return null;
+}
+
 function makeIcon(color: string, size = 10) {
   return divIcon({
     className: "",
@@ -56,8 +68,9 @@ function makeIcon(color: string, size = 10) {
 const startIcon = makeIcon("#22c55e", 16);
 const endIcon   = makeIcon("#e11d48", 16);
 const midIcon   = makeIcon("#f97316", 10);
+const midIconSel = makeIcon("#f97316", 14);
 
-export default function RouteMap() {
+export default function RouteMap({ selectedIndex = null }: { selectedIndex?: number | null }) {
   // Centro mappa spostato per coprire il percorso reale (adriatica + tirrenica)
   const center: [number, number] = [41.5, 14.0];
 
@@ -70,6 +83,7 @@ export default function RouteMap() {
         scrollWheelZoom={false}
         style={{ height: "100%", width: "100%" }}
       >
+        <MapController selectedIndex={selectedIndex} />
         <ZoomControl position="bottomright" />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -89,8 +103,15 @@ export default function RouteMap() {
 
         {/* Marker per ogni tappa */}
         {waypoints.map((pos, i) => {
+          const isSelected = i === selectedIndex;
           const icon =
-            i === 0 ? startIcon : i === waypoints.length - 1 ? endIcon : midIcon;
+            i === 0
+              ? startIcon
+              : i === waypoints.length - 1
+              ? endIcon
+              : isSelected
+              ? midIconSel
+              : midIcon;
           return (
             <Marker key={labels[i]} position={pos} icon={icon}>
               <Popup>
