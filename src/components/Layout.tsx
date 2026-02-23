@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Heart, ChevronDown } from "lucide-react";
+import { Menu, X, Heart, ChevronDown, LogIn } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
@@ -55,6 +55,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </div>
                   </div>
                 </div>
+              ) : link.label === "Login" ? (
+                <Link
+                  key={link.to}
+                  to={link.to!}
+                  className="flex items-center gap-1.5 text-sm font-body font-medium tracking-wide border border-primary-foreground/40 rounded-md px-3 py-1.5 text-primary-foreground/80 hover:text-primary-foreground hover:border-primary-foreground transition-colors"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  {link.label}
+                </Link>
               ) : (
                 <Link
                   key={link.to}
@@ -131,6 +140,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         )}
                       </AnimatePresence>
                     </div>
+                  ) : link.label === "Login" ? (
+                    <Link
+                      key={link.to}
+                      to={link.to!}
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-2 py-3 mt-1 text-primary-foreground font-body text-sm font-semibold border border-primary-foreground/40 rounded-md px-3"
+                    >
+                      <LogIn className="w-4 h-4" />
+                      {link.label}
+                    </Link>
                   ) : (
                     <Link
                       key={link.to}
