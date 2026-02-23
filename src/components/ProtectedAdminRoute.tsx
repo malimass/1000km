@@ -7,12 +7,12 @@ type Status = "loading" | "authenticated" | "unauthenticated";
 
 /**
  * Protegge le route admin.
- * - Se Supabase non è configurato → lascia passare (backward-compat)
+ * - Se Supabase non è configurato → reindirizza a /admin-login
  * - Se Supabase configurato → verifica sessione; reindirizza a /admin-login se assente
  */
 export default function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<Status>(
-    isSupabaseConfigured ? "loading" : "authenticated",
+    isSupabaseConfigured ? "loading" : "unauthenticated",
   );
 
   useEffect(() => {
