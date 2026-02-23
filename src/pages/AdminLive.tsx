@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
-  Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2,
+  Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video,
 } from "lucide-react";
 
 // ─── Costanti ────────────────────────────────────────────────────────────────
@@ -32,12 +32,12 @@ const tappe = [
 
 // ─── Keys localStorage ────────────────────────────────────────────────────────
 const K = {
-  fbPageId:      "gp_fb_page_id",
-  fbToken:       "gp_fb_token",
-  igUserId:      "gp_ig_user_id",
-  igImageUrl:    "gp_ig_image_url",
-  cloudName:     "gp_cloudinary_name",
-  cloudPreset:   "gp_cloudinary_preset",
+  fbPageId:    "gp_fb_page_id",
+  fbToken:     "gp_fb_token",
+  igUserId:    "gp_ig_user_id",
+  igImageUrl:  "gp_ig_image_url",
+  cloudName:   "gp_cloudinary_name",
+  cloudPreset: "gp_cloudinary_preset",
 };
 
 function ls(key: string) {
@@ -71,24 +71,25 @@ function buildMessage(ltwUrl: string, isTraining: boolean): string {
   );
 }
 
-// ─── Upload foto su Cloudinary ────────────────────────────────────────────────
+// ─── Upload su Cloudinary (foto o video) ─────────────────────────────────────
 async function uploadToCloudinary(
   file: File,
   cloudName: string,
   uploadPreset: string,
+  resourceType: "image" | "video" = "image",
 ): Promise<string | null> {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("upload_preset", uploadPreset);
   const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+    `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
     { method: "POST", body: fd },
   );
   const data = await res.json();
   return data.secure_url ?? null;
 }
 
-// ─── Meta Graph API ───────────────────────────────────────────────────────────
+// ─── Meta Graph API — Foto ────────────────────────────────────────────────────
 async function fbTextPost(pageId: string, token: string, message: string) {
   const res = await fetch(`https://graph.facebook.com/v20.0/${pageId}/feed`, {
     method: "POST",
@@ -112,7 +113,6 @@ async function fbPhotoPost(
     });
     return res.json();
   }
-  // Multipart upload diretto (nessun Cloudinary)
   const fd = new FormData();
   fd.append("source", imageUrlOrFile);
   fd.append("caption", caption);
@@ -141,6 +141,86 @@ async function igPhotoPost(igUserId: string, token: string, imageUrl: string, ca
   return publishRes.json();
 }
 
+// ─── Meta Graph API — Reel ────────────────────────────────────────────────────
+async function fbReelPost(pageId: string, token: string, videoUrl: string, description: string) {
+  // Metodo "pull": Facebook scarica il video dall'URL di Cloudinary
+  const res = await fetch(`https://graph.facebook.com/v20.0/${pageId}/video_reels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      upload_phase: "pull",
+      file_url: videoUrl,
+      description,
+      access_token: token,
+    }),
+  });
+  return res.json();
+}
+
+async function igReelPost(igUserId: string, token: string, videoUrl: string, caption: string) {
+  // Step 1: Crea container
+  const createRes = await fetch(`https://graph.facebook.com/v20.0/${igUserId}/media`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      media_type: "REELS",
+      video_url: videoUrl,
+      caption,
+      share_to_feed: true,
+      access_token: token,
+    }),
+  });
+  const created = await createRes.json();
+  if (created.error) throw new Error(created.error.message);
+
+  // Step 2: Attendi elaborazione (max ~30s)
+  for (let i = 0; i < 15; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    const statusRes = await fetch(
+      `https://graph.facebook.com/v20.0/${created.id}?fields=status_code&access_token=${token}`,
+    );
+    const status = await statusRes.json();
+    if (status.status_code === "FINISHED") break;
+    if (status.status_code === "ERROR") throw new Error("Errore elaborazione video su Instagram");
+  }
+
+  // Step 3: Pubblica
+  const publishRes = await fetch(`https://graph.facebook.com/v20.0/${igUserId}/media_publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ creation_id: created.id, access_token: token }),
+  });
+  return publishRes.json();
+}
+
+// ─── TikTok — condivisione nativa (Web Share API) ────────────────────────────
+// L'API TikTok non è accessibile dal browser per CORS.
+// Su iOS/Android usa navigator.share() → apre il foglio di condivisione nativo
+// con TikTok come opzione. Su desktop: scarica il video + copia didascalia.
+async function shareToTikTok(file: File, caption: string): Promise<{ ok: boolean; msg: string }> {
+  if (typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], text: caption });
+      return { ok: true, msg: "foglio condivisione aperto — seleziona TikTok" };
+    } catch (e) {
+      const err = e as Error;
+      if (err.name === "AbortError") return { ok: false, msg: "condivisione annullata" };
+      return { ok: false, msg: String(e) };
+    }
+  }
+  // Fallback: scarica il video e copia la didascalia
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "reel-1000km.mp4";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  try { await navigator.clipboard.writeText(caption); } catch {}
+  return { ok: true, msg: "video scaricato + testo copiato — carica manualmente su TikTok" };
+}
+
 // ─── Componente ──────────────────────────────────────────────────────────────
 export default function AdminLive() {
   // ─ Live tracking ─
@@ -158,29 +238,38 @@ export default function AdminLive() {
 
   // ─ Composer ─
   const isTraining = new Date() < CAMMINO_START;
+  const [contentType, setContentType] = useState<"photo" | "reel">("photo");
   const [message, setMessage] = useState(() =>
     buildMessage(getLtwUrl() || "https://locatoweb.com/map/single/...", isTraining),
   );
   const [postFb, setPostFb] = useState(true);
   const [postIg, setPostIg] = useState(true);
+  const [postTt, setPostTt] = useState(false);
 
   // ─ Foto ─
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreview,  setPhotoPreview]  = useState<string | null>(null);
-  const [uploading,     setUploading]     = useState(false);
   const fileInputGallery = useRef<HTMLInputElement>(null);
   const fileInputCamera  = useRef<HTMLInputElement>(null);
 
+  // ─ Video ─
+  const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
+  const [videoPreview,  setVideoPreview]  = useState<string | null>(null);
+  const fileInputVideoGallery = useRef<HTMLInputElement>(null);
+  const fileInputVideoCamera  = useRef<HTMLInputElement>(null);
+
   // ─ Pubblicazione ─
-  const [posting,    setPosting]    = useState(false);
-  const [postResult, setPostResult] = useState<{ ok: string[]; err: string[] } | null>(null);
+  const [posting,      setPosting]      = useState(false);
+  const [uploadStatus, setUploadStatus] = useState("");
+  const [postResult,   setPostResult]   = useState<{ ok: string[]; err: string[] } | null>(null);
 
   useEffect(() => {
     if (ltwUrl) setMessage(buildMessage(ltwUrl, isTraining));
   }, [ltwUrl, isTraining]);
 
-  // Cleanup blob URL
+  // Cleanup blob URLs
   useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
+  useEffect(() => () => { if (videoPreview) URL.revokeObjectURL(videoPreview); }, [videoPreview]);
 
   // ─ Foto handlers ─
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -198,6 +287,24 @@ export default function AdminLive() {
     setPhotoPreview(null);
     if (fileInputGallery.current) fileInputGallery.current.value = "";
     if (fileInputCamera.current)  fileInputCamera.current.value  = "";
+  }
+
+  // ─ Video handlers ─
+  function handleVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
+    setSelectedVideo(file);
+    setVideoPreview(URL.createObjectURL(file));
+    setPostResult(null);
+  }
+
+  function removeVideo() {
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
+    setSelectedVideo(null);
+    setVideoPreview(null);
+    if (fileInputVideoGallery.current) fileInputVideoGallery.current.value = "";
+    if (fileInputVideoCamera.current)  fileInputVideoCamera.current.value  = "";
   }
 
   // ─ LTW ─
@@ -230,69 +337,128 @@ export default function AdminLive() {
     const ok: string[] = [];
     const err: string[] = [];
 
-    // Step 1 — upload foto su Cloudinary (se presente + configurato)
-    let uploadedUrl: string | null = null;
-    if (selectedPhoto && cloudName && cloudPreset) {
-      setUploading(true);
-      try {
-        uploadedUrl = await uploadToCloudinary(selectedPhoto, cloudName, cloudPreset);
-        if (!uploadedUrl) err.push("Cloudinary: upload fallito, riprova");
-      } catch (e) {
-        err.push(`Cloudinary: ${String(e)}`);
-      }
-      setUploading(false);
-    }
-
-    // Risolvi URL immagine finale
-    const imageUrl = uploadedUrl ?? (selectedPhoto ? null : igImageUrl) ?? null;
-
-    // Step 2 — Facebook
-    if (postFb) {
-      try {
-        let res;
-        if (imageUrl) {
-          res = await fbPhotoPost(fbPageId, fbToken, message, imageUrl);
-        } else if (selectedPhoto) {
-          // Upload multipart diretto se no Cloudinary
-          res = await fbPhotoPost(fbPageId, fbToken, message, selectedPhoto);
-        } else {
-          res = await fbTextPost(fbPageId, fbToken, message);
-        }
-        if (res.error) err.push(`Facebook: ${res.error.message}`);
-        else ok.push("Facebook");
-      } catch (e) {
-        err.push(`Facebook: ${String(e)}`);
-      }
-    }
-
-    // Step 3 — Instagram (richiede URL pubblico)
-    if (postIg) {
-      if (!imageUrl) {
-        if (selectedPhoto && !cloudName) {
-          err.push("Instagram: configura Cloudinary nelle impostazioni per postare foto");
-        } else {
-          err.push("Instagram: aggiungi una foto o imposta un URL immagine nelle impostazioni");
-        }
-      } else {
+    if (contentType === "photo") {
+      // ── FLUSSO FOTO ──────────────────────────────────────────────────────────
+      let uploadedUrl: string | null = null;
+      if (selectedPhoto && cloudName && cloudPreset) {
+        setUploadStatus("Caricamento foto…");
         try {
-          const res = await igPhotoPost(igUserId, fbToken, imageUrl, message);
-          if (res.error) err.push(`Instagram: ${res.error.message}`);
-          else ok.push("Instagram");
+          uploadedUrl = await uploadToCloudinary(selectedPhoto, cloudName, cloudPreset, "image");
+          if (!uploadedUrl) err.push("Cloudinary: upload fallito, riprova");
         } catch (e) {
-          err.push(`Instagram: ${String(e)}`);
+          err.push(`Cloudinary: ${String(e)}`);
         }
+      }
+      const imageUrl = uploadedUrl ?? (selectedPhoto ? null : igImageUrl) ?? null;
+
+      if (postFb) {
+        setUploadStatus("Pubblicazione su Facebook…");
+        try {
+          let res;
+          if (imageUrl) {
+            res = await fbPhotoPost(fbPageId, fbToken, message, imageUrl);
+          } else if (selectedPhoto) {
+            res = await fbPhotoPost(fbPageId, fbToken, message, selectedPhoto);
+          } else {
+            res = await fbTextPost(fbPageId, fbToken, message);
+          }
+          if (res.error) err.push(`Facebook: ${res.error.message}`);
+          else ok.push("Facebook ✓");
+        } catch (e) {
+          err.push(`Facebook: ${String(e)}`);
+        }
+      }
+
+      if (postIg) {
+        setUploadStatus("Pubblicazione su Instagram…");
+        if (!imageUrl) {
+          if (selectedPhoto && !cloudName) {
+            err.push("Instagram: configura Cloudinary nelle impostazioni per postare foto");
+          } else {
+            err.push("Instagram: aggiungi una foto o imposta un URL immagine nelle impostazioni");
+          }
+        } else {
+          try {
+            const res = await igPhotoPost(igUserId, fbToken, imageUrl, message);
+            if (res.error) err.push(`Instagram: ${res.error.message}`);
+            else ok.push("Instagram ✓");
+          } catch (e) {
+            err.push(`Instagram: ${String(e)}`);
+          }
+        }
+      }
+
+    } else {
+      // ── FLUSSO REEL ──────────────────────────────────────────────────────────
+      if (!selectedVideo) {
+        err.push("Seleziona un video per pubblicare un reel");
+        setPostResult({ ok, err });
+        setPosting(false);
+        setUploadStatus("");
+        return;
+      }
+
+      if ((postFb || postIg) && (!cloudName || !cloudPreset)) {
+        err.push("Configura Cloudinary nelle impostazioni per pubblicare reel su FB/IG");
+      }
+
+      // Step 1: Upload video su Cloudinary (se FB o IG selezionati)
+      let videoUrl: string | null = null;
+      if ((postFb || postIg) && cloudName && cloudPreset) {
+        setUploadStatus("Caricamento video su Cloudinary…");
+        try {
+          videoUrl = await uploadToCloudinary(selectedVideo, cloudName, cloudPreset, "video");
+          if (!videoUrl) err.push("Cloudinary: upload video fallito, riprova");
+        } catch (e) {
+          err.push(`Cloudinary: ${String(e)}`);
+        }
+      }
+
+      // Step 2: Facebook Reel
+      if (postFb && videoUrl) {
+        setUploadStatus("Pubblicazione Reel su Facebook…");
+        try {
+          const res = await fbReelPost(fbPageId, fbToken, videoUrl, message);
+          if (res.error) err.push(`Facebook Reel: ${res.error.message}`);
+          else ok.push("Facebook Reel ✓");
+        } catch (e) {
+          err.push(`Facebook Reel: ${String(e)}`);
+        }
+      }
+
+      // Step 3: Instagram Reel (richiede polling ~30s)
+      if (postIg && videoUrl) {
+        setUploadStatus("Elaborazione Reel Instagram… (potrebbe richiedere fino a 30 secondi)");
+        try {
+          const res = await igReelPost(igUserId, fbToken, videoUrl, message);
+          if (res.error) err.push(`Instagram Reel: ${res.error.message}`);
+          else ok.push("Instagram Reel ✓");
+        } catch (e) {
+          err.push(`Instagram Reel: ${String(e)}`);
+        }
+      }
+
+      // Step 4: TikTok — foglio condivisione nativo
+      if (postTt) {
+        setUploadStatus("Apertura condivisione TikTok…");
+        const result = await shareToTikTok(selectedVideo, message);
+        if (result.ok) ok.push(`TikTok ✓ (${result.msg})`);
+        else err.push(`TikTok: ${result.msg}`);
       }
     }
 
+    setUploadStatus("");
     setPostResult({ ok, err });
     setPosting(false);
   }
 
-  const canPublish =
-    (postFb || postIg) &&
-    !!fbToken &&
-    (postFb ? !!fbPageId : true) &&
-    (postIg ? !!igUserId : true);
+  const canPublish = (() => {
+    const anyPlatform = postFb || postIg || (contentType === "reel" && postTt);
+    if (!anyPlatform) return false;
+    if (postFb && (!fbToken || !fbPageId)) return false;
+    if (postIg && (!fbToken || !igUserId)) return false;
+    return true;
+  })();
 
   // ─────────────────────────────────────────────────────────────────────────────
   return (
@@ -363,6 +529,28 @@ export default function AdminLive() {
             📣 Pubblica sui social
           </h2>
 
+          {/* Tipo contenuto: Foto / Reel */}
+          <div className="flex gap-1 mb-4 bg-muted rounded-lg p-1">
+            <button
+              onClick={() => { setContentType("photo"); setPostResult(null); }}
+              className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-semibold transition-all
+                ${contentType === "photo"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Camera className="w-4 h-4" /> Foto
+            </button>
+            <button
+              onClick={() => { setContentType("reel"); setPostResult(null); }}
+              className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-semibold transition-all
+                ${contentType === "reel"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Video className="w-4 h-4" /> Reel
+            </button>
+          </div>
+
           {/* Template */}
           <div className="flex gap-2 mb-3">
             <button
@@ -388,63 +576,128 @@ export default function AdminLive() {
           />
 
           {/* ── Foto ── */}
-          <div className="mb-4">
-            <p className="text-xs font-semibold text-foreground mb-2">📷 Foto (opzionale)</p>
+          {contentType === "photo" && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-foreground mb-2">📷 Foto (opzionale)</p>
 
-            {/* Input nascosti */}
-            <input ref={fileInputGallery} type="file" accept="image/*"
-              className="hidden" onChange={handlePhotoChange} />
-            <input ref={fileInputCamera}  type="file" accept="image/*" capture="environment"
-              className="hidden" onChange={handlePhotoChange} />
+              <input ref={fileInputGallery} type="file" accept="image/*"
+                className="hidden" onChange={handlePhotoChange} />
+              <input ref={fileInputCamera}  type="file" accept="image/*" capture="environment"
+                className="hidden" onChange={handlePhotoChange} />
 
-            {photoPreview ? (
-              // Anteprima foto
-              <div className="relative rounded-xl overflow-hidden">
-                <img src={photoPreview} alt="Anteprima"
-                  className="w-full h-52 object-cover" />
-                <div className="absolute top-2 right-2 flex gap-2">
+              {photoPreview ? (
+                <div className="relative rounded-xl overflow-hidden">
+                  <img src={photoPreview} alt="Anteprima"
+                    className="w-full h-52 object-cover" />
+                  <div className="absolute top-2 right-2 flex gap-2">
+                    <button
+                      onClick={() => fileInputGallery.current?.click()}
+                      className="bg-black/60 text-white rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-sm"
+                    >
+                      Cambia
+                    </button>
+                    <button onClick={removePhoto}
+                      className="bg-black/60 text-white rounded-full p-1.5 backdrop-blur-sm">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {!cloudName && (
+                    <div className="absolute bottom-0 inset-x-0 bg-amber-500/90 px-3 py-1.5">
+                      <p className="text-xs text-white font-semibold text-center">
+                        ⚠️ Configura Cloudinary nelle impostazioni per postare su Instagram
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => fileInputCamera.current?.click()}
+                    className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all"
+                  >
+                    <Camera className="w-6 h-6 text-muted-foreground" />
+                    <span className="text-xs font-semibold text-muted-foreground">Scatta foto</span>
+                  </button>
                   <button
                     onClick={() => fileInputGallery.current?.click()}
-                    className="bg-black/60 text-white rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-sm"
+                    className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all"
                   >
-                    Cambia
-                  </button>
-                  <button onClick={removePhoto}
-                    className="bg-black/60 text-white rounded-full p-1.5 backdrop-blur-sm">
-                    <X className="w-4 h-4" />
+                    <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                    <span className="text-xs font-semibold text-muted-foreground">Dalla galleria</span>
                   </button>
                 </div>
-                {!cloudName && (
-                  <div className="absolute bottom-0 inset-x-0 bg-amber-500/90 px-3 py-1.5">
-                    <p className="text-xs text-white font-semibold text-center">
-                      ⚠️ Configura Cloudinary nelle impostazioni per postare su Instagram
-                    </p>
+              )}
+            </div>
+          )}
+
+          {/* ── Video (Reel) ── */}
+          {contentType === "reel" && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-foreground mb-2">🎬 Video (richiesto)</p>
+
+              <input ref={fileInputVideoGallery} type="file" accept="video/*"
+                className="hidden" onChange={handleVideoChange} />
+              <input ref={fileInputVideoCamera}  type="file" accept="video/*" capture="environment"
+                className="hidden" onChange={handleVideoChange} />
+
+              {videoPreview ? (
+                <div className="relative rounded-xl overflow-hidden">
+                  <video
+                    src={videoPreview}
+                    controls
+                    className="w-full max-h-64 rounded-xl bg-black"
+                  />
+                  <div className="absolute top-2 right-2 flex gap-2">
+                    <button
+                      onClick={() => fileInputVideoGallery.current?.click()}
+                      className="bg-black/60 text-white rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-sm"
+                    >
+                      Cambia
+                    </button>
+                    <button onClick={removeVideo}
+                      className="bg-black/60 text-white rounded-full p-1.5 backdrop-blur-sm">
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                )}
-              </div>
-            ) : (
-              // Pulsanti scegli/scatta
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => fileInputCamera.current?.click()}
-                  className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all"
-                >
-                  <Camera className="w-6 h-6 text-muted-foreground" />
-                  <span className="text-xs font-semibold text-muted-foreground">Scatta foto</span>
-                </button>
-                <button
-                  onClick={() => fileInputGallery.current?.click()}
-                  className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all"
-                >
-                  <ImageIcon className="w-6 h-6 text-muted-foreground" />
-                  <span className="text-xs font-semibold text-muted-foreground">Dalla galleria</span>
-                </button>
-              </div>
-            )}
-          </div>
+                  {!cloudName && (
+                    <div className="absolute bottom-0 inset-x-0 bg-amber-500/90 px-3 py-1.5">
+                      <p className="text-xs text-white font-semibold text-center">
+                        ⚠️ Configura Cloudinary nelle impostazioni per pubblicare reel
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => fileInputVideoCamera.current?.click()}
+                    className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all"
+                  >
+                    <Video className="w-6 h-6 text-muted-foreground" />
+                    <span className="text-xs font-semibold text-muted-foreground">Registra video</span>
+                  </button>
+                  <button
+                    onClick={() => fileInputVideoGallery.current?.click()}
+                    className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all"
+                  >
+                    <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                    <span className="text-xs font-semibold text-muted-foreground">Dalla galleria</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Note TikTok */}
+              {postTt && (
+                <p className="mt-2 text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">
+                  ℹ️ <strong>TikTok</strong>: al momento della pubblicazione si aprirà il
+                  foglio di condivisione iOS — seleziona TikTok dall'elenco.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Piattaforme */}
-          <div className="flex gap-3 mb-4">
+          <div className="flex flex-wrap gap-2 mb-4">
             <button
               onClick={() => setPostFb(v => !v)}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold border transition-all
@@ -461,13 +714,33 @@ export default function AdminLive() {
             >
               <Instagram className="w-4 h-4" /> Instagram
             </button>
+            {/* TikTok visibile solo in modalità Reel */}
+            {contentType === "reel" && (
+              <button
+                onClick={() => setPostTt(v => !v)}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold border transition-all
+                  ${postTt
+                    ? "bg-black text-white border-black"
+                    : "border-border text-muted-foreground"}`}
+              >
+                <TikTokIcon active={postTt} /> TikTok
+              </button>
+            )}
           </div>
+
+          {/* Stato upload */}
+          {uploadStatus && (
+            <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+              <span>{uploadStatus}</span>
+            </div>
+          )}
 
           {/* Risultato */}
           {postResult && (
             <div className="mb-3 space-y-1">
-              {postResult.ok.map(p => (
-                <p key={p} className="text-xs text-green-600 font-semibold">✓ Pubblicato su {p}</p>
+              {postResult.ok.map((p, i) => (
+                <p key={i} className="text-xs text-green-600 font-semibold">✓ {p}</p>
               ))}
               {postResult.err.map((e, i) => (
                 <p key={i} className="text-xs text-red-500">{e}</p>
@@ -475,7 +748,7 @@ export default function AdminLive() {
             </div>
           )}
 
-          {!fbToken && (
+          {!fbToken && (postFb || postIg) && (
             <p className="text-xs text-amber-600 mb-3">
               ⚠️ Imposta le credenziali Meta nelle{" "}
               <button onClick={() => setShowSettings(true)} className="underline">Impostazioni</button>{" "}
@@ -488,9 +761,9 @@ export default function AdminLive() {
             disabled={!canPublish || posting}
             className="w-full flex items-center justify-center gap-2 bg-dona text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-40 transition-opacity"
           >
-            {posting || uploading
-              ? <><Loader2 className="w-4 h-4 animate-spin" />{uploading ? "Caricamento foto…" : "Pubblicazione…"}</>
-              : <><Send className="w-4 h-4" />Pubblica ora</>
+            {posting
+              ? <><Loader2 className="w-4 h-4 animate-spin" />{uploadStatus || "Pubblicazione…"}</>
+              : <><Send className="w-4 h-4" />{contentType === "reel" ? "Pubblica Reel" : "Pubblica ora"}</>
             }
           </button>
         </div>
@@ -522,7 +795,7 @@ export default function AdminLive() {
               {/* Cloudinary */}
               <div className="border-t border-border pt-4">
                 <p className="text-xs font-bold text-foreground mb-3">
-                  Cloudinary — upload foto per Instagram
+                  Cloudinary — upload foto e video per IG/FB
                 </p>
                 <Field label="Cloud Name"     value={cloudName}   onChange={setCloudName}   placeholder="il-tuo-cloud" />
                 <div className="mt-3">
@@ -542,6 +815,18 @@ export default function AdminLive() {
                     <li>Copia il nome del preset e incollalo qui</li>
                   </ol>
                 </details>
+              </div>
+
+              {/* TikTok info */}
+              <div className="border-t border-border pt-4">
+                <p className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+                  <TikTokIcon active={false} /> TikTok
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  La pubblicazione su TikTok avviene tramite il foglio di condivisione nativo
+                  iOS/Android — non richiede credenziali. Assicurati di avere l'app TikTok
+                  installata sul telefono.
+                </p>
               </div>
 
               {/* Meta guide */}
@@ -578,6 +863,20 @@ export default function AdminLive() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── TikTok SVG icon ──────────────────────────────────────────────────────────
+function TikTokIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      className="w-4 h-4"
+      viewBox="0 0 24 24"
+      fill={active ? "white" : "currentColor"}
+      aria-hidden="true"
+    >
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.19 8.19 0 0 0 4.78 1.52V6.75a4.84 4.84 0 0 1-1.01-.06Z" />
+    </svg>
   );
 }
 
