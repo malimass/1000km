@@ -65,12 +65,44 @@ function makeIcon(color: string, size = 10) {
   });
 }
 
+function makeIconWithCount(color: string, size: number, count: number) {
+  return divIcon({
+    className: "",
+    html: `<div style="position:relative;display:inline-block">
+      <div style="
+        width:${size}px;height:${size}px;
+        background:${color};
+        border:2px solid white;
+        border-radius:50%;
+        box-shadow:0 2px 6px rgba(0,0,0,0.4)
+      "></div>
+      <div style="
+        position:absolute;top:-7px;right:-14px;
+        background:#e11d48;color:white;
+        font-size:9px;font-weight:700;
+        border-radius:99px;padding:1px 5px;
+        white-space:nowrap;font-family:sans-serif;
+        box-shadow:0 1px 4px rgba(0,0,0,0.3);
+        line-height:14px;
+      ">${count}</div>
+    </div>`,
+    iconSize: [size + 20, size + 10],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
 const startIcon = makeIcon("#22c55e", 16);
 const endIcon   = makeIcon("#e11d48", 16);
 const midIcon   = makeIcon("#f97316", 10);
 const midIconSel = makeIcon("#f97316", 14);
 
-export default function RouteMap({ selectedIndex = null }: { selectedIndex?: number | null }) {
+export default function RouteMap({
+  selectedIndex = null,
+  iscritti = {},
+}: {
+  selectedIndex?: number | null;
+  iscritti?: Record<number, number>;
+}) {
   // Centro mappa spostato per coprire il percorso reale (adriatica + tirrenica)
   const center: [number, number] = [41.5, 14.0];
 
@@ -104,14 +136,20 @@ export default function RouteMap({ selectedIndex = null }: { selectedIndex?: num
         {/* Marker per ogni tappa */}
         {waypoints.map((pos, i) => {
           const isSelected = i === selectedIndex;
-          const icon =
-            i === 0
-              ? startIcon
-              : i === waypoints.length - 1
-              ? endIcon
-              : isSelected
-              ? midIconSel
-              : midIcon;
+          // iscritti[i] mappa tappa_numero = waypoint index (1..14)
+          const count = iscritti[i] ?? 0;
+
+          let icon;
+          if (i === 0) {
+            icon = startIcon;
+          } else if (i === waypoints.length - 1) {
+            icon = endIcon;
+          } else if (count > 0) {
+            icon = makeIconWithCount("#f97316", isSelected ? 14 : 10, count);
+          } else {
+            icon = isSelected ? midIconSel : midIcon;
+          }
+
           return (
             <Marker key={labels[i]} position={pos} icon={icon}>
               <Popup>
@@ -119,6 +157,14 @@ export default function RouteMap({ selectedIndex = null }: { selectedIndex?: num
                   <strong>{labels[i]}</strong>
                   <br />
                   {dates[i]} · {km[i]} km
+                  {count > 0 && (
+                    <>
+                      <br />
+                      <span style={{ color: "#e11d48", fontWeight: 600 }}>
+                        👥 {count} iscritti
+                      </span>
+                    </>
+                  )}
                 </div>
               </Popup>
             </Marker>

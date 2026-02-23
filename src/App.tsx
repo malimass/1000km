@@ -16,6 +16,8 @@ const Contatti = lazy(() => import("./pages/Contatti"));
 const Dona = lazy(() => import("./pages/Dona"));
 const AdminLive = lazy(() => import("./pages/AdminLive"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const Iscriviti = lazy(() => import("./pages/Iscriviti"));
+const IscrizioneSuccesso = lazy(() => import("./pages/IscrizioneSuccesso"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -36,6 +38,8 @@ const App = () => (
           <Route path="/sponsor" element={<Sponsor />} />
           <Route path="/contatti" element={<Contatti />} />
           <Route path="/dona" element={<Dona />} />
+          <Route path="/iscriviti" element={<Iscriviti />} />
+          <Route path="/iscrizione-successo" element={<IscrizioneSuccesso />} />
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-live" element={
             <ProtectedAdminRoute>

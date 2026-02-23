@@ -1,12 +1,14 @@
 import { lazy, Suspense, useState, useRef, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getLtwUrl, setLtwUrl } from "@/lib/ltwStore";
-import { Heart, MapPin, Radio, Navigation } from "lucide-react";
+import { Heart, MapPin, Radio, Navigation, Users, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
 import percorsoHero from "@/assets/percorso-hero.jpg";
 import { motion } from "framer-motion";
+import { tappe } from "@/lib/tappe";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 // Caricamento lazy per evitare problemi SSR con Leaflet
 const RouteMap = lazy(() => import("@/components/RouteMap"));
@@ -16,23 +18,6 @@ const LOCATOWEB_FALLBACK = "";
 
 const CAMMINO_START = new Date("2026-04-18T06:00:00");
 const CAMMINO_END   = new Date("2026-05-01T23:59:00");
-
-const tappe = [
-  { giorno: 1,  da: "Bologna",              a: "Faenza",                   km: 55,  data: "18 aprile" },
-  { giorno: 2,  da: "Faenza",               a: "Rimini",                   km: 70,  data: "19 aprile" },
-  { giorno: 3,  da: "Rimini",               a: "Ancona",                   km: 90,  data: "20 aprile" },
-  { giorno: 4,  da: "Ancona",               a: "Porto San Giorgio",        km: 65,  data: "21 aprile" },
-  { giorno: 5,  da: "Porto San Giorgio",    a: "Pescara",                  km: 85,  data: "22 aprile" },
-  { giorno: 6,  da: "Pescara",              a: "Vasto",                    km: 75,  data: "23 aprile" },
-  { giorno: 7,  da: "Vasto",               a: "Campobasso",                km: 90,  data: "24 aprile" },
-  { giorno: 8,  da: "Campobasso",           a: "Avellino",                 km: 90,  data: "25 aprile" },
-  { giorno: 9,  da: "Avellino",             a: "Sala Consilina",           km: 70,  data: "26 aprile" },
-  { giorno: 10, da: "Sala Consilina",       a: "Scalea",                   km: 85,  data: "27 aprile" },
-  { giorno: 11, da: "Scalea",               a: "Paola",                    km: 55,  data: "28 aprile" },
-  { giorno: 12, da: "Paola",                a: "Pizzo Calabro",            km: 65,  data: "29 aprile" },
-  { giorno: 13, da: "Pizzo Calabro",        a: "Rosarno",                  km: 65,  data: "30 aprile" },
-  { giorno: 14, da: "Rosarno",              a: "Terranova Sappo Minulio",  km: 40,  data: "1 maggio"  },
-];
 
 function LiveTrackingSection({ ltwUrl }: { ltwUrl: string }) {
   const now = new Date();
@@ -128,6 +113,9 @@ export default function Percorso() {
   const [selectedWaypoint, setSelectedWaypoint] = useState<number | null>(null);
   const mapRef = useRef<HTMLDivElement>(null);
 
+  // Contatori iscritti per tappa (chiave = tappa_numero 1-14)
+  const [iscritti, setIscritti] = useState<Record<number, number>>({});
+
   // URL LocaToWeb: legge prima dal query param ?ltw=, poi da localStorage, poi fallback vuoto
   const [searchParams] = useSearchParams();
   const [ltwUrl, setLtwUrlState] = useState<string>(() => {
@@ -143,6 +131,21 @@ export default function Percorso() {
       setLtwUrlState(fromParam);
     }
   }, [searchParams]);
+
+  // Carica contatori iscritti da Supabase
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    supabase!
+      .rpc("get_iscritti_per_tappa")
+      .then(({ data }) => {
+        if (!data) return;
+        const map: Record<number, number> = {};
+        (data as { tappa_numero: number; totale: number }[]).forEach(
+          (row) => { map[row.tappa_numero] = Number(row.totale); }
+        );
+        setIscritti(map);
+      });
+  }, []);
 
   function handleTappaClick(waypointIndex: number) {
     setSelectedWaypoint(waypointIndex);
@@ -200,7 +203,7 @@ export default function Percorso() {
                   </div>
                 }
               >
-                <RouteMap selectedIndex={selectedWaypoint} />
+                <RouteMap selectedIndex={selectedWaypoint} iscritti={iscritti} />
               </Suspense>
             </div>
 
@@ -223,7 +226,7 @@ export default function Percorso() {
         </div>
       </section>
 
-      {/* Timeline tappe — cliccabili */}
+      {/* Timeline tappe */}
       <section className="section-padding bg-background">
         <div className="container-narrow">
           <AnimatedSection>
@@ -231,7 +234,7 @@ export default function Percorso() {
               Le 14 tappe
             </h2>
             <p className="text-center text-muted-foreground font-body text-sm mb-8">
-              Clicca per vedere la tappa sulla mappa
+              Clicca sulla tappa per vederla sulla mappa · premi <strong>Iscriviti</strong> per partecipare
             </p>
           </AnimatedSection>
           <div className="space-y-4 max-w-3xl mx-auto">
@@ -239,30 +242,58 @@ export default function Percorso() {
               // waypoint i+1 è la destinazione della tappa i
               const wpIndex = i + 1;
               const isSelected = selectedWaypoint === wpIndex;
+              const numIscritti = iscritti[t.giorno] ?? 0;
               return (
                 <AnimatedSection key={t.giorno} delay={i * 0.05}>
-                  <button
-                    onClick={() => handleTappaClick(wpIndex)}
-                    className={`w-full flex items-start gap-4 bg-card rounded-lg p-4 shadow-sm border transition-all text-left cursor-pointer
+                  <div
+                    className={`w-full flex items-center gap-3 bg-card rounded-lg p-4 shadow-sm border transition-all
                       ${isSelected
                         ? "border-dona ring-2 ring-dona/30 shadow-md"
                         : "border-border hover:shadow-md hover:border-dona/50"
                       }`}
                   >
-                    <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center font-heading font-bold text-lg transition-colors
-                      ${isSelected ? "bg-dona text-white" : "bg-dona/10 text-dona"}`}>
-                      {t.giorno}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-body font-semibold text-foreground">
-                        {t.da} → {t.a}
+                    {/* Area cliccabile per centrare la mappa */}
+                    <button
+                      type="button"
+                      onClick={() => handleTappaClick(wpIndex)}
+                      className="flex items-start gap-3 flex-1 text-left min-w-0"
+                    >
+                      <div className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center font-heading font-bold text-base transition-colors
+                        ${isSelected ? "bg-dona text-white" : "bg-dona/10 text-dona"}`}>
+                        {t.giorno}
                       </div>
-                      <div className="text-muted-foreground text-sm font-body">
-                        {t.data} · {t.km} km
+                      <div className="flex-1 min-w-0">
+                        <div className="font-body font-semibold text-foreground text-sm leading-snug truncate">
+                          {t.da} → {t.a}
+                        </div>
+                        <div className="text-muted-foreground text-xs font-body mt-0.5">
+                          {t.data} · {t.km} km
+                        </div>
+                        {numIscritti > 0 && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <Users className="w-3 h-3 text-dona" />
+                            <span className="text-dona text-xs font-body font-medium">
+                              {numIscritti} iscritti
+                            </span>
+                          </div>
+                        )}
                       </div>
+                    </button>
+
+                    {/* Azioni destra */}
+                    <div className="flex-shrink-0 flex items-center gap-2">
+                      <MapPin className={`w-4 h-4 transition-colors ${isSelected ? "text-dona" : "text-muted-foreground/30"}`} />
+                      <Link to={`/iscriviti?tappa=${t.giorno}`}>
+                        <Button
+                          size="sm"
+                          className="text-xs h-8 px-3 bg-dona hover:bg-dona/90 text-white"
+                        >
+                          <UserPlus className="w-3.5 h-3.5 mr-1" />
+                          Iscriviti
+                        </Button>
+                      </Link>
                     </div>
-                    <MapPin className={`w-4 h-4 mt-1 flex-shrink-0 transition-colors ${isSelected ? "text-dona" : "text-muted-foreground/40"}`} />
-                  </button>
+                  </div>
                 </AnimatedSection>
               );
             })}
