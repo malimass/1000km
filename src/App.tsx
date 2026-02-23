@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import ScrollToTop from "./components/ScrollToTop";
+import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 
 const Index = lazy(() => import("./pages/Index"));
 const Percorso = lazy(() => import("./pages/Percorso"));
@@ -14,6 +15,7 @@ const Sponsor = lazy(() => import("./pages/Sponsor"));
 const Contatti = lazy(() => import("./pages/Contatti"));
 const Dona = lazy(() => import("./pages/Dona"));
 const AdminLive = lazy(() => import("./pages/AdminLive"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -34,7 +36,12 @@ const App = () => (
           <Route path="/sponsor" element={<Sponsor />} />
           <Route path="/contatti" element={<Contatti />} />
           <Route path="/dona" element={<Dona />} />
-          <Route path="/admin-live" element={<AdminLive />} />
+          <Route path="/admin-login" element={<AdminLogin />} />
+          <Route path="/admin-live" element={
+            <ProtectedAdminRoute>
+              <AdminLive />
+            </ProtectedAdminRoute>
+          } />
           <Route path="*" element={<NotFound />} />
         </Routes>
         </Suspense>
