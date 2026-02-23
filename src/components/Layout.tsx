@@ -16,6 +16,7 @@ const navLinks = [
   },
   { label: "Sponsor", to: "/sponsor" },
   { label: "Contatti", to: "/contatti" },
+  { label: "Login", to: "/admin-login" },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
