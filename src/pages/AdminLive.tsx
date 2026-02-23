@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
-  Send, Facebook, Instagram,
+  Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2,
 } from "lucide-react";
 
 // ─── Costanti ────────────────────────────────────────────────────────────────
@@ -32,10 +32,12 @@ const tappe = [
 
 // ─── Keys localStorage ────────────────────────────────────────────────────────
 const K = {
-  fbPageId:   "gp_fb_page_id",
-  fbToken:    "gp_fb_token",
-  igUserId:   "gp_ig_user_id",
-  igImageUrl: "gp_ig_image_url",
+  fbPageId:      "gp_fb_page_id",
+  fbToken:       "gp_fb_token",
+  igUserId:      "gp_ig_user_id",
+  igImageUrl:    "gp_ig_image_url",
+  cloudName:     "gp_cloudinary_name",
+  cloudPreset:   "gp_cloudinary_preset",
 };
 
 function ls(key: string) {
@@ -69,8 +71,25 @@ function buildMessage(ltwUrl: string, isTraining: boolean): string {
   );
 }
 
-// ─── Chiamate Meta Graph API ──────────────────────────────────────────────────
-async function postToFacebook(pageId: string, token: string, message: string) {
+// ─── Upload foto su Cloudinary ────────────────────────────────────────────────
+async function uploadToCloudinary(
+  file: File,
+  cloudName: string,
+  uploadPreset: string,
+): Promise<string | null> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("upload_preset", uploadPreset);
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+    { method: "POST", body: fd },
+  );
+  const data = await res.json();
+  return data.secure_url ?? null;
+}
+
+// ─── Meta Graph API ───────────────────────────────────────────────────────────
+async function fbTextPost(pageId: string, token: string, message: string) {
   const res = await fetch(`https://graph.facebook.com/v20.0/${pageId}/feed`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -79,33 +98,46 @@ async function postToFacebook(pageId: string, token: string, message: string) {
   return res.json();
 }
 
-async function postToInstagram(
-  igUserId: string,
+async function fbPhotoPost(
+  pageId: string,
   token: string,
-  imageUrl: string,
   caption: string,
+  imageUrlOrFile: string | File,
 ) {
-  // Step 1: crea container media
-  const createRes = await fetch(
-    `https://graph.facebook.com/v20.0/${igUserId}/media`,
-    {
+  if (typeof imageUrlOrFile === "string") {
+    const res = await fetch(`https://graph.facebook.com/v20.0/${pageId}/photos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image_url: imageUrl, caption, access_token: token }),
-    },
-  );
+      body: JSON.stringify({ url: imageUrlOrFile, caption, access_token: token }),
+    });
+    return res.json();
+  }
+  // Multipart upload diretto (nessun Cloudinary)
+  const fd = new FormData();
+  fd.append("source", imageUrlOrFile);
+  fd.append("caption", caption);
+  fd.append("access_token", token);
+  const res = await fetch(`https://graph.facebook.com/v20.0/${pageId}/photos`, {
+    method: "POST",
+    body: fd,
+  });
+  return res.json();
+}
+
+async function igPhotoPost(igUserId: string, token: string, imageUrl: string, caption: string) {
+  const createRes = await fetch(`https://graph.facebook.com/v20.0/${igUserId}/media`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image_url: imageUrl, caption, access_token: token }),
+  });
   const created = await createRes.json();
   if (created.error) throw new Error(created.error.message);
 
-  // Step 2: pubblica il container
-  const publishRes = await fetch(
-    `https://graph.facebook.com/v20.0/${igUserId}/media_publish`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ creation_id: created.id, access_token: token }),
-    },
-  );
+  const publishRes = await fetch(`https://graph.facebook.com/v20.0/${igUserId}/media_publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ creation_id: created.id, access_token: token }),
+  });
   return publishRes.json();
 }
 
@@ -115,38 +147,60 @@ export default function AdminLive() {
   const [ltwUrl, setLtwUrlLocal] = useState(getLtwUrl);
   const [ltwSaved, setLtwSaved] = useState(false);
 
-  // ─ Social settings ─
+  // ─ Settings ─
   const [showSettings, setShowSettings] = useState(false);
-  const [fbPageId,   setFbPageId]   = useState(() => ls(K.fbPageId));
-  const [fbToken,    setFbToken]    = useState(() => ls(K.fbToken));
-  const [igUserId,   setIgUserId]   = useState(() => ls(K.igUserId));
-  const [igImageUrl, setIgImageUrl] = useState(() => ls(K.igImageUrl));
+  const [fbPageId,    setFbPageId]    = useState(() => ls(K.fbPageId));
+  const [fbToken,     setFbToken]     = useState(() => ls(K.fbToken));
+  const [igUserId,    setIgUserId]    = useState(() => ls(K.igUserId));
+  const [igImageUrl,  setIgImageUrl]  = useState(() => ls(K.igImageUrl));
+  const [cloudName,   setCloudName]   = useState(() => ls(K.cloudName));
+  const [cloudPreset, setCloudPreset] = useState(() => ls(K.cloudPreset));
 
-  // ─ Post composer ─
+  // ─ Composer ─
   const isTraining = new Date() < CAMMINO_START;
   const [message, setMessage] = useState(() =>
     buildMessage(getLtwUrl() || "https://locatoweb.com/map/single/...", isTraining),
   );
   const [postFb, setPostFb] = useState(true);
   const [postIg, setPostIg] = useState(true);
-  const [posting, setPosting] = useState(false);
+
+  // ─ Foto ─
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [photoPreview,  setPhotoPreview]  = useState<string | null>(null);
+  const [uploading,     setUploading]     = useState(false);
+  const fileInputGallery = useRef<HTMLInputElement>(null);
+  const fileInputCamera  = useRef<HTMLInputElement>(null);
+
+  // ─ Pubblicazione ─
+  const [posting,    setPosting]    = useState(false);
   const [postResult, setPostResult] = useState<{ ok: string[]; err: string[] } | null>(null);
 
-  // Aggiorna template quando cambia ltwUrl
   useEffect(() => {
     if (ltwUrl) setMessage(buildMessage(ltwUrl, isTraining));
   }, [ltwUrl, isTraining]);
 
-  // ─ Salva impostazioni social ─
-  function saveSettings() {
-    lsSet(K.fbPageId,   fbPageId);
-    lsSet(K.fbToken,    fbToken);
-    lsSet(K.igUserId,   igUserId);
-    lsSet(K.igImageUrl, igImageUrl);
-    setShowSettings(false);
+  // Cleanup blob URL
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
+
+  // ─ Foto handlers ─
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setSelectedPhoto(file);
+    setPhotoPreview(URL.createObjectURL(file));
+    setPostResult(null);
   }
 
-  // ─ Salva URL LocaToWeb ─
+  function removePhoto() {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setSelectedPhoto(null);
+    setPhotoPreview(null);
+    if (fileInputGallery.current) fileInputGallery.current.value = "";
+    if (fileInputCamera.current)  fileInputCamera.current.value  = "";
+  }
+
+  // ─ LTW ─
   function handleSaveLtw() {
     setLtwUrl(ltwUrl);
     setLtwSaved(true);
@@ -158,6 +212,17 @@ export default function AdminLive() {
     await navigator.clipboard.writeText(url);
   }
 
+  // ─ Impostazioni ─
+  function saveSettings() {
+    lsSet(K.fbPageId,    fbPageId);
+    lsSet(K.fbToken,     fbToken);
+    lsSet(K.igUserId,    igUserId);
+    lsSet(K.igImageUrl,  igImageUrl);
+    lsSet(K.cloudName,   cloudName);
+    lsSet(K.cloudPreset, cloudPreset);
+    setShowSettings(false);
+  }
+
   // ─ Pubblica ─
   async function handlePublish() {
     setPosting(true);
@@ -165,9 +230,34 @@ export default function AdminLive() {
     const ok: string[] = [];
     const err: string[] = [];
 
+    // Step 1 — upload foto su Cloudinary (se presente + configurato)
+    let uploadedUrl: string | null = null;
+    if (selectedPhoto && cloudName && cloudPreset) {
+      setUploading(true);
+      try {
+        uploadedUrl = await uploadToCloudinary(selectedPhoto, cloudName, cloudPreset);
+        if (!uploadedUrl) err.push("Cloudinary: upload fallito, riprova");
+      } catch (e) {
+        err.push(`Cloudinary: ${String(e)}`);
+      }
+      setUploading(false);
+    }
+
+    // Risolvi URL immagine finale
+    const imageUrl = uploadedUrl ?? (selectedPhoto ? null : igImageUrl) ?? null;
+
+    // Step 2 — Facebook
     if (postFb) {
       try {
-        const res = await postToFacebook(fbPageId, fbToken, message);
+        let res;
+        if (imageUrl) {
+          res = await fbPhotoPost(fbPageId, fbToken, message, imageUrl);
+        } else if (selectedPhoto) {
+          // Upload multipart diretto se no Cloudinary
+          res = await fbPhotoPost(fbPageId, fbToken, message, selectedPhoto);
+        } else {
+          res = await fbTextPost(fbPageId, fbToken, message);
+        }
         if (res.error) err.push(`Facebook: ${res.error.message}`);
         else ok.push("Facebook");
       } catch (e) {
@@ -175,12 +265,17 @@ export default function AdminLive() {
       }
     }
 
+    // Step 3 — Instagram (richiede URL pubblico)
     if (postIg) {
-      if (!igImageUrl) {
-        err.push("Instagram: nessun URL immagine nelle impostazioni");
+      if (!imageUrl) {
+        if (selectedPhoto && !cloudName) {
+          err.push("Instagram: configura Cloudinary nelle impostazioni per postare foto");
+        } else {
+          err.push("Instagram: aggiungi una foto o imposta un URL immagine nelle impostazioni");
+        }
       } else {
         try {
-          const res = await postToInstagram(igUserId, fbToken, igImageUrl, message);
+          const res = await igPhotoPost(igUserId, fbToken, imageUrl, message);
           if (res.error) err.push(`Instagram: ${res.error.message}`);
           else ok.push("Instagram");
         } catch (e) {
@@ -195,7 +290,6 @@ export default function AdminLive() {
 
   const canPublish =
     (postFb || postIg) &&
-    !!ltwUrl &&
     !!fbToken &&
     (postFb ? !!fbPageId : true) &&
     (postIg ? !!igUserId : true);
@@ -213,14 +307,11 @@ export default function AdminLive() {
           </p>
         </div>
 
-        {/* ── Sezione 1: LocaToWeb ── */}
+        {/* ── 1: LocaToWeb ── */}
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <h2 className="font-semibold text-foreground mb-1 text-sm uppercase tracking-wide">
             📍 Link Live Tracking
           </h2>
-          {ls(K.fbToken) === "" && (
-            <div/>
-          )}
           {getLtwUrl() && (
             <p className="text-xs text-green-600 font-mono break-all mb-2">{getLtwUrl()}</p>
           )}
@@ -252,31 +343,27 @@ export default function AdminLive() {
               {ltwSaved ? <><CheckCircle className="w-4 h-4" />Salvato!</> : "Salva"}
             </button>
             {ltwUrl && (
-              <button
-                onClick={handleCopyShareLink}
+              <button onClick={handleCopyShareLink}
                 className="px-3 border border-dona/30 text-dona rounded-lg text-sm hover:bg-dona/5"
-                title="Copia link condivisibile"
-              >
+                title="Copia link condivisibile">
                 <ExternalLink className="w-4 h-4" />
               </button>
             )}
-            <button
-              onClick={() => { clearLtwUrl(); setLtwUrlLocal(""); }}
+            <button onClick={() => { clearLtwUrl(); setLtwUrlLocal(""); }}
               className="px-3 border border-border text-muted-foreground rounded-lg text-sm hover:bg-muted"
-              title="Cancella URL"
-            >
+              title="Cancella URL">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* ── Sezione 2: Pubblica sui social ── */}
+        {/* ── 2: Pubblica sui social ── */}
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <h2 className="font-semibold text-foreground mb-3 text-sm uppercase tracking-wide">
             📣 Pubblica sui social
           </h2>
 
-          {/* Template buttons */}
+          {/* Template */}
           <div className="flex gap-2 mb-3">
             <button
               onClick={() => setMessage(buildMessage(ltwUrl || "https://...", true))}
@@ -292,15 +379,71 @@ export default function AdminLive() {
             </button>
           </div>
 
-          {/* Testo post */}
+          {/* Testo */}
           <textarea
-            rows={9}
-            className="w-full border border-border rounded-lg px-3 py-2.5 text-sm font-body mb-3 focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground resize-none"
+            rows={8}
+            className="w-full border border-border rounded-lg px-3 py-2.5 text-sm font-body mb-4 focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground resize-none"
             value={message}
             onChange={e => setMessage(e.target.value)}
           />
 
-          {/* Toggle piattaforme */}
+          {/* ── Foto ── */}
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-foreground mb-2">📷 Foto (opzionale)</p>
+
+            {/* Input nascosti */}
+            <input ref={fileInputGallery} type="file" accept="image/*"
+              className="hidden" onChange={handlePhotoChange} />
+            <input ref={fileInputCamera}  type="file" accept="image/*" capture="environment"
+              className="hidden" onChange={handlePhotoChange} />
+
+            {photoPreview ? (
+              // Anteprima foto
+              <div className="relative rounded-xl overflow-hidden">
+                <img src={photoPreview} alt="Anteprima"
+                  className="w-full h-52 object-cover" />
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <button
+                    onClick={() => fileInputGallery.current?.click()}
+                    className="bg-black/60 text-white rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-sm"
+                  >
+                    Cambia
+                  </button>
+                  <button onClick={removePhoto}
+                    className="bg-black/60 text-white rounded-full p-1.5 backdrop-blur-sm">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                {!cloudName && (
+                  <div className="absolute bottom-0 inset-x-0 bg-amber-500/90 px-3 py-1.5">
+                    <p className="text-xs text-white font-semibold text-center">
+                      ⚠️ Configura Cloudinary nelle impostazioni per postare su Instagram
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Pulsanti scegli/scatta
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => fileInputCamera.current?.click()}
+                  className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all"
+                >
+                  <Camera className="w-6 h-6 text-muted-foreground" />
+                  <span className="text-xs font-semibold text-muted-foreground">Scatta foto</span>
+                </button>
+                <button
+                  onClick={() => fileInputGallery.current?.click()}
+                  className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all"
+                >
+                  <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                  <span className="text-xs font-semibold text-muted-foreground">Dalla galleria</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Piattaforme */}
           <div className="flex gap-3 mb-4">
             <button
               onClick={() => setPostFb(v => !v)}
@@ -312,7 +455,9 @@ export default function AdminLive() {
             <button
               onClick={() => setPostIg(v => !v)}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold border transition-all
-                ${postIg ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-transparent" : "border-border text-muted-foreground"}`}
+                ${postIg
+                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-transparent"
+                  : "border-border text-muted-foreground"}`}
             >
               <Instagram className="w-4 h-4" /> Instagram
             </button>
@@ -324,13 +469,12 @@ export default function AdminLive() {
               {postResult.ok.map(p => (
                 <p key={p} className="text-xs text-green-600 font-semibold">✓ Pubblicato su {p}</p>
               ))}
-              {postResult.err.map(e => (
-                <p key={e} className="text-xs text-red-500">{e}</p>
+              {postResult.err.map((e, i) => (
+                <p key={i} className="text-xs text-red-500">{e}</p>
               ))}
             </div>
           )}
 
-          {/* Avviso se mancano credenziali */}
           {!fbToken && (
             <p className="text-xs text-amber-600 mb-3">
               ⚠️ Imposta le credenziali Meta nelle{" "}
@@ -344,71 +488,85 @@ export default function AdminLive() {
             disabled={!canPublish || posting}
             className="w-full flex items-center justify-center gap-2 bg-dona text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-40 transition-opacity"
           >
-            <Send className="w-4 h-4" />
-            {posting ? "Pubblicazione in corso…" : "Pubblica ora"}
+            {posting || uploading
+              ? <><Loader2 className="w-4 h-4 animate-spin" />{uploading ? "Caricamento foto…" : "Pubblicazione…"}</>
+              : <><Send className="w-4 h-4" />Pubblica ora</>
+            }
           </button>
         </div>
 
-        {/* ── Sezione 3: Impostazioni social (collapsibile) ── */}
+        {/* ── 3: Impostazioni ── */}
         <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
           <button
             onClick={() => setShowSettings(v => !v)}
             className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-foreground hover:bg-muted/50 transition-colors"
           >
             <span className="flex items-center gap-2">
-              <Settings className="w-4 h-4" /> Impostazioni social (Meta)
+              <Settings className="w-4 h-4" /> Impostazioni social
             </span>
             {showSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
 
           {showSettings && (
-            <div className="px-5 pb-5 border-t border-border space-y-3 pt-4">
-              <p className="text-xs text-muted-foreground">
-                Inserisci i dati del tuo app Meta (Business Portfolio <strong>1000kmdigratitudine</strong>).{" "}
-                Salvati solo sul tuo dispositivo.
-              </p>
+            <div className="px-5 pb-5 border-t border-border space-y-4 pt-4">
 
-              <Field label="Facebook Page ID" value={fbPageId} onChange={setFbPageId}
-                placeholder="123456789012345" />
-              <Field label="Facebook Page Access Token (long-lived)" value={fbToken} onChange={setFbToken}
-                placeholder="EAABsb..." type="password" />
-              <Field label="Instagram Business User ID" value={igUserId} onChange={setIgUserId}
-                placeholder="17841400..." />
-              <Field label="URL immagine per post Instagram"
-                value={igImageUrl} onChange={setIgImageUrl}
+              {/* Meta */}
+              <p className="text-xs font-bold text-foreground">Meta (Facebook / Instagram)</p>
+              <Field label="Facebook Page ID"     value={fbPageId}   onChange={setFbPageId}   placeholder="123456789012345" />
+              <Field label="Page Access Token"    value={fbToken}    onChange={setFbToken}    placeholder="EAABsb…" type="password" />
+              <Field label="Instagram User ID"    value={igUserId}   onChange={setIgUserId}   placeholder="17841400…" />
+              <Field label="URL immagine fallback Instagram" value={igImageUrl} onChange={setIgImageUrl}
                 placeholder="https://tuosito.com/og-image.jpg"
-                hint="Deve essere un URL pubblico (es. l'immagine hero del sito già online)" />
+                hint="Usata quando non carichi una foto" />
+
+              {/* Cloudinary */}
+              <div className="border-t border-border pt-4">
+                <p className="text-xs font-bold text-foreground mb-3">
+                  Cloudinary — upload foto per Instagram
+                </p>
+                <Field label="Cloud Name"     value={cloudName}   onChange={setCloudName}   placeholder="il-tuo-cloud" />
+                <div className="mt-3">
+                  <Field label="Upload Preset (unsigned)" value={cloudPreset} onChange={setCloudPreset}
+                    placeholder="ml_default"
+                    hint="Crea un preset unsigned su cloudinary.com → Settings → Upload → Upload Presets" />
+                </div>
+                <details className="mt-3">
+                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                    Come creare un account Cloudinary gratuito →
+                  </summary>
+                  <ol className="mt-2 text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                    <li>Registrati gratis su <a href="https://cloudinary.com" target="_blank" rel="noreferrer" className="underline text-dona">cloudinary.com</a></li>
+                    <li>Copia il <strong>Cloud Name</strong> dalla dashboard</li>
+                    <li>Vai su <strong>Settings → Upload → Upload Presets → Add preset</strong></li>
+                    <li>Imposta <strong>Signing Mode: Unsigned</strong> → salva</li>
+                    <li>Copia il nome del preset e incollalo qui</li>
+                  </ol>
+                </details>
+              </div>
+
+              {/* Meta guide */}
+              <div className="border-t border-border pt-4">
+                <details>
+                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                    Come ottenere le credenziali Meta →
+                  </summary>
+                  <ol className="mt-2 text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                    <li><a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="underline text-dona">developers.facebook.com</a> → Crea app → tipo <strong>Business</strong> → collega <strong>1000kmdigratitudine</strong></li>
+                    <li>Aggiungi: <strong>Facebook Login for Business</strong> + <strong>Instagram Graph API</strong></li>
+                    <li><a href="https://developers.facebook.com/tools/explorer" target="_blank" rel="noreferrer" className="underline text-dona">Graph API Explorer</a> → token con: <code className="bg-muted px-1 rounded text-[10px]">pages_manage_posts, instagram_content_publish, instagram_basic</code></li>
+                    <li>Converti in long-lived token (60 gg) dal <a href="https://developers.facebook.com/tools/debug/accesstoken" target="_blank" rel="noreferrer" className="underline text-dona">Token Debugger</a></li>
+                    <li><strong>Page ID</strong>: Pagina FB → Info → ID</li>
+                    <li><strong>Instagram User ID</strong>: Explorer → <code className="bg-muted px-1 rounded text-[10px]">GET /{"{page-id}"}?fields=instagram_business_account</code></li>
+                  </ol>
+                </details>
+              </div>
 
               <button
                 onClick={saveSettings}
-                className="w-full bg-foreground text-background rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity mt-2"
+                className="w-full bg-foreground text-background rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
               >
                 Salva impostazioni
               </button>
-
-              <details className="mt-3">
-                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                  Come ottenere le credenziali Meta →
-                </summary>
-                <ol className="mt-2 text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                  <li>
-                    Vai su <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="underline text-dona">developers.facebook.com</a> → "Le mie app" → "Crea app"
-                  </li>
-                  <li>Tipo: <strong>Business</strong>, collega al Portfolio <strong>1000kmdigratitudine</strong></li>
-                  <li>Aggiungi prodotto: <strong>Facebook Login for Business</strong> + <strong>Instagram Graph API</strong></li>
-                  <li>
-                    Vai su <a href="https://developers.facebook.com/tools/explorer" target="_blank" rel="noreferrer" className="underline text-dona">Graph API Explorer</a> → seleziona la tua app → genera token con permessi:
-                    <br /><code className="bg-muted px-1 rounded text-[10px]">pages_manage_posts, pages_read_engagement, instagram_content_publish, instagram_basic</code>
-                  </li>
-                  <li>Converti in <strong>long-lived token</strong> (dura 60 giorni): usa il <a href="https://developers.facebook.com/tools/debug/accesstoken" target="_blank" rel="noreferrer" className="underline text-dona">Token Debugger</a></li>
-                  <li>
-                    <strong>Page ID</strong>: visita la tua Pagina Facebook → "Informazioni" → ID pagina
-                  </li>
-                  <li>
-                    <strong>Instagram User ID</strong>: nel Graph Explorer chiama <code className="bg-muted px-1 rounded text-[10px]">GET /me/accounts</code> poi <code className="bg-muted px-1 rounded text-[10px]">GET /&#123;page-id&#125;?fields=instagram_business_account</code>
-                  </li>
-                </ol>
-              </details>
             </div>
           )}
         </div>
@@ -423,7 +581,7 @@ export default function AdminLive() {
   );
 }
 
-// ─── Helper campo input ────────────────────────────────────────────────────────
+// ─── Campo input helper ───────────────────────────────────────────────────────
 function Field({
   label, value, onChange, placeholder, type = "text", hint,
 }: {
