@@ -31,23 +31,18 @@ export default function AdminLogin() {
     navigate("/admin-live", { replace: true });
   }
 
-  // Se Supabase non è configurato mostra avviso e reindirizza
+  // Se Supabase non è configurato mostra errore (nessun bypass)
   if (!isSupabaseConfigured) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="max-w-sm w-full bg-card border border-border rounded-xl p-6 shadow-sm text-center space-y-3">
-          <p className="text-sm font-semibold text-foreground">Supabase non configurato</p>
+          <p className="text-sm font-semibold text-foreground">Configurazione mancante</p>
           <p className="text-xs text-muted-foreground">
-            Aggiungi <code className="bg-muted px-1 rounded">VITE_SUPABASE_URL</code> e{" "}
-            <code className="bg-muted px-1 rounded">VITE_SUPABASE_ANON_KEY</code> nelle
-            variabili d'ambiente per abilitare l'autenticazione.
+            Le variabili d'ambiente{" "}
+            <code className="bg-muted px-1 rounded">VITE_SUPABASE_URL</code> e{" "}
+            <code className="bg-muted px-1 rounded">VITE_SUPABASE_ANON_KEY</code>{" "}
+            non sono configurate. Contatta l'amministratore del sistema.
           </p>
-          <button
-            onClick={() => navigate("/admin-live")}
-            className="text-sm text-dona underline"
-          >
-            Vai comunque all'admin →
-          </button>
         </div>
       </div>
     );
