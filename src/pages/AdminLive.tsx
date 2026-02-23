@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { loadSettings, saveSettings as saveSettingsDB, type AdminSettings } from "@/lib/adminSettings";
 import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
-  Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video,
+  Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video, LogOut,
 } from "lucide-react";
 
 // ─── Costanti ────────────────────────────────────────────────────────────────
@@ -30,22 +32,7 @@ const tappe = [
   { giorno: 14, da: "Rosarno",           a: "Terranova Sappo Minulio", km: 40  },
 ];
 
-// ─── Keys localStorage ────────────────────────────────────────────────────────
-const K = {
-  fbPageId:    "gp_fb_page_id",
-  fbToken:     "gp_fb_token",
-  igUserId:    "gp_ig_user_id",
-  igImageUrl:  "gp_ig_image_url",
-  cloudName:   "gp_cloudinary_name",
-  cloudPreset: "gp_cloudinary_preset",
-};
-
-function ls(key: string) {
-  try { return localStorage.getItem(key) ?? ""; } catch { return ""; }
-}
-function lsSet(key: string, val: string) {
-  try { localStorage.setItem(key, val.trim()); } catch {}
-}
+// (Impostazioni ora gestite da src/lib/adminSettings.ts)
 
 // ─── Template post ────────────────────────────────────────────────────────────
 function buildMessage(ltwUrl: string, isTraining: boolean): string {
@@ -223,18 +210,21 @@ async function shareToTikTok(file: File, caption: string): Promise<{ ok: boolean
 
 // ─── Componente ──────────────────────────────────────────────────────────────
 export default function AdminLive() {
+  const navigate = useNavigate();
+
   // ─ Live tracking ─
   const [ltwUrl, setLtwUrlLocal] = useState(getLtwUrl);
   const [ltwSaved, setLtwSaved] = useState(false);
 
   // ─ Settings ─
-  const [showSettings, setShowSettings] = useState(false);
-  const [fbPageId,    setFbPageId]    = useState(() => ls(K.fbPageId));
-  const [fbToken,     setFbToken]     = useState(() => ls(K.fbToken));
-  const [igUserId,    setIgUserId]    = useState(() => ls(K.igUserId));
-  const [igImageUrl,  setIgImageUrl]  = useState(() => ls(K.igImageUrl));
-  const [cloudName,   setCloudName]   = useState(() => ls(K.cloudName));
-  const [cloudPreset, setCloudPreset] = useState(() => ls(K.cloudPreset));
+  const [showSettings, setShowSettings]   = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(isSupabaseConfigured);
+  const [fbPageId,    setFbPageId]    = useState("");
+  const [fbToken,     setFbToken]     = useState("");
+  const [igUserId,    setIgUserId]    = useState("");
+  const [igImageUrl,  setIgImageUrl]  = useState("");
+  const [cloudName,   setCloudName]   = useState("");
+  const [cloudPreset, setCloudPreset] = useState("");
 
   // ─ Composer ─
   const isTraining = new Date() < CAMMINO_START;
@@ -262,6 +252,19 @@ export default function AdminLive() {
   const [posting,      setPosting]      = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
   const [postResult,   setPostResult]   = useState<{ ok: string[]; err: string[] } | null>(null);
+
+  // Carica impostazioni da Supabase (o localStorage) al mount
+  useEffect(() => {
+    loadSettings().then(s => {
+      setFbPageId(s.fbPageId);
+      setFbToken(s.fbToken);
+      setIgUserId(s.igUserId);
+      setIgImageUrl(s.igImageUrl);
+      setCloudName(s.cloudName);
+      setCloudPreset(s.cloudPreset);
+      setSettingsLoading(false);
+    });
+  }, []);
 
   useEffect(() => {
     if (ltwUrl) setMessage(buildMessage(ltwUrl, isTraining));
@@ -320,14 +323,16 @@ export default function AdminLive() {
   }
 
   // ─ Impostazioni ─
-  function saveSettings() {
-    lsSet(K.fbPageId,    fbPageId);
-    lsSet(K.fbToken,     fbToken);
-    lsSet(K.igUserId,    igUserId);
-    lsSet(K.igImageUrl,  igImageUrl);
-    lsSet(K.cloudName,   cloudName);
-    lsSet(K.cloudPreset, cloudPreset);
+  async function handleSaveSettings() {
+    const s: AdminSettings = { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset };
+    await saveSettingsDB(s);
     setShowSettings(false);
+  }
+
+  // ─ Logout ─
+  async function handleLogout() {
+    if (supabase) await supabase.auth.signOut();
+    navigate("/admin-login", { replace: true });
   }
 
   // ─ Pubblica ─
@@ -466,12 +471,30 @@ export default function AdminLive() {
       <div className="max-w-lg mx-auto space-y-5">
 
         {/* Header */}
-        <div className="pt-6 pb-2 text-center">
-          <h1 className="font-heading text-2xl font-bold text-foreground">Admin · Gratitude Path</h1>
-          <p className="text-muted-foreground text-sm font-body mt-1">
-            {isTraining ? "Modalità allenamento" : "Cammino in corso 🚴‍♂️"}
-          </p>
+        <div className="pt-6 pb-2 flex items-start justify-between">
+          <div>
+            <h1 className="font-heading text-2xl font-bold text-foreground">Admin · Gratitude Path</h1>
+            <p className="text-muted-foreground text-sm font-body mt-1">
+              {isTraining ? "Modalità allenamento" : "Cammino in corso 🚴‍♂️"}
+            </p>
+          </div>
+          {isSupabaseConfigured && (
+            <button
+              onClick={handleLogout}
+              title="Esci"
+              className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-1.5 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" /> Esci
+            </button>
+          )}
         </div>
+
+        {/* Caricamento impostazioni */}
+        {settingsLoading && (
+          <div className="flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Caricamento impostazioni…
+          </div>
+        )}
 
         {/* ── 1: LocaToWeb ── */}
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
@@ -847,10 +870,10 @@ export default function AdminLive() {
               </div>
 
               <button
-                onClick={saveSettings}
+                onClick={handleSaveSettings}
                 className="w-full bg-foreground text-background rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
               >
-                Salva impostazioni
+                {isSupabaseConfigured ? "Salva e sincronizza" : "Salva impostazioni"}
               </button>
             </div>
           )}
