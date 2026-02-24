@@ -15,6 +15,10 @@ export type AdminSettings = {
   igImageUrl:  string;
   cloudName:   string;
   cloudPreset: string;
+  // Video YouTube — Crocifisso Nero
+  ytCn1: string;
+  ytCn2: string;
+  ytCn3: string;
 };
 
 const EMPTY: AdminSettings = {
@@ -24,6 +28,9 @@ const EMPTY: AdminSettings = {
   igImageUrl:  "",
   cloudName:   "",
   cloudPreset: "",
+  ytCn1:       "",
+  ytCn2:       "",
+  ytCn3:       "",
 };
 
 // ─── localStorage ─────────────────────────────────────────────────────────────
@@ -34,6 +41,9 @@ const LS = {
   igImageUrl:  "gp_ig_image_url",
   cloudName:   "gp_cloudinary_name",
   cloudPreset: "gp_cloudinary_preset",
+  ytCn1:       "gp_yt_cn_1",
+  ytCn2:       "gp_yt_cn_2",
+  ytCn3:       "gp_yt_cn_3",
 };
 
 function lsGet(k: string) {
@@ -51,6 +61,9 @@ export function loadFromLocalStorage(): AdminSettings {
     igImageUrl:  lsGet(LS.igImageUrl),
     cloudName:   lsGet(LS.cloudName),
     cloudPreset: lsGet(LS.cloudPreset),
+    ytCn1:       lsGet(LS.ytCn1),
+    ytCn2:       lsGet(LS.ytCn2),
+    ytCn3:       lsGet(LS.ytCn3),
   };
 }
 
@@ -61,6 +74,9 @@ function cacheToLocalStorage(s: AdminSettings) {
   lsSet(LS.igImageUrl,  s.igImageUrl);
   lsSet(LS.cloudName,   s.cloudName);
   lsSet(LS.cloudPreset, s.cloudPreset);
+  lsSet(LS.ytCn1,       s.ytCn1);
+  lsSet(LS.ytCn2,       s.ytCn2);
+  lsSet(LS.ytCn3,       s.ytCn3);
 }
 
 // ─── API pubblica ──────────────────────────────────────────────────────────────
@@ -105,4 +121,12 @@ export async function saveSettings(settings: AdminSettings): Promise<void> {
       data:       settings,
       updated_at: new Date().toISOString(),
     });
+}
+
+/**
+ * Legge i soli ID video YouTube per la pagina Crocifisso Nero.
+ * Funziona anche senza autenticazione (solo localStorage).
+ */
+export function loadYtCrocifissoIds(): [string, string, string] {
+  return [lsGet(LS.ytCn1), lsGet(LS.ytCn2), lsGet(LS.ytCn3)];
 }

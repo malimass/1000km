@@ -6,6 +6,7 @@ import { loadSettings, saveSettings as saveSettingsDB, type AdminSettings } from
 import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
   Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video, LogOut,
+  MapPin, Youtube, Menu,
 } from "lucide-react";
 
 // ─── Costanti ────────────────────────────────────────────────────────────────
@@ -31,8 +32,6 @@ const tappe = [
   { giorno: 13, da: "Pizzo Calabro",     a: "Rosarno",                 km: 65  },
   { giorno: 14, da: "Rosarno",           a: "Terranova Sappo Minulio", km: 40  },
 ];
-
-// (Impostazioni ora gestite da src/lib/adminSettings.ts)
 
 // ─── Template post ────────────────────────────────────────────────────────────
 function buildMessage(ltwUrl: string, isTraining: boolean): string {
@@ -130,7 +129,6 @@ async function igPhotoPost(igUserId: string, token: string, imageUrl: string, ca
 
 // ─── Meta Graph API — Reel ────────────────────────────────────────────────────
 async function fbReelPost(pageId: string, token: string, videoUrl: string, description: string) {
-  // Metodo "pull": Facebook scarica il video dall'URL di Cloudinary
   const res = await fetch(`https://graph.facebook.com/v20.0/${pageId}/video_reels`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -145,7 +143,6 @@ async function fbReelPost(pageId: string, token: string, videoUrl: string, descr
 }
 
 async function igReelPost(igUserId: string, token: string, videoUrl: string, caption: string) {
-  // Step 1: Crea container
   const createRes = await fetch(`https://graph.facebook.com/v20.0/${igUserId}/media`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -160,7 +157,6 @@ async function igReelPost(igUserId: string, token: string, videoUrl: string, cap
   const created = await createRes.json();
   if (created.error) throw new Error(created.error.message);
 
-  // Step 2: Attendi elaborazione (max ~30s)
   for (let i = 0; i < 15; i++) {
     await new Promise(r => setTimeout(r, 2000));
     const statusRes = await fetch(
@@ -171,7 +167,6 @@ async function igReelPost(igUserId: string, token: string, videoUrl: string, cap
     if (status.status_code === "ERROR") throw new Error("Errore elaborazione video su Instagram");
   }
 
-  // Step 3: Pubblica
   const publishRes = await fetch(`https://graph.facebook.com/v20.0/${igUserId}/media_publish`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -180,10 +175,7 @@ async function igReelPost(igUserId: string, token: string, videoUrl: string, cap
   return publishRes.json();
 }
 
-// ─── TikTok — condivisione nativa (Web Share API) ────────────────────────────
-// L'API TikTok non è accessibile dal browser per CORS.
-// Su iOS/Android usa navigator.share() → apre il foglio di condivisione nativo
-// con TikTok come opzione. Su desktop: scarica il video + copia didascalia.
+// ─── TikTok ────────────────────────────────────────────────────────────────
 async function shareToTikTok(file: File, caption: string): Promise<{ ok: boolean; msg: string }> {
   if (typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })) {
     try {
@@ -195,7 +187,6 @@ async function shareToTikTok(file: File, caption: string): Promise<{ ok: boolean
       return { ok: false, msg: String(e) };
     }
   }
-  // Fallback: scarica il video e copia la didascalia
   const url = URL.createObjectURL(file);
   const a = document.createElement("a");
   a.href = url;
@@ -208,16 +199,28 @@ async function shareToTikTok(file: File, caption: string): Promise<{ ok: boolean
   return { ok: true, msg: "video scaricato + testo copiato — carica manualmente su TikTok" };
 }
 
-// ─── Componente ──────────────────────────────────────────────────────────────
+// ─── Tipi sezione ─────────────────────────────────────────────────────────────
+type Section = "live" | "social" | "video" | "settings";
+
+const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
+  { key: "live",     label: "Live Tracking", icon: <MapPin className="w-4 h-4" /> },
+  { key: "social",   label: "Pubblica",      icon: <Send className="w-4 h-4" /> },
+  { key: "video",    label: "Video YouTube", icon: <Youtube className="w-4 h-4" /> },
+  { key: "settings", label: "Impostazioni",  icon: <Settings className="w-4 h-4" /> },
+];
+
+// ─── Componente principale ────────────────────────────────────────────────────
 export default function AdminLive() {
   const navigate = useNavigate();
+
+  // ─ Navigazione sezioni ─
+  const [activeSection, setActiveSection] = useState<Section>("live");
 
   // ─ Live tracking ─
   const [ltwUrl, setLtwUrlLocal] = useState(getLtwUrl);
   const [ltwSaved, setLtwSaved] = useState(false);
 
   // ─ Settings ─
-  const [showSettings, setShowSettings]   = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(isSupabaseConfigured);
   const [fbPageId,    setFbPageId]    = useState("");
   const [fbToken,     setFbToken]     = useState("");
@@ -225,6 +228,12 @@ export default function AdminLive() {
   const [igImageUrl,  setIgImageUrl]  = useState("");
   const [cloudName,   setCloudName]   = useState("");
   const [cloudPreset, setCloudPreset] = useState("");
+
+  // ─ Video YouTube ─
+  const [ytCn1, setYtCn1] = useState("");
+  const [ytCn2, setYtCn2] = useState("");
+  const [ytCn3, setYtCn3] = useState("");
+  const [ytSaved, setYtSaved] = useState(false);
 
   // ─ Composer ─
   const isTraining = new Date() < CAMMINO_START;
@@ -253,7 +262,7 @@ export default function AdminLive() {
   const [uploadStatus, setUploadStatus] = useState("");
   const [postResult,   setPostResult]   = useState<{ ok: string[]; err: string[] } | null>(null);
 
-  // Carica impostazioni da Supabase (o localStorage) al mount
+  // Carica impostazioni
   useEffect(() => {
     loadSettings().then(s => {
       setFbPageId(s.fbPageId);
@@ -262,6 +271,9 @@ export default function AdminLive() {
       setIgImageUrl(s.igImageUrl);
       setCloudName(s.cloudName);
       setCloudPreset(s.cloudPreset);
+      setYtCn1(s.ytCn1);
+      setYtCn2(s.ytCn2);
+      setYtCn3(s.ytCn3);
       setSettingsLoading(false);
     });
   }, []);
@@ -270,7 +282,6 @@ export default function AdminLive() {
     if (ltwUrl) setMessage(buildMessage(ltwUrl, isTraining));
   }, [ltwUrl, isTraining]);
 
-  // Cleanup blob URLs
   useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
   useEffect(() => () => { if (videoPreview) URL.revokeObjectURL(videoPreview); }, [videoPreview]);
 
@@ -322,11 +333,18 @@ export default function AdminLive() {
     await navigator.clipboard.writeText(url);
   }
 
-  // ─ Impostazioni ─
+  // ─ Impostazioni social ─
   async function handleSaveSettings() {
-    const s: AdminSettings = { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset };
+    const s: AdminSettings = { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset, ytCn1, ytCn2, ytCn3 };
     await saveSettingsDB(s);
-    setShowSettings(false);
+  }
+
+  // ─ Video YouTube ─
+  async function handleSaveYtVideos() {
+    const s: AdminSettings = { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset, ytCn1, ytCn2, ytCn3 };
+    await saveSettingsDB(s);
+    setYtSaved(true);
+    setTimeout(() => setYtSaved(false), 2500);
   }
 
   // ─ Logout ─
@@ -343,7 +361,6 @@ export default function AdminLive() {
     const err: string[] = [];
 
     if (contentType === "photo") {
-      // ── FLUSSO FOTO ──────────────────────────────────────────────────────────
       let uploadedUrl: string | null = null;
       if (selectedPhoto && cloudName && cloudPreset) {
         setUploadStatus("Caricamento foto…");
@@ -394,7 +411,6 @@ export default function AdminLive() {
       }
 
     } else {
-      // ── FLUSSO REEL ──────────────────────────────────────────────────────────
       if (!selectedVideo) {
         err.push("Seleziona un video per pubblicare un reel");
         setPostResult({ ok, err });
@@ -407,7 +423,6 @@ export default function AdminLive() {
         err.push("Configura Cloudinary nelle impostazioni per pubblicare reel su FB/IG");
       }
 
-      // Step 1: Upload video su Cloudinary (se FB o IG selezionati)
       let videoUrl: string | null = null;
       if ((postFb || postIg) && cloudName && cloudPreset) {
         setUploadStatus("Caricamento video su Cloudinary…");
@@ -419,7 +434,6 @@ export default function AdminLive() {
         }
       }
 
-      // Step 2: Facebook Reel
       if (postFb && videoUrl) {
         setUploadStatus("Pubblicazione Reel su Facebook…");
         try {
@@ -431,7 +445,6 @@ export default function AdminLive() {
         }
       }
 
-      // Step 3: Instagram Reel (richiede polling ~30s)
       if (postIg && videoUrl) {
         setUploadStatus("Elaborazione Reel Instagram… (potrebbe richiedere fino a 30 secondi)");
         try {
@@ -443,7 +456,6 @@ export default function AdminLive() {
         }
       }
 
-      // Step 4: TikTok — foglio condivisione nativo
       if (postTt) {
         setUploadStatus("Apertura condivisione TikTok…");
         const result = await shareToTikTok(selectedVideo, message);
@@ -467,424 +479,543 @@ export default function AdminLive() {
 
   // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background p-4 pb-16">
-      <div className="max-w-lg mx-auto space-y-5">
+    <div className="min-h-screen bg-background flex">
 
-        {/* Header */}
-        <div className="pt-6 pb-2 flex items-start justify-between">
-          <div>
-            <h1 className="font-heading text-2xl font-bold text-foreground">Admin · Gratitude Path</h1>
-            <p className="text-muted-foreground text-sm font-body mt-1">
-              {isTraining ? "Modalità allenamento" : "Cammino in corso 🚴‍♂️"}
-            </p>
-          </div>
+      {/* ══ SIDEBAR — solo desktop (md+) ══════════════════════════════════════ */}
+      <aside className="hidden md:flex flex-col w-60 lg:w-64 border-r border-border bg-card/40 sticky top-0 h-screen shrink-0">
+        {/* Logo / titolo */}
+        <div className="p-5 border-b border-border">
+          <p className="font-heading text-sm font-bold text-foreground leading-tight">
+            Admin · Gratitude Path
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {isTraining ? "Modalità allenamento" : "Cammino in corso 🚴‍♂️"}
+          </p>
+        </div>
+
+        {/* Navigazione */}
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.key}
+              onClick={() => setActiveSection(item.key)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left
+                ${activeSection === item.key
+                  ? "bg-dona/10 text-dona"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                }`}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Footer sidebar */}
+        <div className="p-3 border-t border-border space-y-1">
+          <Link
+            to="/il-percorso"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+          >
+            ← Percorso pubblico
+          </Link>
           {isSupabaseConfigured && (
             <button
               onClick={handleLogout}
-              title="Esci"
-              className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-1.5 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
             >
               <LogOut className="w-3.5 h-3.5" /> Esci
             </button>
           )}
         </div>
+      </aside>
 
-        {/* Caricamento impostazioni */}
-        {settingsLoading && (
-          <div className="flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Caricamento impostazioni…
-          </div>
-        )}
+      {/* ══ AREA PRINCIPALE ════════════════════════════════════════════════════ */}
+      <div className="flex-1 min-w-0 flex flex-col">
 
-        {/* ── 1: LocaToWeb ── */}
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <h2 className="font-semibold text-foreground mb-1 text-sm uppercase tracking-wide">
-            📍 Link Live Tracking
-          </h2>
-          {getLtwUrl() && (
-            <p className="text-xs text-green-600 font-mono break-all mb-2">{getLtwUrl()}</p>
-          )}
-          <input
-            type="url"
-            placeholder="https://locatoweb.com/map/single/..."
-            className="w-full border border-border rounded-lg px-3 py-2.5 text-sm font-mono mb-1 focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
-            value={ltwUrl}
-            onChange={e => { setLtwUrlLocal(e.target.value); setLtwSaved(false); }}
-            onPaste={e => {
-              const pasted = e.clipboardData.getData("text").trim();
-              if (pasted.startsWith("https://locatoweb.com/")) {
-                e.preventDefault();
-                setLtwUrlLocal(pasted);
-                setLtwUrl(pasted);
-                setLtwSaved(true);
-                setMessage(buildMessage(pasted, isTraining));
-                setTimeout(() => setLtwSaved(false), 2500);
-              }
-            }}
-          />
-          <p className="text-xs text-muted-foreground mb-3">💡 Incolla → si salva automaticamente</p>
-          <div className="flex gap-2">
-            <button
-              onClick={handleSaveLtw}
-              disabled={!ltwUrl.startsWith("https://locatoweb.com/")}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-dona text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-40"
-            >
-              {ltwSaved ? <><CheckCircle className="w-4 h-4" />Salvato!</> : "Salva"}
-            </button>
-            {ltwUrl && (
-              <button onClick={handleCopyShareLink}
-                className="px-3 border border-dona/30 text-dona rounded-lg text-sm hover:bg-dona/5"
-                title="Copia link condivisibile">
-                <ExternalLink className="w-4 h-4" />
-              </button>
-            )}
-            <button onClick={() => { clearLtwUrl(); setLtwUrlLocal(""); }}
-              className="px-3 border border-border text-muted-foreground rounded-lg text-sm hover:bg-muted"
-              title="Cancella URL">
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* ── 2: Pubblica sui social ── */}
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <h2 className="font-semibold text-foreground mb-3 text-sm uppercase tracking-wide">
-            📣 Pubblica sui social
-          </h2>
-
-          {/* Tipo contenuto: Foto / Reel */}
-          <div className="flex gap-1 mb-4 bg-muted rounded-lg p-1">
-            <button
-              onClick={() => { setContentType("photo"); setPostResult(null); }}
-              className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-semibold transition-all
-                ${contentType === "photo"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <Camera className="w-4 h-4" /> Foto
-            </button>
-            <button
-              onClick={() => { setContentType("reel"); setPostResult(null); }}
-              className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-semibold transition-all
-                ${contentType === "reel"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <Video className="w-4 h-4" /> Reel
-            </button>
-          </div>
-
-          {/* Template */}
-          <div className="flex gap-2 mb-3">
-            <button
-              onClick={() => setMessage(buildMessage(ltwUrl || "https://...", true))}
-              className="text-xs border border-border rounded-lg px-3 py-1.5 hover:bg-muted transition-colors"
-            >
-              Template allenamento
-            </button>
-            <button
-              onClick={() => setMessage(buildMessage(ltwUrl || "https://...", false))}
-              className="text-xs border border-border rounded-lg px-3 py-1.5 hover:bg-muted transition-colors"
-            >
-              Template evento
-            </button>
-          </div>
-
-          {/* Testo */}
-          <textarea
-            rows={8}
-            className="w-full border border-border rounded-lg px-3 py-2.5 text-sm font-body mb-4 focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground resize-none"
-            value={message}
-            onChange={e => setMessage(e.target.value)}
-          />
-
-          {/* ── Foto ── */}
-          {contentType === "photo" && (
-            <div className="mb-4">
-              <p className="text-xs font-semibold text-foreground mb-2">📷 Foto (opzionale)</p>
-
-              <input ref={fileInputGallery} type="file" accept="image/*"
-                className="hidden" onChange={handlePhotoChange} />
-              <input ref={fileInputCamera}  type="file" accept="image/*" capture="environment"
-                className="hidden" onChange={handlePhotoChange} />
-
-              {photoPreview ? (
-                <div className="relative rounded-xl overflow-hidden">
-                  <img src={photoPreview} alt="Anteprima"
-                    className="w-full h-52 object-cover" />
-                  <div className="absolute top-2 right-2 flex gap-2">
-                    <button
-                      onClick={() => fileInputGallery.current?.click()}
-                      className="bg-black/60 text-white rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-sm"
-                    >
-                      Cambia
-                    </button>
-                    <button onClick={removePhoto}
-                      className="bg-black/60 text-white rounded-full p-1.5 backdrop-blur-sm">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  {!cloudName && (
-                    <div className="absolute bottom-0 inset-x-0 bg-amber-500/90 px-3 py-1.5">
-                      <p className="text-xs text-white font-semibold text-center">
-                        ⚠️ Configura Cloudinary nelle impostazioni per postare su Instagram
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => fileInputCamera.current?.click()}
-                    className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all"
-                  >
-                    <Camera className="w-6 h-6 text-muted-foreground" />
-                    <span className="text-xs font-semibold text-muted-foreground">Scatta foto</span>
-                  </button>
-                  <button
-                    onClick={() => fileInputGallery.current?.click()}
-                    className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all"
-                  >
-                    <ImageIcon className="w-6 h-6 text-muted-foreground" />
-                    <span className="text-xs font-semibold text-muted-foreground">Dalla galleria</span>
-                  </button>
-                </div>
-              )}
+        {/* Header mobile */}
+        <div className="md:hidden sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="font-heading text-sm font-bold text-foreground">Admin · Gratitude Path</p>
+              <p className="text-[11px] text-muted-foreground">
+                {isTraining ? "Modalità allenamento" : "Cammino in corso 🚴‍♂️"}
+              </p>
             </div>
-          )}
-
-          {/* ── Video (Reel) ── */}
-          {contentType === "reel" && (
-            <div className="mb-4">
-              <p className="text-xs font-semibold text-foreground mb-2">🎬 Video (richiesto)</p>
-
-              <input ref={fileInputVideoGallery} type="file" accept="video/*"
-                className="hidden" onChange={handleVideoChange} />
-              <input ref={fileInputVideoCamera}  type="file" accept="video/*" capture="environment"
-                className="hidden" onChange={handleVideoChange} />
-
-              {videoPreview ? (
-                <div className="relative rounded-xl overflow-hidden">
-                  <video
-                    src={videoPreview}
-                    controls
-                    className="w-full max-h-64 rounded-xl bg-black"
-                  />
-                  <div className="absolute top-2 right-2 flex gap-2">
-                    <button
-                      onClick={() => fileInputVideoGallery.current?.click()}
-                      className="bg-black/60 text-white rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-sm"
-                    >
-                      Cambia
-                    </button>
-                    <button onClick={removeVideo}
-                      className="bg-black/60 text-white rounded-full p-1.5 backdrop-blur-sm">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  {!cloudName && (
-                    <div className="absolute bottom-0 inset-x-0 bg-amber-500/90 px-3 py-1.5">
-                      <p className="text-xs text-white font-semibold text-center">
-                        ⚠️ Configura Cloudinary nelle impostazioni per pubblicare reel
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => fileInputVideoCamera.current?.click()}
-                    className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all"
-                  >
-                    <Video className="w-6 h-6 text-muted-foreground" />
-                    <span className="text-xs font-semibold text-muted-foreground">Registra video</span>
-                  </button>
-                  <button
-                    onClick={() => fileInputVideoGallery.current?.click()}
-                    className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all"
-                  >
-                    <ImageIcon className="w-6 h-6 text-muted-foreground" />
-                    <span className="text-xs font-semibold text-muted-foreground">Dalla galleria</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Note TikTok */}
-              {postTt && (
-                <p className="mt-2 text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">
-                  ℹ️ <strong>TikTok</strong>: al momento della pubblicazione si aprirà il
-                  foglio di condivisione iOS — seleziona TikTok dall'elenco.
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Piattaforme */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            <button
-              onClick={() => setPostFb(v => !v)}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold border transition-all
-                ${postFb ? "bg-blue-600 text-white border-blue-600" : "border-border text-muted-foreground"}`}
-            >
-              <Facebook className="w-4 h-4" /> Facebook
-            </button>
-            <button
-              onClick={() => setPostIg(v => !v)}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold border transition-all
-                ${postIg
-                  ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-transparent"
-                  : "border-border text-muted-foreground"}`}
-            >
-              <Instagram className="w-4 h-4" /> Instagram
-            </button>
-            {/* TikTok visibile solo in modalità Reel */}
-            {contentType === "reel" && (
+            {isSupabaseConfigured && (
               <button
-                onClick={() => setPostTt(v => !v)}
-                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold border transition-all
-                  ${postTt
-                    ? "bg-black text-white border-black"
-                    : "border-border text-muted-foreground"}`}
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-1.5 transition-colors"
               >
-                <TikTokIcon active={postTt} /> TikTok
+                <LogOut className="w-3.5 h-3.5" /> Esci
               </button>
             )}
           </div>
 
-          {/* Stato upload */}
-          {uploadStatus && (
-            <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
-              <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
-              <span>{uploadStatus}</span>
-            </div>
-          )}
-
-          {/* Risultato */}
-          {postResult && (
-            <div className="mb-3 space-y-1">
-              {postResult.ok.map((p, i) => (
-                <p key={i} className="text-xs text-green-600 font-semibold">✓ {p}</p>
-              ))}
-              {postResult.err.map((e, i) => (
-                <p key={i} className="text-xs text-red-500">{e}</p>
-              ))}
-            </div>
-          )}
-
-          {!fbToken && (postFb || postIg) && (
-            <p className="text-xs text-amber-600 mb-3">
-              ⚠️ Imposta le credenziali Meta nelle{" "}
-              <button onClick={() => setShowSettings(true)} className="underline">Impostazioni</button>{" "}
-              per poter pubblicare.
-            </p>
-          )}
-
-          <button
-            onClick={handlePublish}
-            disabled={!canPublish || posting}
-            className="w-full flex items-center justify-center gap-2 bg-dona text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-40 transition-opacity"
-          >
-            {posting
-              ? <><Loader2 className="w-4 h-4 animate-spin" />{uploadStatus || "Pubblicazione…"}</>
-              : <><Send className="w-4 h-4" />{contentType === "reel" ? "Pubblica Reel" : "Pubblica ora"}</>
-            }
-          </button>
-        </div>
-
-        {/* ── 3: Impostazioni ── */}
-        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-          <button
-            onClick={() => setShowSettings(v => !v)}
-            className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-foreground hover:bg-muted/50 transition-colors"
-          >
-            <span className="flex items-center gap-2">
-              <Settings className="w-4 h-4" /> Impostazioni social
-            </span>
-            {showSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-
-          {showSettings && (
-            <div className="px-5 pb-5 border-t border-border space-y-4 pt-4">
-
-              {/* Meta */}
-              <p className="text-xs font-bold text-foreground">Meta (Facebook / Instagram)</p>
-              <Field label="Facebook Page ID"     value={fbPageId}   onChange={setFbPageId}   placeholder="123456789012345" />
-              <Field label="Page Access Token"    value={fbToken}    onChange={setFbToken}    placeholder="EAABsb…" type="password" />
-              <Field label="Instagram User ID"    value={igUserId}   onChange={setIgUserId}   placeholder="17841400…" />
-              <Field label="URL immagine fallback Instagram" value={igImageUrl} onChange={setIgImageUrl}
-                placeholder="https://tuosito.com/og-image.jpg"
-                hint="Usata quando non carichi una foto" />
-
-              {/* Cloudinary */}
-              <div className="border-t border-border pt-4">
-                <p className="text-xs font-bold text-foreground mb-3">
-                  Cloudinary — upload foto e video per IG/FB
-                </p>
-                <Field label="Cloud Name"     value={cloudName}   onChange={setCloudName}   placeholder="il-tuo-cloud" />
-                <div className="mt-3">
-                  <Field label="Upload Preset (unsigned)" value={cloudPreset} onChange={setCloudPreset}
-                    placeholder="ml_default"
-                    hint="Crea un preset unsigned su cloudinary.com → Settings → Upload → Upload Presets" />
-                </div>
-                <details className="mt-3">
-                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                    Come creare un account Cloudinary gratuito →
-                  </summary>
-                  <ol className="mt-2 text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                    <li>Registrati gratis su <a href="https://cloudinary.com" target="_blank" rel="noreferrer" className="underline text-dona">cloudinary.com</a></li>
-                    <li>Copia il <strong>Cloud Name</strong> dalla dashboard</li>
-                    <li>Vai su <strong>Settings → Upload → Upload Presets → Add preset</strong></li>
-                    <li>Imposta <strong>Signing Mode: Unsigned</strong> → salva</li>
-                    <li>Copia il nome del preset e incollalo qui</li>
-                  </ol>
-                </details>
-              </div>
-
-              {/* TikTok info */}
-              <div className="border-t border-border pt-4">
-                <p className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
-                  <TikTokIcon active={false} /> TikTok
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  La pubblicazione su TikTok avviene tramite il foglio di condivisione nativo
-                  iOS/Android — non richiede credenziali. Assicurati di avere l'app TikTok
-                  installata sul telefono.
-                </p>
-              </div>
-
-              {/* Meta guide */}
-              <div className="border-t border-border pt-4">
-                <details>
-                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                    Come ottenere le credenziali Meta →
-                  </summary>
-                  <ol className="mt-2 text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                    <li><a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="underline text-dona">developers.facebook.com</a> → Crea app → tipo <strong>Business</strong> → collega <strong>1000kmdigratitudine</strong></li>
-                    <li>Aggiungi: <strong>Facebook Login for Business</strong> + <strong>Instagram Graph API</strong></li>
-                    <li><a href="https://developers.facebook.com/tools/explorer" target="_blank" rel="noreferrer" className="underline text-dona">Graph API Explorer</a> → token con: <code className="bg-muted px-1 rounded text-[10px]">pages_manage_posts, instagram_content_publish, instagram_basic</code></li>
-                    <li>Converti in long-lived token (60 gg) dal <a href="https://developers.facebook.com/tools/debug/accesstoken" target="_blank" rel="noreferrer" className="underline text-dona">Token Debugger</a></li>
-                    <li><strong>Page ID</strong>: Pagina FB → Info → ID</li>
-                    <li><strong>Instagram User ID</strong>: Explorer → <code className="bg-muted px-1 rounded text-[10px]">GET /{"{page-id}"}?fields=instagram_business_account</code></li>
-                  </ol>
-                </details>
-              </div>
-
+          {/* Tab bar mobile */}
+          <div className="flex border-t border-border overflow-x-auto scrollbar-none">
+            {NAV_ITEMS.map(item => (
               <button
-                onClick={handleSaveSettings}
-                className="w-full bg-foreground text-background rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+                key={item.key}
+                onClick={() => setActiveSection(item.key)}
+                className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 py-2 px-1 text-[10px] font-medium transition-colors border-b-2
+                  ${activeSection === item.key
+                    ? "border-dona text-dona"
+                    : "border-transparent text-muted-foreground"
+                  }`}
               >
-                {isSupabaseConfigured ? "Salva e sincronizza" : "Salva impostazioni"}
+                <span className="[&>svg]:w-4 [&>svg]:h-4">{item.icon}</span>
+                <span className="truncate w-full text-center leading-tight">{item.label}</span>
               </button>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
 
-        <div className="text-center pt-2">
-          <Link to="/il-percorso" className="text-sm text-dona underline font-body">
-            ← Vai alla pagina Percorso
-          </Link>
+        {/* Contenuto sezioni */}
+        <div className="flex-1 p-4 pb-20 md:p-8 overflow-y-auto">
+          <div className="max-w-lg mx-auto md:max-w-2xl md:mx-0 space-y-5">
+
+            {/* Caricamento */}
+            {settingsLoading && (
+              <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> Caricamento impostazioni…
+              </div>
+            )}
+
+            {/* ── SEZIONE: Live Tracking ─────────────────────────────────────── */}
+            {activeSection === "live" && (
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                <h2 className="font-semibold text-foreground mb-1 text-sm uppercase tracking-wide">
+                  📍 Link Live Tracking
+                </h2>
+                {getLtwUrl() && (
+                  <p className="text-xs text-green-600 font-mono break-all mb-2">{getLtwUrl()}</p>
+                )}
+                <input
+                  type="url"
+                  placeholder="https://locatoweb.com/map/single/..."
+                  className="w-full border border-border rounded-lg px-3 py-2.5 text-sm font-mono mb-1 focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+                  value={ltwUrl}
+                  onChange={e => { setLtwUrlLocal(e.target.value); setLtwSaved(false); }}
+                  onPaste={e => {
+                    const pasted = e.clipboardData.getData("text").trim();
+                    if (pasted.startsWith("https://locatoweb.com/")) {
+                      e.preventDefault();
+                      setLtwUrlLocal(pasted);
+                      setLtwUrl(pasted);
+                      setLtwSaved(true);
+                      setMessage(buildMessage(pasted, isTraining));
+                      setTimeout(() => setLtwSaved(false), 2500);
+                    }
+                  }}
+                />
+                <p className="text-xs text-muted-foreground mb-3">💡 Incolla → si salva automaticamente</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveLtw}
+                    disabled={!ltwUrl.startsWith("https://locatoweb.com/")}
+                    className="flex-1 flex items-center justify-center gap-1.5 bg-dona text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-40"
+                  >
+                    {ltwSaved ? <><CheckCircle className="w-4 h-4" />Salvato!</> : "Salva"}
+                  </button>
+                  {ltwUrl && (
+                    <button
+                      onClick={handleCopyShareLink}
+                      className="px-3 border border-dona/30 text-dona rounded-lg text-sm hover:bg-dona/5"
+                      title="Copia link condivisibile"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { clearLtwUrl(); setLtwUrlLocal(""); }}
+                    className="px-3 border border-border text-muted-foreground rounded-lg text-sm hover:bg-muted"
+                    title="Cancella URL"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── SEZIONE: Pubblica sui social ───────────────────────────────── */}
+            {activeSection === "social" && (
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                <h2 className="font-semibold text-foreground mb-3 text-sm uppercase tracking-wide">
+                  📣 Pubblica sui social
+                </h2>
+
+                {/* Tipo contenuto */}
+                <div className="flex gap-1 mb-4 bg-muted rounded-lg p-1">
+                  <button
+                    onClick={() => { setContentType("photo"); setPostResult(null); }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-semibold transition-all
+                      ${contentType === "photo" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <Camera className="w-4 h-4" /> Foto
+                  </button>
+                  <button
+                    onClick={() => { setContentType("reel"); setPostResult(null); }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-semibold transition-all
+                      ${contentType === "reel" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <Video className="w-4 h-4" /> Reel
+                  </button>
+                </div>
+
+                {/* Template */}
+                <div className="flex gap-2 mb-3">
+                  <button
+                    onClick={() => setMessage(buildMessage(ltwUrl || "https://...", true))}
+                    className="text-xs border border-border rounded-lg px-3 py-1.5 hover:bg-muted transition-colors"
+                  >
+                    Template allenamento
+                  </button>
+                  <button
+                    onClick={() => setMessage(buildMessage(ltwUrl || "https://...", false))}
+                    className="text-xs border border-border rounded-lg px-3 py-1.5 hover:bg-muted transition-colors"
+                  >
+                    Template evento
+                  </button>
+                </div>
+
+                {/* Testo */}
+                <textarea
+                  rows={8}
+                  className="w-full border border-border rounded-lg px-3 py-2.5 text-sm font-body mb-4 focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground resize-none"
+                  value={message}
+                  onChange={e => setMessage(e.target.value)}
+                />
+
+                {/* Foto */}
+                {contentType === "photo" && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-foreground mb-2">📷 Foto (opzionale)</p>
+                    <input ref={fileInputGallery} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+                    <input ref={fileInputCamera}  type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoChange} />
+
+                    {photoPreview ? (
+                      <div className="relative rounded-xl overflow-hidden">
+                        <img src={photoPreview} alt="Anteprima" className="w-full h-52 object-cover" />
+                        <div className="absolute top-2 right-2 flex gap-2">
+                          <button onClick={() => fileInputGallery.current?.click()}
+                            className="bg-black/60 text-white rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-sm">
+                            Cambia
+                          </button>
+                          <button onClick={removePhoto}
+                            className="bg-black/60 text-white rounded-full p-1.5 backdrop-blur-sm">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {!cloudName && (
+                          <div className="absolute bottom-0 inset-x-0 bg-amber-500/90 px-3 py-1.5">
+                            <p className="text-xs text-white font-semibold text-center">
+                              ⚠️ Configura Cloudinary nelle impostazioni per postare su Instagram
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <button onClick={() => fileInputCamera.current?.click()}
+                          className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all">
+                          <Camera className="w-6 h-6 text-muted-foreground" />
+                          <span className="text-xs font-semibold text-muted-foreground">Scatta foto</span>
+                        </button>
+                        <button onClick={() => fileInputGallery.current?.click()}
+                          className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all">
+                          <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                          <span className="text-xs font-semibold text-muted-foreground">Dalla galleria</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Video (Reel) */}
+                {contentType === "reel" && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-foreground mb-2">🎬 Video (richiesto)</p>
+                    <input ref={fileInputVideoGallery} type="file" accept="video/*" className="hidden" onChange={handleVideoChange} />
+                    <input ref={fileInputVideoCamera}  type="file" accept="video/*" capture="environment" className="hidden" onChange={handleVideoChange} />
+
+                    {videoPreview ? (
+                      <div className="relative rounded-xl overflow-hidden">
+                        <video src={videoPreview} controls className="w-full max-h-64 rounded-xl bg-black" />
+                        <div className="absolute top-2 right-2 flex gap-2">
+                          <button onClick={() => fileInputVideoGallery.current?.click()}
+                            className="bg-black/60 text-white rounded-full px-3 py-1 text-xs font-semibold backdrop-blur-sm">
+                            Cambia
+                          </button>
+                          <button onClick={removeVideo}
+                            className="bg-black/60 text-white rounded-full p-1.5 backdrop-blur-sm">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {!cloudName && (
+                          <div className="absolute bottom-0 inset-x-0 bg-amber-500/90 px-3 py-1.5">
+                            <p className="text-xs text-white font-semibold text-center">
+                              ⚠️ Configura Cloudinary nelle impostazioni per pubblicare reel
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <button onClick={() => fileInputVideoCamera.current?.click()}
+                          className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all">
+                          <Video className="w-6 h-6 text-muted-foreground" />
+                          <span className="text-xs font-semibold text-muted-foreground">Registra video</span>
+                        </button>
+                        <button onClick={() => fileInputVideoGallery.current?.click()}
+                          className="flex flex-col items-center gap-2 border-2 border-dashed border-border rounded-xl p-4 hover:border-dona/50 hover:bg-dona/5 transition-all">
+                          <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                          <span className="text-xs font-semibold text-muted-foreground">Dalla galleria</span>
+                        </button>
+                      </div>
+                    )}
+                    {postTt && (
+                      <p className="mt-2 text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">
+                        ℹ️ <strong>TikTok</strong>: al momento della pubblicazione si aprirà il foglio
+                        di condivisione iOS — seleziona TikTok dall'elenco.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Piattaforme */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <button
+                    onClick={() => setPostFb(v => !v)}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold border transition-all
+                      ${postFb ? "bg-blue-600 text-white border-blue-600" : "border-border text-muted-foreground"}`}
+                  >
+                    <Facebook className="w-4 h-4" /> Facebook
+                  </button>
+                  <button
+                    onClick={() => setPostIg(v => !v)}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold border transition-all
+                      ${postIg ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-transparent" : "border-border text-muted-foreground"}`}
+                  >
+                    <Instagram className="w-4 h-4" /> Instagram
+                  </button>
+                  {contentType === "reel" && (
+                    <button
+                      onClick={() => setPostTt(v => !v)}
+                      className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold border transition-all
+                        ${postTt ? "bg-black text-white border-black" : "border-border text-muted-foreground"}`}
+                    >
+                      <TikTokIcon active={postTt} /> TikTok
+                    </button>
+                  )}
+                </div>
+
+                {/* Stato upload */}
+                {uploadStatus && (
+                  <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+                    <span>{uploadStatus}</span>
+                  </div>
+                )}
+
+                {/* Risultato */}
+                {postResult && (
+                  <div className="mb-3 space-y-1">
+                    {postResult.ok.map((p, i) => <p key={i} className="text-xs text-green-600 font-semibold">✓ {p}</p>)}
+                    {postResult.err.map((e, i) => <p key={i} className="text-xs text-red-500">{e}</p>)}
+                  </div>
+                )}
+
+                {!fbToken && (postFb || postIg) && (
+                  <p className="text-xs text-amber-600 mb-3">
+                    ⚠️ Imposta le credenziali Meta nelle{" "}
+                    <button onClick={() => setActiveSection("settings")} className="underline">Impostazioni</button>{" "}
+                    per poter pubblicare.
+                  </p>
+                )}
+
+                <button
+                  onClick={handlePublish}
+                  disabled={!canPublish || posting}
+                  className="w-full flex items-center justify-center gap-2 bg-dona text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-40 transition-opacity"
+                >
+                  {posting
+                    ? <><Loader2 className="w-4 h-4 animate-spin" />{uploadStatus || "Pubblicazione…"}</>
+                    : <><Send className="w-4 h-4" />{contentType === "reel" ? "Pubblica Reel" : "Pubblica ora"}</>
+                  }
+                </button>
+              </div>
+            )}
+
+            {/* ── SEZIONE: Video YouTube ─────────────────────────────────────── */}
+            {activeSection === "video" && (
+              <div className="space-y-4">
+                <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                  <h2 className="font-semibold text-foreground mb-1 text-sm uppercase tracking-wide">
+                    🎬 Video YouTube — Crocifisso Nero
+                  </h2>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Inserisci l'ID del video YouTube (es. da{" "}
+                    <code className="bg-muted px-1 rounded text-[10px]">youtube.com/watch?v=<strong>dQw4w9WgXcQ</strong></code>{" "}
+                    → copia solo la parte in grassetto).
+                  </p>
+
+                  <div className="space-y-4">
+                    <YtVideoField
+                      label="Video 1 · La Storia del Crocifisso Nero"
+                      value={ytCn1}
+                      onChange={setYtCn1}
+                    />
+                    <YtVideoField
+                      label="Video 2 · La Devozione e le Celebrazioni"
+                      value={ytCn2}
+                      onChange={setYtCn2}
+                    />
+                    <YtVideoField
+                      label="Video 3 · I Miracoli e le Grazie"
+                      value={ytCn3}
+                      onChange={setYtCn3}
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleSaveYtVideos}
+                    className="mt-5 w-full flex items-center justify-center gap-2 bg-foreground text-background rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    {ytSaved
+                      ? <><CheckCircle className="w-4 h-4" /> Salvato!</>
+                      : <><Youtube className="w-4 h-4" /> Salva video</>
+                    }
+                  </button>
+
+                  <p className="mt-3 text-[11px] text-muted-foreground text-center">
+                    I link vengono salvati localmente e applicati alla pagina{" "}
+                    <Link to="/crocifisso-nero" className="underline text-dona" target="_blank">
+                      Crocifisso Nero
+                    </Link>{" "}
+                    su questo dispositivo.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ── SEZIONE: Impostazioni social ───────────────────────────────── */}
+            {activeSection === "settings" && (
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                <h2 className="font-semibold text-foreground text-sm uppercase tracking-wide">
+                  ⚙️ Impostazioni social
+                </h2>
+
+                {/* Meta */}
+                <p className="text-xs font-bold text-foreground">Meta (Facebook / Instagram)</p>
+                <Field label="Facebook Page ID"  value={fbPageId}   onChange={setFbPageId}   placeholder="123456789012345" />
+                <Field label="Page Access Token" value={fbToken}    onChange={setFbToken}    placeholder="EAABsb…" type="password" />
+                <Field label="Instagram User ID" value={igUserId}   onChange={setIgUserId}   placeholder="17841400…" />
+                <Field label="URL immagine fallback Instagram" value={igImageUrl} onChange={setIgImageUrl}
+                  placeholder="https://tuosito.com/og-image.jpg"
+                  hint="Usata quando non carichi una foto" />
+
+                {/* Cloudinary */}
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs font-bold text-foreground mb-3">
+                    Cloudinary — upload foto e video per IG/FB
+                  </p>
+                  <Field label="Cloud Name" value={cloudName} onChange={setCloudName} placeholder="il-tuo-cloud" />
+                  <div className="mt-3">
+                    <Field label="Upload Preset (unsigned)" value={cloudPreset} onChange={setCloudPreset}
+                      placeholder="ml_default"
+                      hint="Crea un preset unsigned su cloudinary.com → Settings → Upload → Upload Presets" />
+                  </div>
+                  <details className="mt-3">
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                      Come creare un account Cloudinary gratuito →
+                    </summary>
+                    <ol className="mt-2 text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                      <li>Registrati gratis su <a href="https://cloudinary.com" target="_blank" rel="noreferrer" className="underline text-dona">cloudinary.com</a></li>
+                      <li>Copia il <strong>Cloud Name</strong> dalla dashboard</li>
+                      <li>Vai su <strong>Settings → Upload → Upload Presets → Add preset</strong></li>
+                      <li>Imposta <strong>Signing Mode: Unsigned</strong> → salva</li>
+                      <li>Copia il nome del preset e incollalo qui</li>
+                    </ol>
+                  </details>
+                </div>
+
+                {/* TikTok info */}
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs font-bold text-foreground mb-2 flex items-center gap-1.5">
+                    <TikTokIcon active={false} /> TikTok
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    La pubblicazione su TikTok avviene tramite il foglio di condivisione nativo
+                    iOS/Android — non richiede credenziali. Assicurati di avere l'app TikTok
+                    installata sul telefono.
+                  </p>
+                </div>
+
+                {/* Meta guide */}
+                <div className="border-t border-border pt-4">
+                  <details>
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                      Come ottenere le credenziali Meta →
+                    </summary>
+                    <ol className="mt-2 text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                      <li><a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="underline text-dona">developers.facebook.com</a> → Crea app → tipo <strong>Business</strong> → collega <strong>1000kmdigratitudine</strong></li>
+                      <li>Aggiungi: <strong>Facebook Login for Business</strong> + <strong>Instagram Graph API</strong></li>
+                      <li><a href="https://developers.facebook.com/tools/explorer" target="_blank" rel="noreferrer" className="underline text-dona">Graph API Explorer</a> → token con: <code className="bg-muted px-1 rounded text-[10px]">pages_manage_posts, instagram_content_publish, instagram_basic</code></li>
+                      <li>Converti in long-lived token (60 gg) dal <a href="https://developers.facebook.com/tools/debug/accesstoken" target="_blank" rel="noreferrer" className="underline text-dona">Token Debugger</a></li>
+                      <li><strong>Page ID</strong>: Pagina FB → Info → ID</li>
+                      <li><strong>Instagram User ID</strong>: Explorer → <code className="bg-muted px-1 rounded text-[10px]">GET /{"{page-id}"}?fields=instagram_business_account</code></li>
+                    </ol>
+                  </details>
+                </div>
+
+                <button
+                  onClick={handleSaveSettings}
+                  className="w-full bg-foreground text-background rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  {isSupabaseConfigured ? "Salva e sincronizza" : "Salva impostazioni"}
+                </button>
+              </div>
+            )}
+
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Campo input YouTube ──────────────────────────────────────────────────────
+function YtVideoField({
+  label, value, onChange,
+}: { label: string; value: string; onChange: (v: string) => void }) {
+  const isValid = value.trim().length > 0 && !value.startsWith("YOUTUBE_ID");
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-foreground mb-1">{label}</label>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value.trim())}
+          placeholder="es. dQw4w9WgXcQ"
+          className="flex-1 border border-border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+        />
+        {isValid && (
+          <a
+            href={`https://www.youtube.com/watch?v=${value}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center px-3 border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Apri su YouTube"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        )}
+      </div>
+      {isValid && (
+        <p className="text-[10px] text-green-600 mt-1">✓ ID impostato</p>
+      )}
     </div>
   );
 }
@@ -892,12 +1023,7 @@ export default function AdminLive() {
 // ─── TikTok SVG icon ──────────────────────────────────────────────────────────
 function TikTokIcon({ active }: { active: boolean }) {
   return (
-    <svg
-      className="w-4 h-4"
-      viewBox="0 0 24 24"
-      fill={active ? "white" : "currentColor"}
-      aria-hidden="true"
-    >
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill={active ? "white" : "currentColor"} aria-hidden="true">
       <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.19 8.19 0 0 0 4.78 1.52V6.75a4.84 4.84 0 0 1-1.01-.06Z" />
     </svg>
   );
