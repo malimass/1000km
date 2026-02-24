@@ -199,7 +199,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div>
               <h4 className="font-heading text-sm font-bold mb-4 uppercase tracking-wider">Beneficenza</h4>
               <p className="text-primary-foreground/70 text-sm font-body leading-relaxed">
-                Raccolta fondi a favore di <strong className="text-accent">Komen Italia</strong>. Rendicontazione pubblica e trasparente.
+                Raccolta fondi solidale per la ricerca. Rendicontazione pubblica e trasparente.
               </p>
             </div>
           </div>
