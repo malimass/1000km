@@ -37,8 +37,11 @@ function LiveTrackingSection({
   // GPS attivo ha priorità su LocaToWeb
   const gpsActive = livePos?.is_active === true;
 
-  // Mostra indicatore live solo se GPS o LTW attivi
-  const showLiveBadge = isLive && (gpsActive || !!ltwUrl);
+  // Se GPS è attivo mostra sempre la live, anche fuori dalle date dell'evento
+  const showLiveContent = isLive || gpsActive;
+
+  // Mostra indicatore live se GPS attivo oppure siamo nel periodo + LTW attivo
+  const showLiveBadge = gpsActive || (isLive && !!ltwUrl);
 
   return (
     <section className="section-padding bg-primary text-primary-foreground">
@@ -59,10 +62,10 @@ function LiveTrackingSection({
           </div>
 
           <h2 className="font-heading text-2xl md:text-3xl font-bold text-center mb-4">
-            {isLive ? "Posizione in tempo reale" : "Segui in diretta"}
+            {showLiveContent ? "Posizione in tempo reale" : "Segui in diretta"}
           </h2>
 
-          {isLive ? (
+          {showLiveContent ? (
             <div className="mt-6">
               {gpsActive ? (
                 // ── GPS diretto attivo ──────────────────────────────────────
@@ -283,8 +286,8 @@ export default function Percorso() {
               </span>
               {traveledRoute.length > 1 && (
                 <span className="flex items-center gap-2">
-                  <span className="inline-block w-6 h-1 rounded bg-blue-500 opacity-90" />
-                  Percorso percorso
+                  <span className="inline-block w-6 h-1 rounded bg-green-600 opacity-90" />
+                  Percorso completato
                 </span>
               )}
             </div>
