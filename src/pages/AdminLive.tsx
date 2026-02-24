@@ -631,7 +631,7 @@ export default function AdminLive() {
       <div className="flex-1 min-w-0 flex flex-col">
 
         {/* Header mobile */}
-        <div className="md:hidden sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="md:hidden sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border pt-safe">
           <div className="flex items-center justify-between px-4 py-3">
             <div>
               <p className="font-heading text-sm font-bold text-foreground">Admin · Gratitude Path</p>
