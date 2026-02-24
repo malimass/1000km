@@ -246,6 +246,7 @@ export default function AdminLive() {
   const [isTracking,  setIsTracking]  = useState(false);
   const [gpsPos,      setGpsPos]      = useState<{ lat: number; lng: number; speed: number | null; accuracy: number | null } | null>(null);
   const [gpsError,    setGpsError]    = useState("");
+  const [dbError,     setDbError]     = useState("");   // errore scrittura Supabase
   const [routeCount,  setRouteCount]  = useState(0);  // punti registrati in sessione
   const watchIdRef        = useRef<number | null>(null);
   const lastRoutePointRef = useRef<[number, number] | null>(null);  // ultimo punto salvato
@@ -382,11 +383,17 @@ export default function AdminLive() {
       return;
     }
     setGpsError("");
+    setDbError("");
     sessionIdRef.current      = todaySessionId();
     lastRoutePointRef.current = null;
     lastRouteTimeRef.current  = 0;
     setRouteCount(0);
-    await upsertLivePosition({ is_active: true }, runnerId);
+
+    // Verifica subito se le scritture su Supabase funzionano
+    const startErr = await upsertLivePosition({ is_active: true }, runnerId);
+    if (startErr) {
+      setDbError(`Salvataggio GPS bloccato (RLS): ${startErr} — vedi istruzioni admin.`);
+    }
     setIsTracking(true);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -395,7 +402,9 @@ export default function AdminLive() {
         setGpsPos({ lat, lng, speed, accuracy });
 
         // ── Aggiorna posizione live ──────────────────────────────────────────
-        await upsertLivePosition({ lat, lng, speed, accuracy, heading, is_active: true }, runnerId);
+        const liveErr = await upsertLivePosition({ lat, lng, speed, accuracy, heading, is_active: true }, runnerId);
+        if (liveErr) setDbError(`Posizione live non salvata: ${liveErr}`);
+        else setDbError("");
 
         // ── Registra punto nella traccia (ogni ≥30 m oppure ≥60 s) ──────────
         const now = Date.now();
@@ -735,6 +744,11 @@ export default function AdminLive() {
                     {!gpsPos && (
                       <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
                         <Loader2 className="w-3.5 h-3.5 animate-spin" /> Acquisizione segnale GPS…
+                      </div>
+                    )}
+                    {dbError && (
+                      <div className="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700 font-semibold">
+                        ⚠️ {dbError}
                       </div>
                     )}
                     {routeCount > 0 && (
