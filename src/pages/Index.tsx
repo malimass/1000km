@@ -329,10 +329,10 @@ const Index = () => {
               },
               {
                 icon: <Users className="w-8 h-8" />,
-                title: "Diventa Sponsor",
-                text: "Associa il tuo brand a un progetto di valore. Visibilità garantita e impatto sociale reale.",
-                cta: "Scopri i pacchetti",
-                to: "/sponsor",
+                title: "Sostenitori del cammino",
+                text: "Scopri le aziende e le persone che sostengono i 1000 km di gratitudine.",
+                cta: "Scopri i sostenitori",
+                to: "/sostenitori",
               },
               {
                 icon: <Share2 className="w-8 h-8" />,

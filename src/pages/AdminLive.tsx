@@ -680,14 +680,12 @@ export default function AdminLive() {
           >
             ← Percorso pubblico
           </Link>
-          {isSupabaseConfigured && (
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-            >
-              <LogOut className="w-3.5 h-3.5" /> Esci
-            </button>
-          )}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" /> Esci
+          </button>
         </div>
       </aside>
 
@@ -703,14 +701,12 @@ export default function AdminLive() {
                 {isTraining ? "Modalità allenamento" : "Cammino in corso 🚴‍♂️"}
               </p>
             </div>
-            {isSupabaseConfigured && (
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-1.5 transition-colors"
-              >
-                <LogOut className="w-3.5 h-3.5" /> Esci
-              </button>
-            )}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-lg px-3 py-1.5 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" /> Esci
+            </button>
           </div>
 
           {/* Tab bar mobile */}
@@ -1157,7 +1153,7 @@ export default function AdminLive() {
 
                   <p className="mt-3 text-[11px] text-muted-foreground text-center">
                     I link vengono salvati localmente e applicati alla pagina{" "}
-                    <Link to="/crocifisso-nero" className="underline text-dona" target="_blank">
+                    <Link to="/ss-crocifisso-nero" className="underline text-dona" target="_blank">
                       Crocifisso Nero
                     </Link>{" "}
                     su questo dispositivo.
