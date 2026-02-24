@@ -138,3 +138,49 @@ export function loadYtCrocifissoVideos(): [YtVideoData, YtVideoData, YtVideoData
     { id: lsGet(LS.ytCn3), titolo: lsGet(LS.ytCn3Title), descrizione: lsGet(LS.ytCn3Desc) },
   ];
 }
+
+// ─── site_settings (lettura pubblica senza auth) ───────────────────────────────
+
+type SiteYtData = {
+  ytCn1: string; ytCn1Title: string; ytCn1Desc: string;
+  ytCn2: string; ytCn2Title: string; ytCn2Desc: string;
+  ytCn3: string; ytCn3Title: string; ytCn3Desc: string;
+};
+
+/**
+ * Salva i video YouTube nella tabella `site_settings` (riga singleton id=1).
+ * Questa tabella è leggibile pubblicamente senza autenticazione,
+ * così i visitatori della pagina CrocifissoNero vedono i video aggiornati.
+ */
+export async function saveSiteYtVideos(s: SiteYtData): Promise<void> {
+  if (!supabase) return;
+  await supabase.from("site_settings").upsert({
+    id: 1,
+    data: {
+      ytCn1: s.ytCn1, ytCn1Title: s.ytCn1Title, ytCn1Desc: s.ytCn1Desc,
+      ytCn2: s.ytCn2, ytCn2Title: s.ytCn2Title, ytCn2Desc: s.ytCn2Desc,
+      ytCn3: s.ytCn3, ytCn3Title: s.ytCn3Title, ytCn3Desc: s.ytCn3Desc,
+    },
+    updated_at: new Date().toISOString(),
+  });
+}
+
+/**
+ * Legge i video YouTube da Supabase `site_settings` senza richiedere autenticazione.
+ * Ritorna null se Supabase non è configurato o la riga non esiste ancora.
+ */
+export async function loadSiteYtVideos(): Promise<[YtVideoData, YtVideoData, YtVideoData] | null> {
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from("site_settings")
+    .select("data")
+    .eq("id", 1)
+    .single();
+  if (!data?.data) return null;
+  const d = data.data as Record<string, string>;
+  return [
+    { id: d.ytCn1 ?? "", titolo: d.ytCn1Title ?? "", descrizione: d.ytCn1Desc ?? "" },
+    { id: d.ytCn2 ?? "", titolo: d.ytCn2Title ?? "", descrizione: d.ytCn2Desc ?? "" },
+    { id: d.ytCn3 ?? "", titolo: d.ytCn3Title ?? "", descrizione: d.ytCn3Desc ?? "" },
+  ];
+}

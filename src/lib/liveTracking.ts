@@ -168,6 +168,21 @@ export function subscribeRoutePositions(
   return () => { supabase!.removeChannel(channel); };
 }
 
+/** Cancella tutti i punti della traccia per la sessione e il corridore indicati.
+ *  Usato dal pannello admin per eliminare dati di test. */
+export async function clearRoutePositions(
+  sessionId: string,
+  runnerId: 1 | 2,
+): Promise<string | null> {
+  if (!supabase) return null;
+  const { error } = await supabase
+    .from("route_positions")
+    .delete()
+    .eq("session_id", sessionId)
+    .eq("runner_id", runnerId);
+  return error?.message ?? null;
+}
+
 // ─── Utility distanza (Haversine) ─────────────────────────────────────────────
 
 /** Distanza in metri tra due coordinate [lat, lng]. */

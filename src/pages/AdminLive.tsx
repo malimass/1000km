@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { loadSettings, saveSettings as saveSettingsDB, type AdminSettings } from "@/lib/adminSettings";
+import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, type AdminSettings } from "@/lib/adminSettings";
 import { loadSosteniPage, saveSosteniPage, type Sostenitore, type SosteniPage } from "@/lib/sostenitori";
 import {
-  upsertLivePosition, appendRoutePoint, distanceMeters, todaySessionId,
+  upsertLivePosition, appendRoutePoint, clearRoutePositions, distanceMeters, todaySessionId,
 } from "@/lib/liveTracking";
 import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
@@ -250,6 +250,7 @@ export default function AdminLive() {
   const [gpsError,    setGpsError]    = useState("");
   const [dbError,     setDbError]     = useState("");   // errore scrittura Supabase
   const [routeCount,  setRouteCount]  = useState(0);  // punti registrati in sessione
+  const [clearingRoute, setClearingRoute] = useState(false);
   const watchIdRef        = useRef<number | null>(null);
   const lastRoutePointRef = useRef<[number, number] | null>(null);  // ultimo punto salvato
   const lastRouteTimeRef  = useRef<number>(0);                      // timestamp ultimo salvataggio
@@ -388,6 +389,8 @@ export default function AdminLive() {
   async function handleSaveYtVideos() {
     const s: AdminSettings = { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset, ytCn1, ytCn1Title, ytCn1Desc, ytCn2, ytCn2Title, ytCn2Desc, ytCn3, ytCn3Title, ytCn3Desc };
     await saveSettingsDB(s);
+    // Salva anche su site_settings (tabella pubblica, senza auth) così i visitatori vedono i video
+    await saveSiteYtVideos({ ytCn1, ytCn1Title, ytCn1Desc, ytCn2, ytCn2Title, ytCn2Desc, ytCn3, ytCn3Title, ytCn3Desc });
     setYtSaved(true);
     setTimeout(() => setYtSaved(false), 2500);
   }
@@ -500,6 +503,15 @@ export default function AdminLive() {
     setIsTracking(false);
     setGpsPos(null);
     await upsertLivePosition({ is_active: false }, runnerId);
+  }
+
+  async function handleClearRoute() {
+    if (!window.confirm(`Cancellare la traccia di oggi per ${runnerId === 1 ? "Massimo" : "Nunzio"}? L'azione è irreversibile.`)) return;
+    setClearingRoute(true);
+    const err = await clearRoutePositions(todaySessionId(), runnerId);
+    setClearingRoute(false);
+    if (err) setDbError(`Errore cancellazione traccia: ${err}`);
+    else { setRouteCount(0); setDbError(""); }
   }
 
   // Ferma il watch se si smonta il componente mentre tracking è attivo
@@ -779,6 +791,14 @@ export default function AdminLive() {
                     >
                       <Navigation className="w-4 h-4" /> Avvia Tracking GPS
                     </button>
+                    <button
+                      onClick={handleClearRoute}
+                      disabled={clearingRoute}
+                      className="w-full flex items-center justify-center gap-2 bg-muted text-muted-foreground border border-border rounded-lg py-2 text-xs font-medium hover:bg-destructive/10 hover:text-destructive hover:border-destructive transition-colors disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      {clearingRoute ? "Cancellazione…" : "Cancella traccia di oggi"}
+                    </button>
                   </>
                 ) : (
                   <>
@@ -824,6 +844,14 @@ export default function AdminLive() {
                       className="w-full flex items-center justify-center gap-2 bg-red-500 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-red-600 transition-colors"
                     >
                       <X className="w-4 h-4" /> Ferma Tracking
+                    </button>
+                    <button
+                      onClick={handleClearRoute}
+                      disabled={clearingRoute}
+                      className="w-full flex items-center justify-center gap-2 bg-muted text-muted-foreground border border-border rounded-lg py-2 text-xs font-medium hover:bg-destructive/10 hover:text-destructive hover:border-destructive transition-colors disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      {clearingRoute ? "Cancellazione…" : "Cancella traccia di oggi"}
                     </button>
                   </>
                 )}
