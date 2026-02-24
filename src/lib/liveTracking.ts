@@ -34,17 +34,19 @@ export type RoutePoint = {
 
 // ─── live_position ─────────────────────────────────────────────────────────────
 
-/** Upsert posizione corrente per il corridore specificato (1 o 2). */
+/** Upsert posizione corrente per il corridore specificato (1 o 2).
+ *  Restituisce il messaggio di errore Supabase, o null se ok. */
 export async function upsertLivePosition(
   fields: Partial<Omit<LivePosition, "updated_at">>,
   runnerId: 1 | 2 = 1,
-): Promise<void> {
-  if (!supabase) return;
-  await supabase.from("live_position").upsert({
+): Promise<string | null> {
+  if (!supabase) return null;
+  const { error } = await supabase.from("live_position").upsert({
     id: runnerId,
     ...fields,
     updated_at: new Date().toISOString(),
   });
+  return error?.message ?? null;
 }
 
 /** Carica l'ultima posizione nota di un corridore. */
@@ -102,7 +104,8 @@ export function todaySessionId(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Aggiunge un punto alla traccia del corridore specificato. */
+/** Aggiunge un punto alla traccia del corridore specificato.
+ *  Restituisce il messaggio di errore Supabase, o null se ok. */
 export async function appendRoutePoint(
   lat: number,
   lng: number,
@@ -111,14 +114,15 @@ export async function appendRoutePoint(
   heading: number | null,
   sessionId: string,
   runnerId: 1 | 2 = 1,
-): Promise<void> {
-  if (!supabase) return;
-  await supabase.from("route_positions").insert({
+): Promise<string | null> {
+  if (!supabase) return null;
+  const { error } = await supabase.from("route_positions").insert({
     lat, lng, speed, accuracy, heading,
     session_id: sessionId,
     recorded_at: new Date().toISOString(),
     runner_id: runnerId,
   });
+  return error?.message ?? null;
 }
 
 /**

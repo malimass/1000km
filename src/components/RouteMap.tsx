@@ -208,7 +208,7 @@ export default function RouteMap({
           <Marker position={liveLatlng1} icon={runner1Icon} zIndexOffset={1000}>
             <Popup>
               <div className="text-sm font-sans space-y-0.5">
-                <strong>🏃‍♂️ Corridore 1</strong>
+                <strong>🏃‍♂️ Massimo</strong>
                 {livePos?.speed != null && <p>{(livePos.speed * 3.6).toFixed(1)} km/h</p>}
                 {livePos?.accuracy != null && <p className="text-xs text-gray-500">±{Math.round(livePos.accuracy)} m</p>}
               </div>
@@ -216,12 +216,12 @@ export default function RouteMap({
           </Marker>
         )}
 
-        {/* Marker corridore 2 — 🏃‍♀️ */}
+        {/* Marker corridore 2 — 🏃‍♂️ */}
         {liveLatlng2 && (
           <Marker position={liveLatlng2} icon={runner2Icon} zIndexOffset={1000}>
             <Popup>
               <div className="text-sm font-sans space-y-0.5">
-                <strong>🏃‍♀️ Corridore 2</strong>
+                <strong>🏃‍♂️ Nunzio</strong>
                 {livePos2?.speed != null && <p>{(livePos2.speed * 3.6).toFixed(1)} km/h</p>}
                 {livePos2?.accuracy != null && <p className="text-xs text-gray-500">±{Math.round(livePos2.accuracy)} m</p>}
               </div>
