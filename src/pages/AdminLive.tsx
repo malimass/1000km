@@ -233,6 +233,10 @@ export default function AdminLive() {
   const [cloudPreset, setCloudPreset] = useState("");
 
   // ─ GPS Live ─
+  const [runnerId,    setRunnerIdState] = useState<1 | 2>(() => {
+    const saved = localStorage.getItem("gratitudepath_runner_id");
+    return saved === "2" ? 2 : 1;
+  });
   const [isTracking,  setIsTracking]  = useState(false);
   const [gpsPos,      setGpsPos]      = useState<{ lat: number; lng: number; speed: number | null; accuracy: number | null } | null>(null);
   const [gpsError,    setGpsError]    = useState("");
@@ -241,6 +245,11 @@ export default function AdminLive() {
   const lastRoutePointRef = useRef<[number, number] | null>(null);  // ultimo punto salvato
   const lastRouteTimeRef  = useRef<number>(0);                      // timestamp ultimo salvataggio
   const sessionIdRef      = useRef<string>("");
+
+  function selectRunner(id: 1 | 2) {
+    setRunnerIdState(id);
+    localStorage.setItem("gratitudepath_runner_id", String(id));
+  }
 
   // ─ Video YouTube ─
   const [ytCn1, setYtCn1] = useState(""); const [ytCn1Title, setYtCn1Title] = useState(""); const [ytCn1Desc, setYtCn1Desc] = useState("");
@@ -371,7 +380,7 @@ export default function AdminLive() {
     lastRoutePointRef.current = null;
     lastRouteTimeRef.current  = 0;
     setRouteCount(0);
-    await upsertLivePosition({ is_active: true });
+    await upsertLivePosition({ is_active: true }, runnerId);
     setIsTracking(true);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -380,7 +389,7 @@ export default function AdminLive() {
         setGpsPos({ lat, lng, speed, accuracy });
 
         // ── Aggiorna posizione live ──────────────────────────────────────────
-        await upsertLivePosition({ lat, lng, speed, accuracy, heading, is_active: true });
+        await upsertLivePosition({ lat, lng, speed, accuracy, heading, is_active: true }, runnerId);
 
         // ── Registra punto nella traccia (ogni ≥30 m oppure ≥60 s) ──────────
         const now = Date.now();
@@ -390,7 +399,7 @@ export default function AdminLive() {
         const timeEnough  = elapsed >= 60_000;
 
         if (movedEnough || timeEnough) {
-          await appendRoutePoint(lat, lng, speed, accuracy, heading, sessionIdRef.current);
+          await appendRoutePoint(lat, lng, speed, accuracy, heading, sessionIdRef.current, runnerId);
           lastRoutePointRef.current = [lat, lng];
           lastRouteTimeRef.current  = now;
           setRouteCount(c => c + 1);
@@ -408,7 +417,7 @@ export default function AdminLive() {
     }
     setIsTracking(false);
     setGpsPos(null);
-    await upsertLivePosition({ is_active: false });
+    await upsertLivePosition({ is_active: false }, runnerId);
   }
 
   // Ferma il watch se si smonta il componente mentre tracking è attivo
@@ -664,18 +673,43 @@ export default function AdminLive() {
                     ⚠️ Supabase non configurato — il GPS diretto non è disponibile.
                   </p>
                 ) : !isTracking ? (
-                  <button
-                    onClick={startGpsTracking}
-                    className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg py-3 text-sm font-semibold hover:bg-blue-700 transition-colors"
-                  >
-                    <Navigation className="w-4 h-4" /> Avvia Tracking GPS
-                  </button>
+                  <>
+                    {/* Selettore corridore */}
+                    <div className="mb-3">
+                      <p className="text-xs text-muted-foreground mb-2 font-medium">Quale corridore sei?</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => selectRunner(1)}
+                          className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold border-2 transition-colors
+                            ${runnerId === 1 ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-muted/40 text-muted-foreground"}`}
+                        >
+                          🏃‍♂️ Corridore 1
+                        </button>
+                        <button
+                          onClick={() => selectRunner(2)}
+                          className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold border-2 transition-colors
+                            ${runnerId === 2 ? "border-orange-500 bg-orange-50 text-orange-700" : "border-border bg-muted/40 text-muted-foreground"}`}
+                        >
+                          🏃‍♀️ Corridore 2
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      onClick={startGpsTracking}
+                      className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg py-3 text-sm font-semibold hover:bg-blue-700 transition-colors"
+                    >
+                      <Navigation className="w-4 h-4" /> Avvia Tracking GPS
+                    </button>
+                  </>
                 ) : (
                   <>
                     <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-green-600">
                       <span className="relative flex h-3 w-3">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                         <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+                      </span>
+                      <span className="text-xs text-muted-foreground font-normal ml-1">
+                        {runnerId === 1 ? "🏃‍♂️ Corridore 1" : "🏃‍♀️ Corridore 2"}
                       </span>
                       LIVE — Aggiornamento continuo
                     </div>

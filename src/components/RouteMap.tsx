@@ -51,16 +51,30 @@ function MapController({ selectedIndex }: { selectedIndex: number | null }) {
   return null;
 }
 
-// Icona con due corridori animati per la posizione live
-const runnerIcon = divIcon({
-  className: "runner-marker",
-  html: `<div style="position:relative;text-align:center;width:52px">
-    <span class="runner-emoji">🏃‍♂️</span><span class="runner-emoji runner-emoji-2">🏃‍♀️</span>
-    <div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:38px;height:7px;background:rgba(0,0,0,0.18);border-radius:50%;filter:blur(3px)"></div>
-  </div>`,
-  iconSize:   [52, 40],
-  iconAnchor: [26, 40],
-});
+// Genera un'icona corridore con emoji, colore pin e animazione bounce
+function makeRunnerIcon(emoji: string, pinColor: string) {
+  return divIcon({
+    className: "runner-marker",
+    html: `
+      <style>
+        @keyframes rb{0%{transform:translateY(0)}100%{transform:translateY(-9px)}}
+        @keyframes rp2{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.4);opacity:0}}
+        .re-s{display:inline-block;font-size:36px;line-height:1;animation:rb 0.42s ease-in-out infinite alternate;filter:drop-shadow(0 3px 5px rgba(0,0,0,0.5))}
+      </style>
+      <div style="position:relative;text-align:center;width:52px">
+        <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.95);border-radius:12px;padding:2px 6px;box-shadow:0 2px 10px rgba(0,0,0,0.25)">
+          <span class="re-s">${emoji}</span>
+        </div>
+        <div style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);width:14px;height:14px;background:${pinColor};border:2.5px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>
+        <div style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);width:28px;height:28px;background:${pinColor}44;border-radius:50%;animation:rp2 1.6s ease-out infinite;margin-left:-7px;margin-top:-7px"></div>
+      </div>`,
+    iconSize:   [52, 58],
+    iconAnchor: [26, 58],
+  });
+}
+
+const runner1Icon = makeRunnerIcon("🏃‍♂️", "#3b82f6");  // blu
+const runner2Icon = makeRunnerIcon("🏃‍♀️", "#f97316");  // arancione
 
 // Vola alla posizione live quando arriva / cambia
 function LiveController({ pos }: { pos: [number, number] }) {
@@ -121,17 +135,27 @@ export default function RouteMap({
   selectedIndex = null,
   iscritti = {},
   livePos = null,
+  livePos2 = null,
   traveledRoute = [],
+  traveledRoute2 = [],
 }: {
   selectedIndex?:  number | null;
   iscritti?:       Record<number, number>;
   livePos?:        LivePosition | null;
+  livePos2?:       LivePosition | null;
   traveledRoute?:  [number, number][];
+  traveledRoute2?: [number, number][];
 }) {
-  const liveLatlng: [number, number] | null =
+  const liveLatlng1: [number, number] | null =
     livePos?.is_active && livePos.lat != null && livePos.lng != null
-      ? [livePos.lat, livePos.lng]
-      : null;
+      ? [livePos.lat, livePos.lng] : null;
+  const liveLatlng2: [number, number] | null =
+    livePos2?.is_active && livePos2.lat != null && livePos2.lng != null
+      ? [livePos2.lat, livePos2.lng] : null;
+
+  // Vola verso il corridore più avanti (o il primo attivo)
+  const liveLatlng = liveLatlng1 ?? liveLatlng2;
+
   // Centro mappa spostato per coprire il percorso reale (adriatica + tirrenica)
   const center: [number, number] = [41.5, 14.0];
 
@@ -163,32 +187,43 @@ export default function RouteMap({
           }}
         />
 
-        {/* Traccia percorsa (verde vivace = già completato) */}
+        {/* Traccia corridore 1 (verde) */}
         {traveledRoute.length > 1 && (
           <Polyline
             positions={traveledRoute}
-            pathOptions={{
-              color: "#16a34a",
-              weight: 5,
-              opacity: 0.95,
-              lineCap: "round",
-              lineJoin: "round",
-            }}
+            pathOptions={{ color: "#16a34a", weight: 5, opacity: 0.95, lineCap: "round", lineJoin: "round" }}
           />
         )}
 
-        {/* Marker GPS live — due corridori */}
-        {liveLatlng && (
-          <Marker position={liveLatlng} icon={runnerIcon} zIndexOffset={1000}>
+        {/* Traccia corridore 2 (arancione) */}
+        {traveledRoute2.length > 1 && (
+          <Polyline
+            positions={traveledRoute2}
+            pathOptions={{ color: "#f97316", weight: 5, opacity: 0.95, lineCap: "round", lineJoin: "round" }}
+          />
+        )}
+
+        {/* Marker corridore 1 — 🏃‍♂️ */}
+        {liveLatlng1 && (
+          <Marker position={liveLatlng1} icon={runner1Icon} zIndexOffset={1000}>
             <Popup>
               <div className="text-sm font-sans space-y-0.5">
-                <strong>📍 Posizione live</strong>
-                {livePos?.speed != null && (
-                  <p>{(livePos.speed * 3.6).toFixed(1)} km/h</p>
-                )}
-                {livePos?.accuracy != null && (
-                  <p className="text-xs text-gray-500">±{Math.round(livePos.accuracy)} m</p>
-                )}
+                <strong>🏃‍♂️ Corridore 1</strong>
+                {livePos?.speed != null && <p>{(livePos.speed * 3.6).toFixed(1)} km/h</p>}
+                {livePos?.accuracy != null && <p className="text-xs text-gray-500">±{Math.round(livePos.accuracy)} m</p>}
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
+        {/* Marker corridore 2 — 🏃‍♀️ */}
+        {liveLatlng2 && (
+          <Marker position={liveLatlng2} icon={runner2Icon} zIndexOffset={1000}>
+            <Popup>
+              <div className="text-sm font-sans space-y-0.5">
+                <strong>🏃‍♀️ Corridore 2</strong>
+                {livePos2?.speed != null && <p>{(livePos2.speed * 3.6).toFixed(1)} km/h</p>}
+                {livePos2?.accuracy != null && <p className="text-xs text-gray-500">±{Math.round(livePos2.accuracy)} m</p>}
               </div>
             </Popup>
           </Marker>
