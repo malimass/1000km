@@ -9,7 +9,10 @@ import percorsoHero from "@/assets/percorso-hero.jpg";
 import { motion } from "framer-motion";
 import { tappe } from "@/lib/tappe";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { loadLivePosition, subscribeLivePosition, type LivePosition } from "@/lib/liveTracking";
+import {
+  loadLivePosition, subscribeLivePosition, type LivePosition,
+  loadRoutePositions, subscribeRoutePositions, todaySessionId,
+} from "@/lib/liveTracking";
 
 // Caricamento lazy per evitare problemi SSR con Leaflet
 const RouteMap = lazy(() => import("@/components/RouteMap"));
@@ -152,6 +155,9 @@ export default function Percorso() {
   // Posizione GPS live
   const [livePos, setLivePos] = useState<LivePosition | null>(null);
 
+  // Traccia percorsa
+  const [traveledRoute, setTraveledRoute] = useState<[number, number][]>([]);
+
   // URL LocaToWeb: legge prima dal query param ?ltw=, poi da localStorage, poi fallback vuoto
   const [searchParams] = useSearchParams();
   const [ltwUrl, setLtwUrlState] = useState<string>(() => {
@@ -188,6 +194,17 @@ export default function Percorso() {
     if (!isSupabaseConfigured) return;
     loadLivePosition().then(pos => { if (pos) setLivePos(pos); });
     return subscribeLivePosition(setLivePos);
+  }, []);
+
+  // Carica traccia percorsa + sottoscrizione Realtime a nuovi punti
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    loadRoutePositions([todaySessionId()]).then(pts =>
+      setTraveledRoute(pts.map(p => [p.lat, p.lng] as [number, number]))
+    );
+    return subscribeRoutePositions(pt =>
+      setTraveledRoute(prev => [...prev, [pt.lat, pt.lng]])
+    );
   }, []);
 
   function handleTappaClick(waypointIndex: number) {
@@ -246,7 +263,7 @@ export default function Percorso() {
                   </div>
                 }
               >
-                <RouteMap selectedIndex={selectedWaypoint} iscritti={iscritti} livePos={livePos} />
+                <RouteMap selectedIndex={selectedWaypoint} iscritti={iscritti} livePos={livePos} traveledRoute={traveledRoute} />
               </Suspense>
             </div>
 
@@ -264,6 +281,12 @@ export default function Percorso() {
                 <span className="w-4 h-4 rounded-full bg-red-600 border-2 border-white shadow" />
                 Arrivo — Terranova Sappo Minulio
               </span>
+              {traveledRoute.length > 1 && (
+                <span className="flex items-center gap-2">
+                  <span className="inline-block w-6 h-1 rounded bg-blue-500 opacity-90" />
+                  Percorso percorso
+                </span>
+              )}
             </div>
           </AnimatedSection>
         </div>

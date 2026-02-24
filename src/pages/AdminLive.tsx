@@ -3,7 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { loadSettings, saveSettings as saveSettingsDB, type AdminSettings } from "@/lib/adminSettings";
-import { upsertLivePosition } from "@/lib/liveTracking";
+import {
+  upsertLivePosition, appendRoutePoint, distanceMeters, todaySessionId,
+} from "@/lib/liveTracking";
 import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
   Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video, LogOut,
@@ -234,7 +236,11 @@ export default function AdminLive() {
   const [isTracking,  setIsTracking]  = useState(false);
   const [gpsPos,      setGpsPos]      = useState<{ lat: number; lng: number; speed: number | null; accuracy: number | null } | null>(null);
   const [gpsError,    setGpsError]    = useState("");
-  const watchIdRef = useRef<number | null>(null);
+  const [routeCount,  setRouteCount]  = useState(0);  // punti registrati in sessione
+  const watchIdRef        = useRef<number | null>(null);
+  const lastRoutePointRef = useRef<[number, number] | null>(null);  // ultimo punto salvato
+  const lastRouteTimeRef  = useRef<number>(0);                      // timestamp ultimo salvataggio
+  const sessionIdRef      = useRef<string>("");
 
   // ─ Video YouTube ─
   const [ytCn1, setYtCn1] = useState(""); const [ytCn1Title, setYtCn1Title] = useState(""); const [ytCn1Desc, setYtCn1Desc] = useState("");
@@ -361,13 +367,34 @@ export default function AdminLive() {
       return;
     }
     setGpsError("");
+    sessionIdRef.current      = todaySessionId();
+    lastRoutePointRef.current = null;
+    lastRouteTimeRef.current  = 0;
+    setRouteCount(0);
     await upsertLivePosition({ is_active: true });
     setIsTracking(true);
+
     watchIdRef.current = navigator.geolocation.watchPosition(
       async ({ coords }) => {
-        const { latitude, longitude, speed, accuracy, heading } = coords;
-        setGpsPos({ lat: latitude, lng: longitude, speed, accuracy });
-        await upsertLivePosition({ lat: latitude, lng: longitude, speed, accuracy, heading, is_active: true });
+        const { latitude: lat, longitude: lng, speed, accuracy, heading } = coords;
+        setGpsPos({ lat, lng, speed, accuracy });
+
+        // ── Aggiorna posizione live ──────────────────────────────────────────
+        await upsertLivePosition({ lat, lng, speed, accuracy, heading, is_active: true });
+
+        // ── Registra punto nella traccia (ogni ≥30 m oppure ≥60 s) ──────────
+        const now = Date.now();
+        const last = lastRoutePointRef.current;
+        const elapsed = now - lastRouteTimeRef.current;
+        const movedEnough = !last || distanceMeters(last, [lat, lng]) >= 30;
+        const timeEnough  = elapsed >= 60_000;
+
+        if (movedEnough || timeEnough) {
+          await appendRoutePoint(lat, lng, speed, accuracy, heading, sessionIdRef.current);
+          lastRoutePointRef.current = [lat, lng];
+          lastRouteTimeRef.current  = now;
+          setRouteCount(c => c + 1);
+        }
       },
       (err) => setGpsError(`Errore GPS: ${err.message}`),
       { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 },
@@ -668,6 +695,11 @@ export default function AdminLive() {
                       <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
                         <Loader2 className="w-3.5 h-3.5 animate-spin" /> Acquisizione segnale GPS…
                       </div>
+                    )}
+                    {routeCount > 0 && (
+                      <p className="text-xs text-muted-foreground mb-3">
+                        📍 {routeCount} punt{routeCount === 1 ? "o" : "i"} registrat{routeCount === 1 ? "o" : "i"} nella traccia
+                      </p>
                     )}
                     <button
                       onClick={stopGpsTracking}

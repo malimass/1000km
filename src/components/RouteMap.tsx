@@ -118,10 +118,12 @@ export default function RouteMap({
   selectedIndex = null,
   iscritti = {},
   livePos = null,
+  traveledRoute = [],
 }: {
-  selectedIndex?: number | null;
-  iscritti?: Record<number, number>;
-  livePos?: LivePosition | null;
+  selectedIndex?:  number | null;
+  iscritti?:       Record<number, number>;
+  livePos?:        LivePosition | null;
+  traveledRoute?:  [number, number][];
 }) {
   const liveLatlng: [number, number] | null =
     livePos?.is_active && livePos.lat != null && livePos.lng != null
@@ -147,7 +149,7 @@ export default function RouteMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* Linea del percorso */}
+        {/* Linea del percorso pianificato */}
         <Polyline
           positions={waypoints}
           pathOptions={{
@@ -157,6 +159,18 @@ export default function RouteMap({
             dashArray: "6 4",
           }}
         />
+
+        {/* Traccia percorsa (blu solida) */}
+        {traveledRoute.length > 1 && (
+          <Polyline
+            positions={traveledRoute}
+            pathOptions={{
+              color: "#3b82f6",
+              weight: 4,
+              opacity: 0.9,
+            }}
+          />
+        )}
 
         {/* Marker GPS live */}
         {liveLatlng && (
