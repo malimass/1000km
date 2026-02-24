@@ -50,7 +50,7 @@ function lsGet(k: string) {
   try { return localStorage.getItem(k) ?? ""; } catch { return ""; }
 }
 function lsSet(k: string, v: string) {
-  try { localStorage.setItem(k, v.trim()); } catch {}
+  try { localStorage.setItem(k, v.trim()); } catch { /* noop */ }
 }
 
 export function loadFromLocalStorage(): AdminSettings {

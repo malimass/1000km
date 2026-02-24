@@ -205,7 +205,7 @@ async function shareToTikTok(file: File, caption: string): Promise<{ ok: boolean
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  try { await navigator.clipboard.writeText(caption); } catch {}
+  try { await navigator.clipboard.writeText(caption); } catch { /* noop */ }
   return { ok: true, msg: "video scaricato + testo copiato — carica manualmente su TikTok" };
 }
 

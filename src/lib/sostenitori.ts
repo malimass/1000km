@@ -53,7 +53,7 @@ export function lsLoadSosteni(): SosteniPage {
 }
 
 export function lsSaveSosteni(data: SosteniPage): void {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch {}
+  try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch { /* noop */ }
 }
 
 /** Carica la pagina sostenitori. Priorità: Supabase → localStorage. */

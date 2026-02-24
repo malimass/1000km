@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Heart, Cross, FlaskConical, MapPin, Users, Share2, ArrowRight, Star, Shield, Clock } from "lucide-react";
+import { Heart, Cross, FlaskConical, MapPin, Users, Share2, ArrowRight, Shield, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
