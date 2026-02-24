@@ -11,11 +11,11 @@ export function getLtwUrl(): string {
 export function setLtwUrl(url: string): void {
   try {
     localStorage.setItem(STORAGE_KEY, url.trim());
-  } catch {}
+  } catch { /* noop */ }
 }
 
 export function clearLtwUrl(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
-  } catch {}
+  } catch { /* noop */ }
 }

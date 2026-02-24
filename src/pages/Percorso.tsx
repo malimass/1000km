@@ -308,13 +308,13 @@ export default function Percorso() {
               {traveledRoute1.length > 1 && (
                 <span className="flex items-center gap-2">
                   <span className="inline-block w-6 h-1 rounded bg-green-600 opacity-90" />
-                  🏃‍♂️ Corridore 1
+                  🏃‍♂️ Massimo
                 </span>
               )}
               {traveledRoute2.length > 1 && (
                 <span className="flex items-center gap-2">
                   <span className="inline-block w-6 h-1 rounded bg-orange-500 opacity-90" />
-                  🏃‍♀️ Corridore 2
+                  🏃‍♂️ Nunzio
                 </span>
               )}
             </div>
