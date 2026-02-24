@@ -51,18 +51,18 @@ function MapController({ selectedIndex }: { selectedIndex: number | null }) {
   return null;
 }
 
-// Genera un'icona corridore con emoji, colore pin e animazione bounce
+// Genera un'icona corridore con emoji, colore pin e animazione gambe
 function makeRunnerIcon(emoji: string, pinColor: string) {
   return divIcon({
     className: "runner-marker",
     html: `
       <style>
-        @keyframes rb{0%{transform:translateY(0)}100%{transform:translateY(-9px)}}
+        @keyframes rl{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
         @keyframes rp2{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.4);opacity:0}}
-        .re-s{display:inline-block;font-size:36px;line-height:1;animation:rb 0.42s ease-in-out infinite alternate;filter:drop-shadow(0 3px 5px rgba(0,0,0,0.5))}
+        .re-s{display:inline-block;font-size:36px;line-height:1;animation:rl 0.45s ease-in-out infinite;transform-origin:50% 15%;filter:drop-shadow(0 3px 5px rgba(0,0,0,0.5))}
       </style>
       <div style="position:relative;text-align:center;width:52px">
-        <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.95);border-radius:12px;padding:2px 6px;box-shadow:0 2px 10px rgba(0,0,0,0.25)">
+        <div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%)">
           <span class="re-s">${emoji}</span>
         </div>
         <div style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);width:14px;height:14px;background:${pinColor};border:2.5px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>

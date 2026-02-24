@@ -37,13 +37,14 @@
   display: inline-block;
   font-size: 24px;
   line-height: 1;
-  animation: runner-bounce 0.42s ease-in-out infinite alternate;
+  animation: runner-legs 0.45s ease-in-out infinite;
+  transform-origin: 50% 15%;
   filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35));
 }
-.runner-emoji-2 { animation-delay: 0.21s; }
-@keyframes runner-bounce {
-  0%   { transform: translateY(0px); }
-  100% { transform: translateY(-6px); }
+.runner-emoji-2 { animation-delay: 0.22s; }
+@keyframes runner-legs {
+  0%, 100% { transform: rotate(-6deg); }
+  50%      { transform: rotate(6deg); }
 }
 
 @layer base {
