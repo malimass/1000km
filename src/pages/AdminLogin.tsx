@@ -1,51 +1,40 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { Loader2, LogIn } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { LogIn } from "lucide-react";
+
+// PIN letto da env (VITE_ADMIN_PIN) con fallback sicuro.
+// Le credenziali Supabase sono usate solo in background per i permessi RLS.
+const ADMIN_PIN   = import.meta.env.VITE_ADMIN_PIN   || "gratitude2026";
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || "";
+const ADMIN_PASS  = import.meta.env.VITE_ADMIN_PASS  || "";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const [email,    setEmail]    = useState("");
-  const [password, setPassword] = useState("");
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
+  const [pin,     setPin]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState<string | null>(null);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (!supabase) return;
+
+    if (pin !== ADMIN_PIN) {
+      setError("PIN non valido. Riprova.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email:    email.trim(),
-      password: password,
-    });
+    // Segna accesso nel localStorage (valido per questo dispositivo)
+    localStorage.setItem("gp_admin_auth", "1");
 
-    if (authError) {
-      setError("Credenziali non valide. Riprova.");
-      setLoading(false);
-      return;
+    // Auth Supabase in background per mantenere i permessi RLS di scrittura GPS
+    if (supabase && ADMIN_EMAIL && ADMIN_PASS) {
+      await supabase.auth.signInWithPassword({ email: ADMIN_EMAIL, password: ADMIN_PASS });
     }
 
     navigate("/admin-live", { replace: true });
-  }
-
-  // Se Supabase non è configurato mostra errore (nessun bypass)
-  if (!isSupabaseConfigured) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="max-w-sm w-full bg-card border border-border rounded-xl p-6 shadow-sm text-center space-y-3">
-          <p className="text-sm font-semibold text-foreground">Configurazione mancante</p>
-          <p className="text-xs text-muted-foreground">
-            Le variabili d'ambiente{" "}
-            <code className="bg-muted px-1 rounded">VITE_SUPABASE_URL</code> e{" "}
-            <code className="bg-muted px-1 rounded">VITE_SUPABASE_ANON_KEY</code>{" "}
-            non sono configurate. Contatta l'amministratore del sistema.
-          </p>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -61,29 +50,16 @@ export default function AdminLogin() {
           <p className="text-muted-foreground text-sm mt-1 font-body">Gratitude Path</p>
         </div>
 
-        {/* Form */}
+        {/* Form PIN */}
         <form onSubmit={handleLogin} className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">Email</label>
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="admin@esempio.it"
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">Password</label>
+            <label className="block text-xs font-semibold text-foreground mb-1">PIN accesso</label>
             <input
               type="password"
               required
               autoComplete="current-password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
+              value={pin}
+              onChange={e => setPin(e.target.value)}
               placeholder="••••••••"
               className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
             />
@@ -98,10 +74,8 @@ export default function AdminLogin() {
             disabled={loading}
             className="w-full flex items-center justify-center gap-2 bg-dona text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50 transition-opacity"
           >
-            {loading
-              ? <><Loader2 className="w-4 h-4 animate-spin" />Accesso in corso…</>
-              : <><LogIn className="w-4 h-4" />Accedi</>
-            }
+            <LogIn className="w-4 h-4" />
+            {loading ? "Accesso in corso…" : "Accedi"}
           </button>
         </form>
 

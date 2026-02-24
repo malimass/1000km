@@ -433,6 +433,7 @@ export default function AdminLive() {
 
   // ─ Logout ─
   async function handleLogout() {
+    localStorage.removeItem("gp_admin_auth");
     if (supabase) await supabase.auth.signOut();
     navigate("/admin-login", { replace: true });
   }
