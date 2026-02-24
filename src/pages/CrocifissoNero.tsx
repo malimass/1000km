@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Heart, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -5,25 +6,21 @@ import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
 import crocifissoImg from "@/assets/crocifisso-nero.jpg";
 import { motion } from "framer-motion";
+import { loadYtCrocifissoIds } from "@/lib/adminSettings";
 
-// ── Video YouTube ─────────────────────────────────────────────────────────────
-// Sostituisci YOUTUBE_ID_X con l'ID del video (parte dopo ?v= nell'URL di YouTube)
-// Es: https://www.youtube.com/watch?v=dQw4w9WgXcQ → ID = dQw4w9WgXcQ
-const videos = [
+// ── Metadati video (titoli e descrizioni) ─────────────────────────────────────
+const VIDEO_META = [
   {
-    id: "YOUTUBE_ID_1",
     titolo: "La Storia del Crocifisso Nero",
     descrizione:
       "Le origini e la leggenda del sacro simulacro ligneo venerato a Terranova Sappo Minulio, tra fede popolare e tradizione secolare.",
   },
   {
-    id: "YOUTUBE_ID_2",
     titolo: "La Devozione e le Celebrazioni",
     descrizione:
       "Le feste patronali e i pellegrinaggi che ogni anno richiamano migliaia di fedeli da tutta la Calabria e dal sud Italia.",
   },
   {
-    id: "YOUTUBE_ID_3",
     titolo: "I Miracoli e le Grazie",
     descrizione:
       "Le testimonianze dei fedeli e i prodigi tramandati dalla tradizione locale legati al SS Crocifisso Nero.",
@@ -55,6 +52,17 @@ function VideoEmbed({ videoId, titolo }: { videoId: string; titolo: string }) {
 }
 
 export default function CrocifissoNero() {
+  const [ytIds, setYtIds] = useState<[string, string, string]>(["", "", ""]);
+
+  useEffect(() => {
+    setYtIds(loadYtCrocifissoIds());
+  }, []);
+
+  const videos = VIDEO_META.map((meta, i) => ({
+    id: ytIds[i] || `YOUTUBE_ID_${i + 1}`,
+    ...meta,
+  }));
+
   return (
     <Layout>
       <section className="relative h-[50vh] flex items-center justify-center overflow-hidden">
