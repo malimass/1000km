@@ -4,6 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Safe area (iPhone notch / home indicator) ─────────────────────────────── */
+.pt-safe  { padding-top:    env(safe-area-inset-top);    }
+.pb-safe  { padding-bottom: env(safe-area-inset-bottom); }
+
 /* ─── GPS Live marker (Leaflet) ─────────────────────────────────────────────── */
 .gps-marker { background: transparent !important; border: none !important; }
 .gps-dot {
