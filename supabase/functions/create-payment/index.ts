@@ -107,7 +107,7 @@ Deno.serve(async (req: Request) => {
             currency: "eur",
             product_data: {
               name: `Tappa ${tappa_numero} · 1000km di Gratitudine`,
-              description: `Iscrizione + Maglia ufficiale taglia ${taglia_maglia} — Beneficenza Komen Italia`,
+              description: `Iscrizione + Maglia ufficiale taglia ${taglia_maglia} — 1000km di Gratitudine`,
               images: [],
             },
             unit_amount: Math.round(donazione_euro * 100),

@@ -90,7 +90,7 @@ const Index = () => {
             className="text-primary-foreground/50 text-xs font-body flex items-center justify-center gap-2"
           >
             <Shield className="w-3 h-3" />
-            Raccolta fondi a favore di <strong className="text-accent">Komen Italia</strong> · Rendicontazione pubblica e trasparente
+            Raccolta fondi solidale · Rendicontazione pubblica e trasparente
           </motion.p>
         </motion.div>
 
@@ -137,7 +137,7 @@ const Index = () => {
               {
                 icon: <FlaskConical className="w-10 h-10" />,
                 title: "Ricerca",
-                text: "I fondi raccolti sostengono Komen Italia nella lotta contro i tumori al seno. Un gesto concreto per chi combatte.",
+                text: "I fondi raccolti sostengono la lotta contro i tumori al seno. Un gesto concreto per chi combatte.",
               },
             ].map((item, i) => (
               <AnimatedSection key={item.title} delay={i * 0.15}>
@@ -374,7 +374,7 @@ const Index = () => {
                 Trasforma un passo in speranza
               </h3>
               <p className="font-body text-primary-foreground/70 mb-8 max-w-lg mx-auto">
-                Ogni donazione sostiene la ricerca di Komen Italia. Insieme possiamo fare la differenza.
+                Ogni donazione sostiene la ricerca contro i tumori al seno. Insieme possiamo fare la differenza.
               </p>
               <Button asChild variant="dona" size="lg" className="text-base px-12 py-6 shadow-[0_0_30px_hsl(340_82%_52%/0.3)]">
                 <Link to="/dona">

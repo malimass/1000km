@@ -14,7 +14,7 @@ const donationTiers = [
 
 const trustBadges = [
   { icon: <Shield className="w-5 h-5" />, text: "100% trasparente" },
-  { icon: <Heart className="w-5 h-5" />, text: "Destinato a Komen Italia" },
+  { icon: <Heart className="w-5 h-5" />, text: "100% alla ricerca" },
   { icon: <Users className="w-5 h-5" />, text: "Rendicontazione pubblica" },
 ];
 
@@ -69,9 +69,9 @@ export default function Dona() {
           {/* Donation card */}
           <AnimatedSection>
             <div className="bg-card rounded-xl p-8 md:p-12 shadow-lg border border-border/50">
-              <h2 className="font-heading text-2xl font-bold text-foreground mb-2 text-center">Sostieni Komen Italia</h2>
+              <h2 className="font-heading text-2xl font-bold text-foreground mb-2 text-center">Sostieni la ricerca</h2>
               <p className="text-muted-foreground font-body leading-relaxed mb-10 text-center max-w-lg mx-auto">
-                La raccolta fondi è interamente destinata a <strong className="text-dona">Komen Italia</strong> per la lotta contro i tumori al seno.
+                La raccolta fondi è interamente destinata alla lotta contro i tumori al seno.
               </p>
 
               {/* Tiers */}

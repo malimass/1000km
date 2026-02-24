@@ -340,7 +340,7 @@ export default function Iscriviti() {
                     <Shirt className="w-4 h-4 text-dona" />
                   </div>
                   <p className="text-muted-foreground text-sm font-body leading-relaxed">
-                    Supporta la raccolta per Komen Italia e ricevi la maglia ufficiale
+                    Supporta la raccolta solidale e ricevi la maglia ufficiale
                     dell'evento, consegnata la sera prima della partenza.
                   </p>
                 </button>
