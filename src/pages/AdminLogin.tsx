@@ -38,7 +38,7 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+    <div className="min-h-screen bg-background flex items-center justify-center p-6 pt-safe">
       <div className="max-w-sm w-full">
 
         {/* Logo / titolo */}
