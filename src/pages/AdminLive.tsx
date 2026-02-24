@@ -7,6 +7,7 @@ import { loadSosteniPage, saveSosteniPage, type Sostenitore, type SosteniPage } 
 import {
   upsertLivePosition, appendRoutePoint, clearRoutePositions, distanceMeters, todaySessionId,
 } from "@/lib/liveTracking";
+import { startGeoTracking, stopGeoTracking, isNativeApp } from "@/lib/capacitorGeo";
 import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
   Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video, LogOut,
@@ -478,10 +479,6 @@ export default function AdminLive() {
 
   // ─ GPS tracking ─
   async function startGpsTracking() {
-    if (!navigator.geolocation) {
-      setGpsError("GPS non disponibile su questo dispositivo.");
-      return;
-    }
     setGpsError("");
     setDbError("");
     sessionIdRef.current      = todaySessionId();
@@ -490,14 +487,12 @@ export default function AdminLive() {
     setRouteCount(0);
     setIsTracking(true);
     isTrackingRef.current = true;
-    acquireWakeLock();
 
-    // ⚠️ watchPosition va avviato SUBITO (prima di qualsiasi await) —
-    // su iOS Safari il contesto utente si perde dopo un'operazione async
-    // e il GPS non viene mai avviato.
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      async ({ coords }) => {
-        const { latitude: lat, longitude: lng, speed, accuracy, heading } = coords;
+    // Su app nativa il wake lock non serve (lo schermo può spegnersi)
+    if (!isNativeApp()) acquireWakeLock();
+
+    await startGeoTracking(
+      async ({ latitude: lat, longitude: lng, speed, accuracy, heading }) => {
         setGpsPos({ lat, lng, speed, accuracy });
 
         // ── Aggiorna posizione live ──────────────────────────────────────────
@@ -519,11 +514,10 @@ export default function AdminLive() {
           setRouteCount(c => c + 1);
         }
       },
-      (err) => setGpsError(`Errore GPS: ${err.message}`),
-      { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 },
+      (errMsg) => setGpsError(errMsg),
     );
 
-    // Aggiorna stato attivo su Supabase in background (dopo aver avviato il GPS)
+    // Aggiorna stato attivo su Supabase
     const startErr = await upsertLivePosition({ is_active: true }, runnerId);
     if (startErr) {
       setDbError(`Salvataggio GPS bloccato (RLS): ${startErr} — vedi istruzioni admin.`);
@@ -531,8 +525,10 @@ export default function AdminLive() {
   }
 
   async function stopGpsTracking() {
+    await stopGeoTracking();
+    // Pulisci il vecchio watchId web (per retrocompatibilità)
     if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
+      navigator.geolocation?.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     }
     isTrackingRef.current = false;
@@ -553,7 +549,8 @@ export default function AdminLive() {
 
   // Ferma il watch e rilascia il wake lock se si smonta il componente
   useEffect(() => () => {
-    if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+    stopGeoTracking();
+    if (watchIdRef.current !== null) navigator.geolocation?.clearWatch(watchIdRef.current);
     if (wakeLockRef.current) { try { wakeLockRef.current.release(); } catch { /* noop */ } }
   }, []);
 
@@ -877,12 +874,18 @@ export default function AdminLive() {
                         📍 {routeCount} punt{routeCount === 1 ? "o" : "i"} registrat{routeCount === 1 ? "o" : "i"} nella traccia
                       </p>
                     )}
-                    <div className={`mb-3 rounded-lg px-3 py-2 text-xs font-medium flex items-center gap-2 ${wakeLockOn ? "bg-green-50 border border-green-200 text-green-700" : "bg-yellow-50 border border-yellow-200 text-yellow-700"}`}>
-                      {wakeLockOn
-                        ? <><span>🔆</span> Schermo sempre acceso — il GPS continua anche in tasca</>
-                        : <><span>⚠️</span> Tieni lo schermo acceso — se si blocca il GPS si ferma</>
-                      }
-                    </div>
+                    {isNativeApp() ? (
+                      <div className="mb-3 rounded-lg px-3 py-2 text-xs font-medium flex items-center gap-2 bg-green-50 border border-green-200 text-green-700">
+                        <span>📲</span> App nativa — GPS attivo in background anche con schermo spento
+                      </div>
+                    ) : (
+                      <div className={`mb-3 rounded-lg px-3 py-2 text-xs font-medium flex items-center gap-2 ${wakeLockOn ? "bg-green-50 border border-green-200 text-green-700" : "bg-yellow-50 border border-yellow-200 text-yellow-700"}`}>
+                        {wakeLockOn
+                          ? <><span>🔆</span> Schermo sempre acceso — il GPS continua anche in tasca</>
+                          : <><span>⚠️</span> Tieni lo schermo acceso — se si blocca il GPS si ferma</>
+                        }
+                      </div>
+                    )}
                     <button
                       onClick={stopGpsTracking}
                       className="w-full flex items-center justify-center gap-2 bg-red-500 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-red-600 transition-colors"
