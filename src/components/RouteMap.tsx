@@ -56,16 +56,20 @@ const runnerIcon = divIcon({
   className: "runner-marker",
   html: `
     <style>
-      @keyframes rb{0%{transform:translateY(0)}100%{transform:translateY(-7px)}}
-      .re{display:inline-block;font-size:26px;line-height:1;animation:rb 0.42s ease-in-out infinite alternate;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3))}
+      @keyframes rb{0%{transform:translateY(0)}100%{transform:translateY(-9px)}}
+      @keyframes rp{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.2);opacity:0}}
+      .re{display:inline-block;font-size:34px;line-height:1;animation:rb 0.42s ease-in-out infinite alternate;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.5))}
       .re2{animation-delay:.21s}
     </style>
-    <div style="position:relative;text-align:center;width:56px">
-      <span class="re">🏃‍♂️</span><span class="re re2">🏃‍♀️</span>
-      <div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:42px;height:7px;background:rgba(0,0,0,0.15);border-radius:50%;filter:blur(3px)"></div>
+    <div style="position:relative;text-align:center;width:72px">
+      <div style="position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:68px;background:rgba(255,255,255,0.92);border-radius:12px;padding:2px 4px;box-shadow:0 2px 10px rgba(0,0,0,0.25)">
+        <span class="re">🏃‍♂️</span><span class="re re2">🏃‍♀️</span>
+      </div>
+      <div style="position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);width:12px;height:12px;background:#e11d48;border:2px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>
+      <div style="position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);width:24px;height:24px;background:rgba(225,29,72,0.3);border-radius:50%;animation:rp 1.6s ease-out infinite;margin-left:-6px;margin-top:-6px"></div>
     </div>`,
-  iconSize:   [56, 44],
-  iconAnchor: [28, 44],
+  iconSize:   [72, 60],
+  iconAnchor: [36, 60],
 });
 
 // Vola alla posizione live quando arriva / cambia
