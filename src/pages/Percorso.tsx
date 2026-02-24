@@ -10,7 +10,7 @@ import { motion } from "framer-motion";
 import { tappe } from "@/lib/tappe";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
-  loadLivePosition, subscribeLivePosition, type LivePosition,
+  loadAllLivePositions, subscribeLivePosition, type LivePosition,
   loadRoutePositions, subscribeRoutePositions, todaySessionId,
 } from "@/lib/liveTracking";
 
@@ -25,17 +25,19 @@ const CAMMINO_END   = new Date("2026-05-01T23:59:00");
 
 function LiveTrackingSection({
   ltwUrl,
-  livePos,
+  livePos1,
+  livePos2,
 }: {
   ltwUrl: string;
-  livePos: LivePosition | null;
+  livePos1: LivePosition | null;
+  livePos2: LivePosition | null;
 }) {
   const now = new Date();
   const isLive   = now >= CAMMINO_START && now <= CAMMINO_END;
   const isFuture = now < CAMMINO_START;
 
   // GPS attivo ha priorità su LocaToWeb
-  const gpsActive = livePos?.is_active === true;
+  const gpsActive = livePos1?.is_active === true || livePos2?.is_active === true;
 
   // Se GPS è attivo mostra sempre la live, anche fuori dalle date dell'evento
   const showLiveContent = isLive || gpsActive;
@@ -73,19 +75,17 @@ function LiveTrackingSection({
                   <p className="text-center text-primary-foreground/70 font-body mb-2">
                     Segui la posizione live aggiornata direttamente dal telefono.
                   </p>
-                  <p className="text-center text-primary-foreground/40 text-xs font-body mb-6">
-                    {livePos?.speed != null
-                      ? `${(livePos.speed * 3.6).toFixed(1)} km/h · `
-                      : ""}
-                    {livePos?.accuracy != null
-                      ? `precisione ±${Math.round(livePos.accuracy)} m · `
-                      : ""}
-                    La mappa si aggiorna in tempo reale
-                  </p>
-                  {/* Il marker blu è già visibile nel RouteMap della sezione sopra */}
+                  <div className="flex items-center justify-center gap-6 text-xs text-primary-foreground/50 font-body mb-6">
+                    {livePos1?.is_active && (
+                      <span>🏃‍♂️ {livePos1.speed != null ? `${(livePos1.speed * 3.6).toFixed(1)} km/h` : "—"}</span>
+                    )}
+                    {livePos2?.is_active && (
+                      <span>🏃‍♀️ {livePos2.speed != null ? `${(livePos2.speed * 3.6).toFixed(1)} km/h` : "—"}</span>
+                    )}
+                  </div>
                   <div className="flex items-center justify-center gap-2 text-sm text-primary-foreground/60 font-body">
-                    <span className="inline-block w-3 h-3 rounded-full bg-blue-400 ring-2 ring-blue-300/40 animate-pulse" />
-                    Il punto blu nella mappa indica la posizione attuale
+                    <span className="text-base">🏃‍♂️🏃‍♀️</span>
+                    I corridori nella mappa indicano le posizioni in tempo reale
                   </div>
                 </>
               ) : ltwUrl ? (
@@ -155,11 +155,13 @@ export default function Percorso() {
   // Contatori iscritti per tappa (chiave = tappa_numero 1-14)
   const [iscritti, setIscritti] = useState<Record<number, number>>({});
 
-  // Posizione GPS live
-  const [livePos, setLivePos] = useState<LivePosition | null>(null);
+  // Posizioni GPS live (corridore 1 e 2)
+  const [livePos1, setLivePos1] = useState<LivePosition | null>(null);
+  const [livePos2, setLivePos2] = useState<LivePosition | null>(null);
 
-  // Traccia percorsa
-  const [traveledRoute, setTraveledRoute] = useState<[number, number][]>([]);
+  // Tracce percorse (corridore 1 e 2)
+  const [traveledRoute1, setTraveledRoute1] = useState<[number, number][]>([]);
+  const [traveledRoute2, setTraveledRoute2] = useState<[number, number][]>([]);
 
   // URL LocaToWeb: legge prima dal query param ?ltw=, poi da localStorage, poi fallback vuoto
   const [searchParams] = useSearchParams();
@@ -192,21 +194,40 @@ export default function Percorso() {
       });
   }, []);
 
-  // Carica posizione live iniziale + sottoscrizione Realtime
+  // Carica posizioni live iniziali (entrambi i corridori) + sottoscrizione Realtime
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    loadLivePosition().then(pos => { if (pos) setLivePos(pos); });
-    return subscribeLivePosition(setLivePos);
+    loadAllLivePositions().then(({ 1: p1, 2: p2 }) => {
+      if (p1) setLivePos1(p1);
+      if (p2) setLivePos2(p2);
+    });
+    return subscribeLivePosition((id, pos) => {
+      if (id === 1) setLivePos1(pos);
+      else          setLivePos2(pos);
+    });
   }, []);
 
-  // Carica traccia percorsa + sottoscrizione Realtime a nuovi punti
+  // Carica tracce percorse (corridore 1) + sottoscrizione Realtime
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    loadRoutePositions([todaySessionId()]).then(pts =>
-      setTraveledRoute(pts.map(p => [p.lat, p.lng] as [number, number]))
+    loadRoutePositions([todaySessionId()], 1).then(pts =>
+      setTraveledRoute1(pts.map(p => [p.lat, p.lng] as [number, number]))
     );
-    return subscribeRoutePositions(pt =>
-      setTraveledRoute(prev => [...prev, [pt.lat, pt.lng]])
+    return subscribeRoutePositions(
+      pt => setTraveledRoute1(prev => [...prev, [pt.lat, pt.lng]]),
+      1,
+    );
+  }, []);
+
+  // Carica tracce percorse (corridore 2) + sottoscrizione Realtime
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    loadRoutePositions([todaySessionId()], 2).then(pts =>
+      setTraveledRoute2(pts.map(p => [p.lat, p.lng] as [number, number]))
+    );
+    return subscribeRoutePositions(
+      pt => setTraveledRoute2(prev => [...prev, [pt.lat, pt.lng]]),
+      2,
     );
   }, []);
 
@@ -266,7 +287,7 @@ export default function Percorso() {
                   </div>
                 }
               >
-                <RouteMap selectedIndex={selectedWaypoint} iscritti={iscritti} livePos={livePos} traveledRoute={traveledRoute} />
+                <RouteMap selectedIndex={selectedWaypoint} iscritti={iscritti} livePos={livePos1} livePos2={livePos2} traveledRoute={traveledRoute1} traveledRoute2={traveledRoute2} />
               </Suspense>
             </div>
 
@@ -284,10 +305,16 @@ export default function Percorso() {
                 <span className="w-4 h-4 rounded-full bg-red-600 border-2 border-white shadow" />
                 Arrivo — Terranova Sappo Minulio
               </span>
-              {traveledRoute.length > 1 && (
+              {traveledRoute1.length > 1 && (
                 <span className="flex items-center gap-2">
                   <span className="inline-block w-6 h-1 rounded bg-green-600 opacity-90" />
-                  Percorso completato
+                  🏃‍♂️ Corridore 1
+                </span>
+              )}
+              {traveledRoute2.length > 1 && (
+                <span className="flex items-center gap-2">
+                  <span className="inline-block w-6 h-1 rounded bg-orange-500 opacity-90" />
+                  🏃‍♀️ Corridore 2
                 </span>
               )}
             </div>
@@ -371,7 +398,7 @@ export default function Percorso() {
       </section>
 
       {/* Sezione live tracking */}
-      <LiveTrackingSection ltwUrl={ltwUrl} livePos={livePos} />
+      <LiveTrackingSection ltwUrl={ltwUrl} livePos1={livePos1} livePos2={livePos2} />
 
       <div className="h-16 lg:hidden" />
     </Layout>
