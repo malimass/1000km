@@ -51,12 +51,15 @@ function MapController({ selectedIndex }: { selectedIndex: number | null }) {
   return null;
 }
 
-// Icona pulsante per la posizione GPS live
-const gpsIcon = divIcon({
-  className: "gps-marker",
-  html: `<span class="gps-dot"></span><span class="gps-ring"></span>`,
-  iconSize:   [20, 20],
-  iconAnchor: [10, 10],
+// Icona con due corridori animati per la posizione live
+const runnerIcon = divIcon({
+  className: "runner-marker",
+  html: `<div style="position:relative;text-align:center;width:52px">
+    <span class="runner-emoji">🏃‍♂️</span><span class="runner-emoji runner-emoji-2">🏃‍♀️</span>
+    <div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:38px;height:7px;background:rgba(0,0,0,0.18);border-radius:50%;filter:blur(3px)"></div>
+  </div>`,
+  iconSize:   [52, 40],
+  iconAnchor: [26, 40],
 });
 
 // Vola alla posizione live quando arriva / cambia
@@ -160,21 +163,23 @@ export default function RouteMap({
           }}
         />
 
-        {/* Traccia percorsa (blu solida) */}
+        {/* Traccia percorsa (verde vivace = già completato) */}
         {traveledRoute.length > 1 && (
           <Polyline
             positions={traveledRoute}
             pathOptions={{
-              color: "#3b82f6",
-              weight: 4,
-              opacity: 0.9,
+              color: "#16a34a",
+              weight: 5,
+              opacity: 0.95,
+              lineCap: "round",
+              lineJoin: "round",
             }}
           />
         )}
 
-        {/* Marker GPS live */}
+        {/* Marker GPS live — due corridori */}
         {liveLatlng && (
-          <Marker position={liveLatlng} icon={gpsIcon} zIndexOffset={1000}>
+          <Marker position={liveLatlng} icon={runnerIcon} zIndexOffset={1000}>
             <Popup>
               <div className="text-sm font-sans space-y-0.5">
                 <strong>📍 Posizione live</strong>

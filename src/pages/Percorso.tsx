@@ -286,8 +286,8 @@ export default function Percorso() {
               </span>
               {traveledRoute.length > 1 && (
                 <span className="flex items-center gap-2">
-                  <span className="inline-block w-6 h-1 rounded bg-blue-500 opacity-90" />
-                  Percorso percorso
+                  <span className="inline-block w-6 h-1 rounded bg-green-600 opacity-90" />
+                  Percorso completato
                 </span>
               )}
             </div>

@@ -31,6 +31,21 @@
   100% { transform: scale(2.8); opacity: 0; }
 }
 
+/* ─── Runner marker (posizione live) ────────────────────────────────────────── */
+.runner-marker { background: transparent !important; border: none !important; }
+.runner-emoji {
+  display: inline-block;
+  font-size: 24px;
+  line-height: 1;
+  animation: runner-bounce 0.42s ease-in-out infinite alternate;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35));
+}
+.runner-emoji-2 { animation-delay: 0.21s; }
+@keyframes runner-bounce {
+  0%   { transform: translateY(0px); }
+  100% { transform: translateY(-6px); }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
