@@ -54,12 +54,18 @@ function MapController({ selectedIndex }: { selectedIndex: number | null }) {
 // Icona con due corridori animati per la posizione live
 const runnerIcon = divIcon({
   className: "runner-marker",
-  html: `<div style="position:relative;text-align:center;width:52px">
-    <span class="runner-emoji">🏃‍♂️</span><span class="runner-emoji runner-emoji-2">🏃‍♀️</span>
-    <div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:38px;height:7px;background:rgba(0,0,0,0.18);border-radius:50%;filter:blur(3px)"></div>
-  </div>`,
-  iconSize:   [52, 40],
-  iconAnchor: [26, 40],
+  html: `
+    <style>
+      @keyframes rb{0%{transform:translateY(0)}100%{transform:translateY(-7px)}}
+      .re{display:inline-block;font-size:26px;line-height:1;animation:rb 0.42s ease-in-out infinite alternate;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3))}
+      .re2{animation-delay:.21s}
+    </style>
+    <div style="position:relative;text-align:center;width:56px">
+      <span class="re">🏃‍♂️</span><span class="re re2">🏃‍♀️</span>
+      <div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:42px;height:7px;background:rgba(0,0,0,0.15);border-radius:50%;filter:blur(3px)"></div>
+    </div>`,
+  iconSize:   [56, 44],
+  iconAnchor: [28, 44],
 });
 
 // Vola alla posizione live quando arriva / cambia
