@@ -14,7 +14,7 @@ const navLinks = [
       { label: "SS Crocifisso Nero", to: "/ss-crocifisso-nero" },
     ],
   },
-  { label: "Sostenitori del cammino", to: "/sostenitori" },
+  { label: "Sostenitori", to: "/sostenitori" },
   { label: "Contatti", to: "/contatti" },
   { label: "Login", to: "/admin-login" },
 ];
@@ -185,13 +185,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div>
               <h4 className="font-heading text-sm font-bold mb-4 uppercase tracking-wider">Link Utili</h4>
               <div className="flex flex-col gap-2">
-                {["/il-percorso", "/sponsor", "/contatti"].map((to) => (
+                {([
+                  { to: "/il-percorso",  label: "Il Percorso" },
+                  { to: "/sostenitori",  label: "Sostenitori del cammino" },
+                  { to: "/contatti",     label: "Contatti" },
+                ] as const).map(({ to, label }) => (
                   <Link
                     key={to}
                     to={to}
                     className="text-primary-foreground/70 hover:text-accent text-sm font-body transition-colors"
                   >
-                    {to.replace("/", "").replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase())}
+                    {label}
                   </Link>
                 ))}
               </div>
