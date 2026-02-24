@@ -230,9 +230,9 @@ export default function AdminLive() {
   const [cloudPreset, setCloudPreset] = useState("");
 
   // ─ Video YouTube ─
-  const [ytCn1, setYtCn1] = useState("");
-  const [ytCn2, setYtCn2] = useState("");
-  const [ytCn3, setYtCn3] = useState("");
+  const [ytCn1, setYtCn1] = useState(""); const [ytCn1Title, setYtCn1Title] = useState(""); const [ytCn1Desc, setYtCn1Desc] = useState("");
+  const [ytCn2, setYtCn2] = useState(""); const [ytCn2Title, setYtCn2Title] = useState(""); const [ytCn2Desc, setYtCn2Desc] = useState("");
+  const [ytCn3, setYtCn3] = useState(""); const [ytCn3Title, setYtCn3Title] = useState(""); const [ytCn3Desc, setYtCn3Desc] = useState("");
   const [ytSaved, setYtSaved] = useState(false);
 
   // ─ Composer ─
@@ -271,9 +271,9 @@ export default function AdminLive() {
       setIgImageUrl(s.igImageUrl);
       setCloudName(s.cloudName);
       setCloudPreset(s.cloudPreset);
-      setYtCn1(s.ytCn1);
-      setYtCn2(s.ytCn2);
-      setYtCn3(s.ytCn3);
+      setYtCn1(s.ytCn1); setYtCn1Title(s.ytCn1Title); setYtCn1Desc(s.ytCn1Desc);
+      setYtCn2(s.ytCn2); setYtCn2Title(s.ytCn2Title); setYtCn2Desc(s.ytCn2Desc);
+      setYtCn3(s.ytCn3); setYtCn3Title(s.ytCn3Title); setYtCn3Desc(s.ytCn3Desc);
       setSettingsLoading(false);
     });
   }, []);
@@ -335,13 +335,13 @@ export default function AdminLive() {
 
   // ─ Impostazioni social ─
   async function handleSaveSettings() {
-    const s: AdminSettings = { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset, ytCn1, ytCn2, ytCn3 };
+    const s: AdminSettings = { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset, ytCn1, ytCn1Title, ytCn1Desc, ytCn2, ytCn2Title, ytCn2Desc, ytCn3, ytCn3Title, ytCn3Desc };
     await saveSettingsDB(s);
   }
 
   // ─ Video YouTube ─
   async function handleSaveYtVideos() {
-    const s: AdminSettings = { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset, ytCn1, ytCn2, ytCn3 };
+    const s: AdminSettings = { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset, ytCn1, ytCn1Title, ytCn1Desc, ytCn2, ytCn2Title, ytCn2Desc, ytCn3, ytCn3Title, ytCn3Desc };
     await saveSettingsDB(s);
     setYtSaved(true);
     setTimeout(() => setYtSaved(false), 2500);
@@ -860,21 +860,30 @@ export default function AdminLive() {
                     → copia solo la parte in grassetto).
                   </p>
 
-                  <div className="space-y-4">
+                  <div className="space-y-5">
                     <YtVideoField
-                      label="Video 1 · La Storia del Crocifisso Nero"
-                      value={ytCn1}
-                      onChange={setYtCn1}
+                      num={1}
+                      ytId={ytCn1} onYtId={setYtCn1}
+                      title={ytCn1Title} onTitle={setYtCn1Title}
+                      desc={ytCn1Desc}  onDesc={setYtCn1Desc}
+                      defaultTitle="La Storia del Crocifisso Nero"
+                      defaultDesc="Le origini e la leggenda del sacro simulacro ligneo venerato a Terranova Sappo Minulio, tra fede popolare e tradizione secolare."
                     />
                     <YtVideoField
-                      label="Video 2 · La Devozione e le Celebrazioni"
-                      value={ytCn2}
-                      onChange={setYtCn2}
+                      num={2}
+                      ytId={ytCn2} onYtId={setYtCn2}
+                      title={ytCn2Title} onTitle={setYtCn2Title}
+                      desc={ytCn2Desc}  onDesc={setYtCn2Desc}
+                      defaultTitle="La Devozione e le Celebrazioni"
+                      defaultDesc="Le feste patronali e i pellegrinaggi che ogni anno richiamano migliaia di fedeli da tutta la Calabria e dal sud Italia."
                     />
                     <YtVideoField
-                      label="Video 3 · I Miracoli e le Grazie"
-                      value={ytCn3}
-                      onChange={setYtCn3}
+                      num={3}
+                      ytId={ytCn3} onYtId={setYtCn3}
+                      title={ytCn3Title} onTitle={setYtCn3Title}
+                      desc={ytCn3Desc}  onDesc={setYtCn3Desc}
+                      defaultTitle="I Miracoli e le Grazie"
+                      defaultDesc="Le testimonianze dei fedeli e i prodigi tramandati dalla tradizione locale legati al SS Crocifisso Nero."
                     />
                   </div>
 
@@ -985,37 +994,74 @@ export default function AdminLive() {
   );
 }
 
-// ─── Campo input YouTube ──────────────────────────────────────────────────────
+// ─── Card video YouTube (ID + titolo + descrizione) ──────────────────────────
 function YtVideoField({
-  label, value, onChange,
-}: { label: string; value: string; onChange: (v: string) => void }) {
-  const isValid = value.trim().length > 0 && !value.startsWith("YOUTUBE_ID");
+  num, ytId, onYtId, title, onTitle, desc, onDesc, defaultTitle, defaultDesc,
+}: {
+  num: number;
+  ytId: string;    onYtId: (v: string) => void;
+  title: string;   onTitle: (v: string) => void;
+  desc: string;    onDesc: (v: string) => void;
+  defaultTitle: string;
+  defaultDesc: string;
+}) {
+  const idValid = ytId.trim().length > 0 && !ytId.startsWith("YOUTUBE_ID");
   return (
-    <div>
-      <label className="block text-xs font-semibold text-foreground mb-1">{label}</label>
-      <div className="flex gap-2">
+    <div className="border border-border rounded-xl p-4 space-y-3 bg-background">
+      <p className="text-xs font-bold text-foreground">Video {num}</p>
+
+      {/* Titolo */}
+      <div>
+        <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Titolo</label>
         <input
           type="text"
-          value={value}
-          onChange={e => onChange(e.target.value.trim())}
-          placeholder="es. dQw4w9WgXcQ"
-          className="flex-1 border border-border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+          value={title}
+          onChange={e => onTitle(e.target.value)}
+          placeholder={defaultTitle}
+          className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-card text-foreground"
         />
-        {isValid && (
-          <a
-            href={`https://www.youtube.com/watch?v=${value}`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center px-3 border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Apri su YouTube"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-        )}
       </div>
-      {isValid && (
-        <p className="text-[10px] text-green-600 mt-1">✓ ID impostato</p>
-      )}
+
+      {/* Descrizione */}
+      <div>
+        <label className="block text-[11px] font-semibold text-muted-foreground mb-1">Descrizione</label>
+        <textarea
+          rows={3}
+          value={desc}
+          onChange={e => onDesc(e.target.value)}
+          placeholder={defaultDesc}
+          className="w-full border border-border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-dona/40 bg-card text-foreground"
+        />
+      </div>
+
+      {/* ID YouTube */}
+      <div>
+        <label className="block text-[11px] font-semibold text-muted-foreground mb-1">ID YouTube</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={ytId}
+            onChange={e => onYtId(e.target.value.trim())}
+            placeholder="es. dQw4w9WgXcQ"
+            className="flex-1 border border-border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-dona/40 bg-card text-foreground"
+          />
+          {idValid && (
+            <a
+              href={`https://www.youtube.com/watch?v=${ytId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center px-3 border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Apri su YouTube"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
+        </div>
+        {idValid
+          ? <p className="text-[10px] text-green-600 mt-1">✓ ID impostato</p>
+          : <p className="text-[10px] text-muted-foreground mt-1">Parte finale dell'URL YouTube dopo <code className="bg-muted px-0.5 rounded">?v=</code></p>
+        }
+      </div>
     </div>
   );
 }

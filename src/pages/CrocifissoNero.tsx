@@ -6,7 +6,7 @@ import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
 import crocifissoImg from "@/assets/crocifisso-nero.jpg";
 import { motion } from "framer-motion";
-import { loadYtCrocifissoIds } from "@/lib/adminSettings";
+import { loadYtCrocifissoVideos, type YtVideoData } from "@/lib/adminSettings";
 
 // ── Metadati video (titoli e descrizioni) ─────────────────────────────────────
 const VIDEO_META = [
@@ -52,16 +52,20 @@ function VideoEmbed({ videoId, titolo }: { videoId: string; titolo: string }) {
 }
 
 export default function CrocifissoNero() {
-  const [ytIds, setYtIds] = useState<[string, string, string]>(["", "", ""]);
+  const [videos, setVideos] = useState<YtVideoData[]>(() =>
+    VIDEO_META.map((meta, i) => ({ id: `YOUTUBE_ID_${i + 1}`, ...meta })),
+  );
 
   useEffect(() => {
-    setYtIds(loadYtCrocifissoIds());
+    const saved = loadYtCrocifissoVideos();
+    setVideos(
+      VIDEO_META.map((meta, i) => ({
+        id:         saved[i].id        || `YOUTUBE_ID_${i + 1}`,
+        titolo:     saved[i].titolo    || meta.titolo,
+        descrizione: saved[i].descrizione || meta.descrizione,
+      })),
+    );
   }, []);
-
-  const videos = VIDEO_META.map((meta, i) => ({
-    id: ytIds[i] || `YOUTUBE_ID_${i + 1}`,
-    ...meta,
-  }));
 
   return (
     <Layout>
