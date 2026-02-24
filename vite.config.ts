@@ -18,6 +18,13 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      // Forza il reload immediato della pagina quando è disponibile una nuova versione.
+      // Senza questo, Android tende a tenere in cache la versione precedente.
+      injectRegister: "auto",
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+      },
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "icon-512.png"],
       manifest: {
         name: "1000km di Gratitudine",
