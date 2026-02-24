@@ -9,6 +9,7 @@ import percorsoHero from "@/assets/percorso-hero.jpg";
 import { motion } from "framer-motion";
 import { tappe } from "@/lib/tappe";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { loadLivePosition, subscribeLivePosition, type LivePosition } from "@/lib/liveTracking";
 
 // Caricamento lazy per evitare problemi SSR con Leaflet
 const RouteMap = lazy(() => import("@/components/RouteMap"));
@@ -19,17 +20,29 @@ const LOCATOWEB_FALLBACK = "";
 const CAMMINO_START = new Date("2026-04-18T06:00:00");
 const CAMMINO_END   = new Date("2026-05-01T23:59:00");
 
-function LiveTrackingSection({ ltwUrl }: { ltwUrl: string }) {
+function LiveTrackingSection({
+  ltwUrl,
+  livePos,
+}: {
+  ltwUrl: string;
+  livePos: LivePosition | null;
+}) {
   const now = new Date();
-  const isLive = now >= CAMMINO_START && now <= CAMMINO_END;
+  const isLive   = now >= CAMMINO_START && now <= CAMMINO_END;
   const isFuture = now < CAMMINO_START;
+
+  // GPS attivo ha priorità su LocaToWeb
+  const gpsActive = livePos?.is_active === true;
+
+  // Mostra indicatore live solo se GPS o LTW attivi
+  const showLiveBadge = isLive && (gpsActive || !!ltwUrl);
 
   return (
     <section className="section-padding bg-primary text-primary-foreground">
       <div className="container-narrow">
         <AnimatedSection>
           <div className="flex items-center justify-center gap-3 mb-4">
-            {isLive ? (
+            {showLiveBadge ? (
               <span className="flex items-center gap-2">
                 <span className="relative flex h-3 w-3">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
@@ -47,13 +60,34 @@ function LiveTrackingSection({ ltwUrl }: { ltwUrl: string }) {
           </h2>
 
           {isLive ? (
-            // ── Cammino in corso: mostra la mappa live di LocaToWeb ──
             <div className="mt-6">
-              <p className="text-center text-primary-foreground/70 font-body mb-6">
-                Segui ogni passo in tempo reale grazie a LocaToWeb.
-              </p>
-              {ltwUrl ? (
+              {gpsActive ? (
+                // ── GPS diretto attivo ──────────────────────────────────────
                 <>
+                  <p className="text-center text-primary-foreground/70 font-body mb-2">
+                    Segui la posizione live aggiornata direttamente dal telefono.
+                  </p>
+                  <p className="text-center text-primary-foreground/40 text-xs font-body mb-6">
+                    {livePos?.speed != null
+                      ? `${(livePos.speed * 3.6).toFixed(1)} km/h · `
+                      : ""}
+                    {livePos?.accuracy != null
+                      ? `precisione ±${Math.round(livePos.accuracy)} m · `
+                      : ""}
+                    La mappa si aggiorna in tempo reale
+                  </p>
+                  {/* Il marker blu è già visibile nel RouteMap della sezione sopra */}
+                  <div className="flex items-center justify-center gap-2 text-sm text-primary-foreground/60 font-body">
+                    <span className="inline-block w-3 h-3 rounded-full bg-blue-400 ring-2 ring-blue-300/40 animate-pulse" />
+                    Il punto blu nella mappa indica la posizione attuale
+                  </div>
+                </>
+              ) : ltwUrl ? (
+                // ── LocaToWeb fallback ──────────────────────────────────────
+                <>
+                  <p className="text-center text-primary-foreground/70 font-body mb-6">
+                    Segui ogni passo in tempo reale.
+                  </p>
                   <div className="rounded-xl overflow-hidden shadow-2xl border border-primary-foreground/10" style={{ height: 480 }}>
                     <iframe
                       src={ltwUrl}
@@ -69,8 +103,7 @@ function LiveTrackingSection({ ltwUrl }: { ltwUrl: string }) {
                 </>
               ) : (
                 <p className="text-center text-primary-foreground/50 font-body text-sm mt-4">
-                  Il link di tracking non è ancora stato impostato.{" "}
-                  <a href="/admin-live" className="underline text-dona">Vai all'admin</a> per aggiornarlo.
+                  Il tracking non è ancora stato attivato.
                 </p>
               )}
             </div>
@@ -116,6 +149,9 @@ export default function Percorso() {
   // Contatori iscritti per tappa (chiave = tappa_numero 1-14)
   const [iscritti, setIscritti] = useState<Record<number, number>>({});
 
+  // Posizione GPS live
+  const [livePos, setLivePos] = useState<LivePosition | null>(null);
+
   // URL LocaToWeb: legge prima dal query param ?ltw=, poi da localStorage, poi fallback vuoto
   const [searchParams] = useSearchParams();
   const [ltwUrl, setLtwUrlState] = useState<string>(() => {
@@ -145,6 +181,13 @@ export default function Percorso() {
         );
         setIscritti(map);
       });
+  }, []);
+
+  // Carica posizione live iniziale + sottoscrizione Realtime
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    loadLivePosition().then(pos => { if (pos) setLivePos(pos); });
+    return subscribeLivePosition(setLivePos);
   }, []);
 
   function handleTappaClick(waypointIndex: number) {
@@ -203,7 +246,7 @@ export default function Percorso() {
                   </div>
                 }
               >
-                <RouteMap selectedIndex={selectedWaypoint} iscritti={iscritti} />
+                <RouteMap selectedIndex={selectedWaypoint} iscritti={iscritti} livePos={livePos} />
               </Suspense>
             </div>
 
@@ -302,7 +345,7 @@ export default function Percorso() {
       </section>
 
       {/* Sezione live tracking */}
-      <LiveTrackingSection ltwUrl={ltwUrl} />
+      <LiveTrackingSection ltwUrl={ltwUrl} livePos={livePos} />
 
       <div className="h-16 lg:hidden" />
     </Layout>

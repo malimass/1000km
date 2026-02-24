@@ -3,10 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { loadSettings, saveSettings as saveSettingsDB, type AdminSettings } from "@/lib/adminSettings";
+import { upsertLivePosition } from "@/lib/liveTracking";
 import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
   Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video, LogOut,
-  MapPin, Youtube, Menu,
+  MapPin, Youtube, Navigation,
 } from "lucide-react";
 
 // ─── Costanti ────────────────────────────────────────────────────────────────
@@ -229,6 +230,12 @@ export default function AdminLive() {
   const [cloudName,   setCloudName]   = useState("");
   const [cloudPreset, setCloudPreset] = useState("");
 
+  // ─ GPS Live ─
+  const [isTracking,  setIsTracking]  = useState(false);
+  const [gpsPos,      setGpsPos]      = useState<{ lat: number; lng: number; speed: number | null; accuracy: number | null } | null>(null);
+  const [gpsError,    setGpsError]    = useState("");
+  const watchIdRef = useRef<number | null>(null);
+
   // ─ Video YouTube ─
   const [ytCn1, setYtCn1] = useState(""); const [ytCn1Title, setYtCn1Title] = useState(""); const [ytCn1Desc, setYtCn1Desc] = useState("");
   const [ytCn2, setYtCn2] = useState(""); const [ytCn2Title, setYtCn2Title] = useState(""); const [ytCn2Desc, setYtCn2Desc] = useState("");
@@ -346,6 +353,41 @@ export default function AdminLive() {
     setYtSaved(true);
     setTimeout(() => setYtSaved(false), 2500);
   }
+
+  // ─ GPS tracking ─
+  async function startGpsTracking() {
+    if (!navigator.geolocation) {
+      setGpsError("GPS non disponibile su questo dispositivo.");
+      return;
+    }
+    setGpsError("");
+    await upsertLivePosition({ is_active: true });
+    setIsTracking(true);
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      async ({ coords }) => {
+        const { latitude, longitude, speed, accuracy, heading } = coords;
+        setGpsPos({ lat: latitude, lng: longitude, speed, accuracy });
+        await upsertLivePosition({ lat: latitude, lng: longitude, speed, accuracy, heading, is_active: true });
+      },
+      (err) => setGpsError(`Errore GPS: ${err.message}`),
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 },
+    );
+  }
+
+  async function stopGpsTracking() {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setIsTracking(false);
+    setGpsPos(null);
+    await upsertLivePosition({ is_active: false });
+  }
+
+  // Ferma il watch se si smonta il componente mentre tracking è attivo
+  useEffect(() => () => {
+    if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+  }, []);
 
   // ─ Logout ─
   async function handleLogout() {
@@ -583,7 +625,69 @@ export default function AdminLive() {
             )}
 
             {/* ── SEZIONE: Live Tracking ─────────────────────────────────────── */}
-            {activeSection === "live" && (
+            {activeSection === "live" && (<>
+              {/* Pannello GPS diretto */}
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                <h2 className="font-semibold text-foreground mb-3 text-sm uppercase tracking-wide flex items-center gap-2">
+                  <Navigation className="w-4 h-4" /> GPS Diretto
+                </h2>
+
+                {!isSupabaseConfigured ? (
+                  <p className="text-xs text-amber-600">
+                    ⚠️ Supabase non configurato — il GPS diretto non è disponibile.
+                  </p>
+                ) : !isTracking ? (
+                  <button
+                    onClick={startGpsTracking}
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg py-3 text-sm font-semibold hover:bg-blue-700 transition-colors"
+                  >
+                    <Navigation className="w-4 h-4" /> Avvia Tracking GPS
+                  </button>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-green-600">
+                      <span className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+                      </span>
+                      LIVE — Aggiornamento continuo
+                    </div>
+                    {gpsPos && (
+                      <div className="bg-muted rounded-lg px-4 py-3 mb-3 font-mono text-xs space-y-1 text-foreground">
+                        <p>Lat: {gpsPos.lat.toFixed(6)}</p>
+                        <p>Lng: {gpsPos.lng.toFixed(6)}</p>
+                        {gpsPos.speed != null && (
+                          <p>Velocità: {(gpsPos.speed * 3.6).toFixed(1)} km/h</p>
+                        )}
+                        {gpsPos.accuracy != null && (
+                          <p>Precisione: ±{Math.round(gpsPos.accuracy)} m</p>
+                        )}
+                      </div>
+                    )}
+                    {!gpsPos && (
+                      <div className="flex items-center gap-2 mb-3 text-xs text-muted-foreground">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Acquisizione segnale GPS…
+                      </div>
+                    )}
+                    <button
+                      onClick={stopGpsTracking}
+                      className="w-full flex items-center justify-center gap-2 bg-red-500 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-red-600 transition-colors"
+                    >
+                      <X className="w-4 h-4" /> Ferma Tracking
+                    </button>
+                  </>
+                )}
+                {gpsError && <p className="text-xs text-red-500 mt-2">{gpsError}</p>}
+              </div>
+
+              {/* Separatore */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground">oppure usa LocaToWeb</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
+              {/* Card LTW originale */}
               <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
                 <h2 className="font-semibold text-foreground mb-1 text-sm uppercase tracking-wide">
                   📍 Link Live Tracking
@@ -636,7 +740,7 @@ export default function AdminLive() {
                   </button>
                 </div>
               </div>
-            )}
+            </>)}
 
             {/* ── SEZIONE: Pubblica sui social ───────────────────────────────── */}
             {activeSection === "social" && (

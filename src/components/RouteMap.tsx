@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, ZoomControl, useMap } from "react-leaflet";
 import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
+import type { LivePosition } from "@/lib/liveTracking";
 
 // Coordinate delle 15 tappe (Bologna → Via Emilia → SS16 Adriatica → interno Sud → SS18 Tirrenica → Terranova)
 const waypoints: [number, number][] = [
@@ -47,6 +48,23 @@ function MapController({ selectedIndex }: { selectedIndex: number | null }) {
       map.flyTo(waypoints[selectedIndex], 10, { duration: 1.2 });
     }
   }, [selectedIndex, map]);
+  return null;
+}
+
+// Icona pulsante per la posizione GPS live
+const gpsIcon = divIcon({
+  className: "gps-marker",
+  html: `<span class="gps-dot"></span><span class="gps-ring"></span>`,
+  iconSize:   [20, 20],
+  iconAnchor: [10, 10],
+});
+
+// Vola alla posizione live quando arriva / cambia
+function LiveController({ pos }: { pos: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.flyTo(pos, Math.max(map.getZoom(), 11), { duration: 1.5 });
+  }, [pos, map]);
   return null;
 }
 
@@ -99,10 +117,16 @@ const midIconSel = makeIcon("#f97316", 14);
 export default function RouteMap({
   selectedIndex = null,
   iscritti = {},
+  livePos = null,
 }: {
   selectedIndex?: number | null;
   iscritti?: Record<number, number>;
+  livePos?: LivePosition | null;
 }) {
+  const liveLatlng: [number, number] | null =
+    livePos?.is_active && livePos.lat != null && livePos.lng != null
+      ? [livePos.lat, livePos.lng]
+      : null;
   // Centro mappa spostato per coprire il percorso reale (adriatica + tirrenica)
   const center: [number, number] = [41.5, 14.0];
 
@@ -116,6 +140,7 @@ export default function RouteMap({
         style={{ height: "100%", width: "100%" }}
       >
         <MapController selectedIndex={selectedIndex} />
+        {liveLatlng && <LiveController pos={liveLatlng} />}
         <ZoomControl position="bottomright" />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -132,6 +157,23 @@ export default function RouteMap({
             dashArray: "6 4",
           }}
         />
+
+        {/* Marker GPS live */}
+        {liveLatlng && (
+          <Marker position={liveLatlng} icon={gpsIcon} zIndexOffset={1000}>
+            <Popup>
+              <div className="text-sm font-sans space-y-0.5">
+                <strong>📍 Posizione live</strong>
+                {livePos?.speed != null && (
+                  <p>{(livePos.speed * 3.6).toFixed(1)} km/h</p>
+                )}
+                {livePos?.accuracy != null && (
+                  <p className="text-xs text-gray-500">±{Math.round(livePos.accuracy)} m</p>
+                )}
+              </div>
+            </Popup>
+          </Marker>
+        )}
 
         {/* Marker per ogni tappa */}
         {waypoints.map((pos, i) => {
