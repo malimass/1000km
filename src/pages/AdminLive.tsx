@@ -388,14 +388,11 @@ export default function AdminLive() {
     lastRoutePointRef.current = null;
     lastRouteTimeRef.current  = 0;
     setRouteCount(0);
-
-    // Verifica subito se le scritture su Supabase funzionano
-    const startErr = await upsertLivePosition({ is_active: true }, runnerId);
-    if (startErr) {
-      setDbError(`Salvataggio GPS bloccato (RLS): ${startErr} — vedi istruzioni admin.`);
-    }
     setIsTracking(true);
 
+    // ⚠️ watchPosition va avviato SUBITO (prima di qualsiasi await) —
+    // su iOS Safari il contesto utente si perde dopo un'operazione async
+    // e il GPS non viene mai avviato.
     watchIdRef.current = navigator.geolocation.watchPosition(
       async ({ coords }) => {
         const { latitude: lat, longitude: lng, speed, accuracy, heading } = coords;
@@ -423,6 +420,12 @@ export default function AdminLive() {
       (err) => setGpsError(`Errore GPS: ${err.message}`),
       { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 },
     );
+
+    // Aggiorna stato attivo su Supabase in background (dopo aver avviato il GPS)
+    const startErr = await upsertLivePosition({ is_active: true }, runnerId);
+    if (startErr) {
+      setDbError(`Salvataggio GPS bloccato (RLS): ${startErr} — vedi istruzioni admin.`);
+    }
   }
 
   async function stopGpsTracking() {
@@ -699,14 +702,14 @@ export default function AdminLive() {
                           className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold border-2 transition-colors
                             ${runnerId === 1 ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-muted/40 text-muted-foreground"}`}
                         >
-                          🏃‍♂️ Corridore 1
+                          🏃‍♂️ Massimo
                         </button>
                         <button
                           onClick={() => selectRunner(2)}
                           className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold border-2 transition-colors
                             ${runnerId === 2 ? "border-orange-500 bg-orange-50 text-orange-700" : "border-border bg-muted/40 text-muted-foreground"}`}
                         >
-                          🏃‍♀️ Corridore 2
+                          🏃‍♂️ Nunzio
                         </button>
                       </div>
                     </div>
@@ -725,7 +728,7 @@ export default function AdminLive() {
                         <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
                       </span>
                       <span className="text-xs text-muted-foreground font-normal ml-1">
-                        {runnerId === 1 ? "🏃‍♂️ Corridore 1" : "🏃‍♀️ Corridore 2"}
+                        {runnerId === 1 ? "🏃‍♂️ Massimo" : "🏃‍♂️ Nunzio"}
                       </span>
                       LIVE — Aggiornamento continuo
                     </div>
