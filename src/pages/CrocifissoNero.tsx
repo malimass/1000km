@@ -6,7 +6,7 @@ import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
 import crocifissoImg from "@/assets/crocifisso-nero.jpg";
 import { motion } from "framer-motion";
-import { loadYtCrocifissoVideos, type YtVideoData } from "@/lib/adminSettings";
+import { loadYtCrocifissoVideos, loadSiteYtVideos, type YtVideoData } from "@/lib/adminSettings";
 
 // ── Metadati video (titoli e descrizioni) ─────────────────────────────────────
 const VIDEO_META = [
@@ -57,14 +57,18 @@ export default function CrocifissoNero() {
   );
 
   useEffect(() => {
-    const saved = loadYtCrocifissoVideos();
-    setVideos(
-      VIDEO_META.map((meta, i) => ({
-        id:         saved[i].id        || `YOUTUBE_ID_${i + 1}`,
-        titolo:     saved[i].titolo    || meta.titolo,
-        descrizione: saved[i].descrizione || meta.descrizione,
-      })),
-    );
+    // Prova prima Supabase (cross-device, aggiornato dall'admin),
+    // poi fallback su localStorage (stesso dispositivo admin).
+    loadSiteYtVideos().then(siteData => {
+      const source = siteData ?? loadYtCrocifissoVideos();
+      setVideos(
+        VIDEO_META.map((meta, i) => ({
+          id:          source[i].id          || `YOUTUBE_ID_${i + 1}`,
+          titolo:      source[i].titolo      || meta.titolo,
+          descrizione: source[i].descrizione || meta.descrizione,
+        })),
+      );
+    });
   }, []);
 
   return (
