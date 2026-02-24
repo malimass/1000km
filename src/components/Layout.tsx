@@ -27,7 +27,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-primary shadow-lg">
+      <header className="sticky top-0 z-50 bg-primary shadow-lg pt-safe">
         <div className="container-narrow flex items-center justify-between px-4 py-3 md:py-4">
           <Link to="/" className="font-heading text-lg md:text-xl font-bold text-primary-foreground tracking-wider">
             1000<span className="text-accent">KM</span>DIGRATITUDINE
@@ -210,7 +210,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </footer>
 
       {/* Mobile sticky DONA */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 p-3 bg-primary/95 backdrop-blur-sm border-t border-primary-foreground/10">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 p-3 pb-safe bg-primary/95 backdrop-blur-sm border-t border-primary-foreground/10">
         <Button asChild variant="dona" size="lg" className="w-full">
           <Link to="/dona">
             <Heart className="w-4 h-4 mr-2" />
