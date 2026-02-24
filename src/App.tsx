@@ -12,6 +12,7 @@ const Percorso = lazy(() => import("./pages/Percorso"));
 const SanLuca = lazy(() => import("./pages/SanLuca"));
 const CrocifissoNero = lazy(() => import("./pages/CrocifissoNero"));
 const Sponsor = lazy(() => import("./pages/Sponsor"));
+const Sostenitori = lazy(() => import("./pages/Sostenitori"));
 const Contatti = lazy(() => import("./pages/Contatti"));
 const Dona = lazy(() => import("./pages/Dona"));
 const AdminLive = lazy(() => import("./pages/AdminLive"));
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/madonna-di-san-luca" element={<SanLuca />} />
           <Route path="/ss-crocifisso-nero" element={<CrocifissoNero />} />
           <Route path="/sponsor" element={<Sponsor />} />
+          <Route path="/sostenitori" element={<Sostenitori />} />
           <Route path="/contatti" element={<Contatti />} />
           <Route path="/dona" element={<Dona />} />
           <Route path="/iscriviti" element={<Iscriviti />} />
