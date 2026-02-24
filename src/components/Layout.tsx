@@ -14,7 +14,7 @@ const navLinks = [
       { label: "SS Crocifisso Nero", to: "/ss-crocifisso-nero" },
     ],
   },
-  { label: "Sponsor", to: "/sponsor" },
+  { label: "Sostenitori del cammino", to: "/sostenitori" },
   { label: "Contatti", to: "/contatti" },
   { label: "Login", to: "/admin-login" },
 ];

@@ -3,13 +3,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { loadSettings, saveSettings as saveSettingsDB, type AdminSettings } from "@/lib/adminSettings";
+import { loadSosteniPage, saveSosteniPage, type Sostenitore, type SosteniPage } from "@/lib/sostenitori";
 import {
   upsertLivePosition, appendRoutePoint, distanceMeters, todaySessionId,
 } from "@/lib/liveTracking";
 import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
   Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video, LogOut,
-  MapPin, Youtube, Navigation,
+  MapPin, Youtube, Navigation, Users, Upload,
 } from "lucide-react";
 
 // ─── Costanti ────────────────────────────────────────────────────────────────
@@ -209,13 +210,14 @@ async function shareToTikTok(file: File, caption: string): Promise<{ ok: boolean
 }
 
 // ─── Tipi sezione ─────────────────────────────────────────────────────────────
-type Section = "live" | "social" | "video" | "settings";
+type Section = "live" | "social" | "video" | "sostenitori" | "settings";
 
 const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
-  { key: "live",     label: "Live Tracking", icon: <MapPin className="w-4 h-4" /> },
-  { key: "social",   label: "Pubblica",      icon: <Send className="w-4 h-4" /> },
-  { key: "video",    label: "Video YouTube", icon: <Youtube className="w-4 h-4" /> },
-  { key: "settings", label: "Impostazioni",  icon: <Settings className="w-4 h-4" /> },
+  { key: "live",        label: "Live Tracking", icon: <MapPin className="w-4 h-4" /> },
+  { key: "social",      label: "Pubblica",      icon: <Send className="w-4 h-4" /> },
+  { key: "video",       label: "Video YouTube", icon: <Youtube className="w-4 h-4" /> },
+  { key: "sostenitori", label: "Sostenitori",   icon: <Users className="w-4 h-4" /> },
+  { key: "settings",    label: "Impostazioni",  icon: <Settings className="w-4 h-4" /> },
 ];
 
 // ─── Componente principale ────────────────────────────────────────────────────
@@ -264,6 +266,15 @@ export default function AdminLive() {
   const [ytCn3, setYtCn3] = useState(""); const [ytCn3Title, setYtCn3Title] = useState(""); const [ytCn3Desc, setYtCn3Desc] = useState("");
   const [ytSaved, setYtSaved] = useState(false);
 
+  // ─ Sostenitori ─
+  const [sosteniTitle,    setSosteniTitle]    = useState("I Sostenitori del Cammino");
+  const [sosteniIntro,    setSosteniIntro]    = useState("");
+  const [sosteniItems,    setSosteniItems]    = useState<Sostenitore[]>([]);
+  const [sosteniSaved,    setSosteniSaved]    = useState(false);
+  const [sosteniUploading, setSosteniUploading] = useState<string | null>(null);
+  const sosteniLogoInputRef    = useRef<HTMLInputElement>(null);
+  const sosteniUploadTargetRef = useRef<string | null>(null);
+
   // ─ Composer ─
   const isTraining = new Date() < CAMMINO_START;
   const [contentType, setContentType] = useState<"photo" | "reel">("photo");
@@ -304,6 +315,11 @@ export default function AdminLive() {
       setYtCn2(s.ytCn2); setYtCn2Title(s.ytCn2Title); setYtCn2Desc(s.ytCn2Desc);
       setYtCn3(s.ytCn3); setYtCn3Title(s.ytCn3Title); setYtCn3Desc(s.ytCn3Desc);
       setSettingsLoading(false);
+    });
+    loadSosteniPage().then(p => {
+      setSosteniTitle(p.title);
+      setSosteniIntro(p.intro);
+      setSosteniItems(p.items);
     });
   }, []);
 
@@ -374,6 +390,54 @@ export default function AdminLive() {
     await saveSettingsDB(s);
     setYtSaved(true);
     setTimeout(() => setYtSaved(false), 2500);
+  }
+
+  // ─ Sostenitori handlers ─
+  async function handleSaveSosteni() {
+    const page: SosteniPage = { title: sosteniTitle, intro: sosteniIntro, items: sosteniItems };
+    await saveSosteniPage(page);
+    setSosteniSaved(true);
+    setTimeout(() => setSosteniSaved(false), 2500);
+  }
+
+  function addSostenitore() {
+    setSosteniItems(prev => [...prev, {
+      id:      crypto.randomUUID(),
+      nome:    "",
+      testo:   "",
+      logoUrl: "",
+    }]);
+  }
+
+  function removeSostenitore(id: string) {
+    setSosteniItems(prev => prev.filter(it => it.id !== id));
+  }
+
+  function updateSostenitore(id: string, field: keyof Sostenitore, value: string) {
+    setSosteniItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it));
+  }
+
+  function openLogoUpload(itemId: string) {
+    sosteniUploadTargetRef.current = itemId;
+    sosteniLogoInputRef.current?.click();
+  }
+
+  async function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const targetId = sosteniUploadTargetRef.current;
+    e.target.value = "";
+    if (!file || !targetId) return;
+
+    if (!cloudName || !cloudPreset) {
+      // Senza Cloudinary usa object URL temporaneo (locale)
+      const url = URL.createObjectURL(file);
+      updateSostenitore(targetId, "logoUrl", url);
+      return;
+    }
+    setSosteniUploading(targetId);
+    const url = await uploadToCloudinary(file, cloudName, cloudPreset, "image");
+    setSosteniUploading(null);
+    if (url) updateSostenitore(targetId, "logoUrl", url);
   }
 
   // ─ GPS tracking ─
@@ -1099,6 +1163,146 @@ export default function AdminLive() {
                     su questo dispositivo.
                   </p>
                 </div>
+              </div>
+            )}
+
+            {/* ── SEZIONE: Sostenitori ───────────────────────────────────────── */}
+            {activeSection === "sostenitori" && (
+              <div className="space-y-4">
+                {/* Input logo nascosto condiviso */}
+                <input
+                  ref={sosteniLogoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleLogoFileChange}
+                />
+
+                {/* Titolo e intro */}
+                <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                  <h2 className="font-semibold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
+                    <Users className="w-4 h-4" /> Pagina Sostenitori
+                  </h2>
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground mb-1">Titolo pagina</label>
+                    <input
+                      type="text"
+                      value={sosteniTitle}
+                      onChange={e => setSosteniTitle(e.target.value)}
+                      placeholder="I Sostenitori del Cammino"
+                      className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground mb-1">Testo introduttivo</label>
+                    <textarea
+                      rows={3}
+                      value={sosteniIntro}
+                      onChange={e => setSosteniIntro(e.target.value)}
+                      placeholder="Un ringraziamento speciale a tutte le aziende e persone che sostengono il cammino…"
+                      className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Lista sostenitori */}
+                {sosteniItems.map((item, idx) => (
+                  <div key={item.id} className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+                        Sostenitore {idx + 1}
+                      </span>
+                      <button
+                        onClick={() => removeSostenitore(item.id)}
+                        className="text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Logo */}
+                    <div className="flex items-center gap-3">
+                      {item.logoUrl ? (
+                        <div className="relative">
+                          <img
+                            src={item.logoUrl}
+                            alt={item.nome}
+                            className="h-14 w-auto max-w-[120px] object-contain rounded border border-border bg-muted/30"
+                          />
+                          <button
+                            onClick={() => updateSostenitore(item.id, "logoUrl", "")}
+                            className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="h-14 w-14 rounded border-2 border-dashed border-border flex items-center justify-center bg-muted/30">
+                          <ImageIcon className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => openLogoUpload(item.id)}
+                        disabled={sosteniUploading === item.id}
+                        className="flex items-center gap-1.5 text-xs border border-border rounded-lg px-3 py-2 hover:bg-muted transition-colors disabled:opacity-50"
+                      >
+                        {sosteniUploading === item.id
+                          ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Caricamento…</>
+                          : <><Upload className="w-3.5 h-3.5" /> {item.logoUrl ? "Cambia logo" : "Carica logo"}</>
+                        }
+                      </button>
+                    </div>
+
+                    {/* Nome */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1">Nome azienda</label>
+                      <input
+                        type="text"
+                        value={item.nome}
+                        onChange={e => updateSostenitore(item.id, "nome", e.target.value)}
+                        placeholder="Es. Azienda XYZ"
+                        className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+                      />
+                    </div>
+
+                    {/* Testo */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1">Descrizione</label>
+                      <textarea
+                        rows={2}
+                        value={item.testo}
+                        onChange={e => updateSostenitore(item.id, "testo", e.target.value)}
+                        placeholder="Breve descrizione del sostenitore…"
+                        className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground resize-none"
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                {/* Aggiungi + Salva */}
+                <button
+                  onClick={addSostenitore}
+                  className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-border rounded-xl py-3 text-sm font-semibold text-muted-foreground hover:border-dona/50 hover:text-dona hover:bg-dona/5 transition-all"
+                >
+                  + Aggiungi sostenitore
+                </button>
+
+                <button
+                  onClick={handleSaveSosteni}
+                  className="w-full flex items-center justify-center gap-2 bg-foreground text-background rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  {sosteniSaved
+                    ? <><CheckCircle className="w-4 h-4" /> Salvato!</>
+                    : <><Users className="w-4 h-4" /> Salva sostenitori</>
+                  }
+                </button>
+
+                <p className="text-[11px] text-muted-foreground text-center">
+                  I dati vengono salvati su Supabase e visibili sulla{" "}
+                  <Link to="/sostenitori" target="_blank" className="underline text-dona">
+                    pagina pubblica
+                  </Link>.
+                </p>
               </div>
             )}
 
