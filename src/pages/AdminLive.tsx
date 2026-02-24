@@ -37,13 +37,19 @@ const tappe = [
 ];
 
 // ─── Template post ────────────────────────────────────────────────────────────
+const MAP_URL = "https://1000kmdigratitudine.it/il-percorso";
+
 function buildMessage(ltwUrl: string, isTraining: boolean): string {
+  const liveLines = ltwUrl
+    ? `🗺️ Seguici in live sulla mappa: ${MAP_URL}\n📍 Tracking GPS: ${ltwUrl}`
+    : `🗺️ Seguici in live sulla mappa: ${MAP_URL}`;
+
   if (isTraining) {
     return (
       `🚴‍♂️ Allenamento in preparazione per i 1000 Km di Gratitudine!\n\n` +
       `Il 18 aprile partirò da Bologna per raggiungere Terranova Sappo Minulio (RC): ` +
       `1000 km, 14 tappe, 1 obiettivo.\n\n` +
-      `📍 Seguimi live: ${ltwUrl}\n\n` +
+      `${liveLines}\n\n` +
       HASHTAGS
     );
   }
@@ -55,7 +61,7 @@ function buildMessage(ltwUrl: string, isTraining: boolean): string {
     `Oggi: ${t.da} → ${t.a} · ${t.km} km\n\n` +
     `Sto percorrendo 1000 km da Bologna a Terranova Sappo Minulio (RC) ` +
     `per raccogliere fondi per la ricerca e la solidarietà.\n\n` +
-    `📍 Seguimi in diretta: ${ltwUrl}\n\n` +
+    `${liveLines}\n\n` +
     HASHTAGS
   );
 }
@@ -427,6 +433,7 @@ export default function AdminLive() {
 
   // ─ Logout ─
   async function handleLogout() {
+    localStorage.removeItem("gp_admin_auth");
     if (supabase) await supabase.auth.signOut();
     navigate("/admin-login", { replace: true });
   }
