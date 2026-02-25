@@ -23,11 +23,10 @@ CREATE POLICY "site_settings_public_read"
   FOR SELECT
   USING (true);
 
--- Solo admin autenticati possono modificare
+-- Solo admin autenticati possono inserire
 CREATE POLICY "site_settings_auth_write"
   ON public.site_settings
   FOR INSERT
-  USING (auth.role() = 'authenticated')
   WITH CHECK (auth.role() = 'authenticated');
 
 CREATE POLICY "site_settings_auth_update"
@@ -74,11 +73,10 @@ CREATE POLICY "sostenitori_public_read"
   FOR SELECT
   USING (true);
 
--- Solo admin autenticati possono modificare
+-- Solo admin autenticati possono inserire
 CREATE POLICY "sostenitori_auth_write"
   ON public.sostenitori_page
   FOR INSERT
-  USING (auth.role() = 'authenticated')
   WITH CHECK (auth.role() = 'authenticated');
 
 CREATE POLICY "sostenitori_auth_update"
