@@ -78,7 +78,7 @@ function buildMessage(ltwUrl: string, isTraining: boolean): string {
 
 // ─── Upload su Cloudinary (foto o video) ─────────────────────────────────────
 async function uploadToCloudinary(
-  file: File,
+  file: File | string,
   cloudName: string,
   uploadPreset: string,
   resourceType: "image" | "video" = "image",
@@ -360,7 +360,7 @@ export default function AdminLive() {
   const [adminLivePos2, setAdminLivePos2] = useState<LivePosition | null>(null);
   const [snapshotAlert, setSnapshotAlert] = useState(false);
   const [showSnapshotPanel, setShowSnapshotPanel] = useState(false);
-  const [snapshotFile, setSnapshotFile] = useState<File | null>(null);
+  const [snapshotFile, setSnapshotFile] = useState<string | null>(null);
   const [snapshotPreview, setSnapshotPreview] = useState<string | null>(null);
   const [snapshotCaption, setSnapshotCaption] = useState("");
   const [snapshotPosting, setSnapshotPosting] = useState(false);
@@ -782,16 +782,11 @@ export default function AdminLive() {
     );
   }
 
-  async function handleCaptureMap() {
-    const el = document.getElementById("admin-snapshot-map");
-    if (!el) return;
-    setCapturingMap(true);
-    const file = await captureMapScreenshot(el);
-    setCapturingMap(false);
-    if (file) {
-      if (snapshotPreview) URL.revokeObjectURL(snapshotPreview);
-      setSnapshotFile(file);
-      setSnapshotPreview(URL.createObjectURL(file));
+  function handleCaptureMap() {
+    const url = captureMapScreenshot({ lat: adminLivePos1?.lat, lng: adminLivePos1?.lng });
+    if (url) {
+      setSnapshotFile(url);
+      setSnapshotPreview(url);
     }
   }
 
