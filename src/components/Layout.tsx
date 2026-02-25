@@ -34,7 +34,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-3 xl:gap-5">
+          <nav className="hidden lg:flex items-center gap-3 xl:gap-5 ml-6">
             {navLinks.map((link) =>
               link.children ? (
                 <div key={link.label} className="relative group">
