@@ -1,6 +1,6 @@
 # Funzionalità — 1000km di Gratitudine
 
-> Documento aggiornabile progressivamente. Ultima modifica: 2026-02-25
+> Documento aggiornabile progressivamente. Ultima modifica: 2026-02-25 (v2)
 
 ---
 
@@ -64,35 +64,42 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 ### 4. Community Tracking (`/partecipa` + `/il-mio-percorso`)
 - Registrazione con email, password, nome, tipo attività, città
 - Login con email e password (Supabase Auth)
+- Scelta sport: corri 🏃, cammino 🚶, pedalo 🚴, nuoto 🏊, altro 💪
 - Condivisione posizione GPS in tempo reale sulla mappa pubblica
 - Start / Stop tracking dalla dashboard utente
-- Stats live: km percorsi, velocità, posizione corrente
-- **Condivisione social** dell'attività (Web Share API o copia negli appunti)
-- Tipi attività: corri 🏃, cammino 🚶, pedalo 🚴, nuoto 🏊, altro
+- Stats live: km percorsi, velocità, tempo, posizione corrente
 - Colori distinti per tipo attività sulla mappa
 
-### 5. Iscrizione Tappe (`/iscriviti`)
+### 5. Share Card — "Anch'io cammino per una giusta causa"
+- **Card visiva** con attività, km percorsi, tempo e logo campagna
+- Messaggio pre-compilato per social: *"Anch'io cammino per una giusta causa! Sto partecipando a #1000kmDIGRATITUDINE..."*
+- **Condivisione nativa** su iOS/Android tramite `@capacitor/share`
+- Fallback Web Share API su browser
+- Fallback copia negli appunti se share non disponibile
+- Hashtag inclusi: `#1000kmdiGratitudine #Komen #solidarieta #AnchIoCammino`
+
+### 6. Iscrizione Tappe (`/iscriviti`)
 - Form con: nome, cognome, email, telefono, tappa (1–14)
 - Opzione t-shirt con scelta taglia (XS → XXL)
 - Integrazione **Stripe** per pagamento maglietta
 - Stati pagamento: gratuito / in attesa / completato / fallito / bonifico
 - Pagina di conferma post-iscrizione
 
-### 6. Donazioni (`/dona`)
+### 7. Donazioni (`/dona`)
 - 4 tier predefiniti: €10, €25, €50, €100
 - Trust badges per sicurezza pagamento
 - Obiettivo: €50.000 per Komen Italia
 - Barra di progresso animata (attualmente mock al 5%)
 
-### 7. Santuari
+### 8. Santuari
 - **San Luca** (`/madonna-di-san-luca`): storia, immagini, testo
 - **Crocifisso Nero** (`/ss-crocifisso-nero`): storia, immagini + **video YouTube** (gestibili da admin)
 
-### 8. Sostenitori (`/sostenitori`)
+### 9. Sostenitori (`/sostenitori`)
 - Lista con nome, testo descrittivo, logo
 - Contenuto **modificabile da admin** (salvataggio su Supabase + fallback localStorage)
 
-### 9. Dashboard Admin (`/admin-live`)
+### 10. Dashboard Admin (`/admin-live`)
 - Accesso protetto via PIN (`VITE_ADMIN_PIN`)
 
 #### Configurazione credenziali
@@ -124,14 +131,21 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 #### Gestione Sostenitori
 - Aggiungere / modificare / rimuovere sostenitori
 
-### 10. App Nativa (Capacitor)
+### 11. App Nativa iOS / Android (Capacitor)
 - **App ID**: `it.gratitudepath.app`
-- Build per **iOS** e **Android**
+- Build per **iOS** (App Store) e **Android** (Play Store)
+- **Flusso app nativa**:
+  1. Splash screen con logo e colori brand (navy + arancione)
+  2. Se non loggato → schermata Registrazione (layout minimale, no header/footer)
+  3. Se loggato → Dashboard GPS direttamente
+- **NativeLayout**: layout dedicato senza header/footer/barra DONA per esperienza app pulita
+- **NativeRedirect**: redirect automatico dalla home al flusso community
 - GPS background con distanceFilter 10m
 - Messaggio notifica background: "Tracciamento GPS percorso in corso..."
 - Safe area per notch iPhone (padding `pt-safe`)
+- **`@capacitor/share`**: condivisione nativa verso qualsiasi app social
 
-### 11. PWA
+### 12. PWA
 - Manifest: nome, icone, display standalone
 - Service Worker con **auto-update** (aggiornamento immediato alla nuova versione)
 - Icone: 512px maskable + apple-touch-icon
@@ -194,10 +208,16 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 ## Comandi Principali
 
 ```bash
-npm run dev        # Dev server → http://localhost:8080
-npm run build      # Build produzione
-npm run lint       # Lint ESLint
-npm run test       # Unit test (vitest)
+npm run dev           # Dev server → http://localhost:8080
+npm run build         # Build produzione
+npm run lint          # Lint ESLint
+npm run test          # Unit test (vitest)
+
+# Capacitor (app nativa)
+npm run cap:sync      # Sincronizza build web → progetti nativi
+npm run cap:build     # Build produzione + sync
+npm run cap:ios       # Build + apri Xcode (per firma e pubblicazione App Store)
+npm run cap:android   # Build + apri Android Studio (per firma e pubblicazione Play Store)
 ```
 
 ---
@@ -215,3 +235,4 @@ npm run test       # Unit test (vitest)
 | Data | Modifica |
 |------|----------|
 | 2026-02-25 | Documento creato |
+| 2026-02-25 | Aggiunta sezione 5 (ShareCard), aggiornata sezione 11 (App Nativa con flusso e componenti), aggiunti comandi Capacitor |
