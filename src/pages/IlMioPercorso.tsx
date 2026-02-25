@@ -10,9 +10,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, Play, Square, Share2, LogOut, MapPin, Loader2, Navigation } from "lucide-react";
+import { Heart, Play, Square, LogOut, MapPin, Loader2, Navigation } from "lucide-react";
 import { motion } from "framer-motion";
-import Layout from "@/components/Layout";
+import NativeLayout from "@/components/NativeLayout";
+import ShareCard from "@/components/ShareCard";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -23,7 +24,6 @@ import {
   upsertCommunityLivePosition,
   setCommunityInactive,
   appendCommunityRoutePoint,
-  shareActivity,
   ACTIVITY_EMOJI,
   ACTIVITY_LABEL,
   ACTIVITY_COLOR,
@@ -186,16 +186,6 @@ export default function IlMioPercorso() {
     setAccuracy(null);
   }
 
-  // ── Condividi post ──
-  async function handleShare() {
-    if (!profile) return;
-    await shareActivity(
-      profile.activity_type as ActivityType,
-      profile.display_name,
-      shareableKm.current,
-    );
-  }
-
   // ── Logout ──
   async function handleLogout() {
     if (tracking) await stopTracking();
@@ -216,17 +206,17 @@ export default function IlMioPercorso() {
 
   if (authLoading) {
     return (
-      <Layout>
+      <NativeLayout>
         <div className="min-h-[60vh] flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-dona" />
         </div>
-      </Layout>
+      </NativeLayout>
     );
   }
 
   if (!profile) {
     return (
-      <Layout>
+      <NativeLayout>
         <div className="min-h-[60vh] flex items-center justify-center px-4">
           <div className="text-center">
             <p className="text-muted-foreground font-body text-sm mb-4">
@@ -237,7 +227,7 @@ export default function IlMioPercorso() {
             </Button>
           </div>
         </div>
-      </Layout>
+      </NativeLayout>
     );
   }
 
@@ -247,7 +237,7 @@ export default function IlMioPercorso() {
   const label   = ACTIVITY_LABEL[actType];
 
   return (
-    <Layout>
+    <NativeLayout>
       <section className="min-h-[85vh] px-4 py-10 max-w-md mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -372,16 +362,13 @@ export default function IlMioPercorso() {
             </Button>
           )}
 
-          {/* Bottone condividi */}
-          <Button
-            variant="outline"
-            size="lg"
-            className="w-full"
-            onClick={handleShare}
-          >
-            <Share2 className="w-4 h-4 mr-2" />
-            Condividi sui social
-          </Button>
+          {/* Card condivisione social */}
+          <ShareCard
+            activityType={actType}
+            displayName={profile.display_name}
+            kmTracked={kmTracked}
+            elapsed={elapsed}
+          />
 
           {/* Info mappa */}
           <div className="bg-primary/5 border border-primary/10 rounded-xl px-4 py-4 text-xs font-body text-muted-foreground leading-relaxed">
@@ -394,6 +381,6 @@ export default function IlMioPercorso() {
           </div>
         </motion.div>
       </section>
-    </Layout>
+    </NativeLayout>
   );
 }

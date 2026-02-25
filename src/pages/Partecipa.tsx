@@ -12,7 +12,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Heart, LogIn, UserPlus, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
-import Layout from "@/components/Layout";
+import NativeLayout from "@/components/NativeLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -124,18 +124,18 @@ export default function Partecipa() {
 
   if (!isSupabaseConfigured) {
     return (
-      <Layout>
+      <NativeLayout>
         <div className="min-h-[60vh] flex items-center justify-center">
           <p className="text-muted-foreground font-body text-sm">
             Supabase non configurato. Aggiungi VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.
           </p>
         </div>
-      </Layout>
+      </NativeLayout>
     );
   }
 
   return (
-    <Layout>
+    <NativeLayout>
       <section className="min-h-[80vh] flex items-center justify-center px-4 py-12">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
@@ -351,6 +351,6 @@ export default function Partecipa() {
           </p>
         </motion.div>
       </section>
-    </Layout>
+    </NativeLayout>
   );
 }
