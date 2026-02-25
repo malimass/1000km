@@ -4,7 +4,7 @@ import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { LivePosition } from "@/lib/liveTracking";
 import type { CommunityLivePosition } from "@/lib/communityTracking";
-import { ACTIVITY_EMOJI, ACTIVITY_COLOR } from "@/lib/communityTracking";
+import { ACTIVITY_EMOJI, ACTIVITY_COLOR, type ActivityType } from "@/lib/communityTracking";
 
 // Coordinate delle 15 tappe (Bologna → Via Emilia → SS16 Adriatica → interno Sud → SS18 Tirrenica → Terranova)
 const waypoints: [number, number][] = [
@@ -156,6 +156,7 @@ export default function RouteMap({
   traveledRoute = [],
   traveledRoute2 = [],
   communityPositions = [],
+  communityRoutes = {},
   containerId,
 }: {
   selectedIndex?:      number | null;
@@ -165,6 +166,7 @@ export default function RouteMap({
   traveledRoute?:      [number, number][];
   traveledRoute2?:     [number, number][];
   communityPositions?: CommunityLivePosition[];
+  communityRoutes?:    Record<string, { points: [number, number][]; activityType: ActivityType }>;
   containerId?:        string;
 }) {
   const liveLatlng1: [number, number] | null =
@@ -223,6 +225,19 @@ export default function RouteMap({
             pathOptions={{ color: "#f97316", weight: 5, opacity: 0.95, lineCap: "round", lineJoin: "round" }}
           />
         )}
+
+        {/* Tracce community — una polyline per utente, colore per attività */}
+        {Object.entries(communityRoutes).map(([userId, { points, activityType }]) => {
+          if (points.length < 2) return null;
+          const color = ACTIVITY_COLOR[activityType] ?? "#8b5cf6";
+          return (
+            <Polyline
+              key={`cr-${userId}`}
+              positions={points}
+              pathOptions={{ color, weight: 3, opacity: 0.75, lineCap: "round", lineJoin: "round" }}
+            />
+          );
+        })}
 
         {/* Marker corridore 1 — 🏃‍♂️ */}
         {liveLatlng1 && (

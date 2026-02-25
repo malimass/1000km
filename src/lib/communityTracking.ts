@@ -15,37 +15,29 @@ import { loadSiteShareSettings } from "./adminSettings";
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
 
-export type ActivityType = "corri" | "cammino" | "pedalo" | "nuoto" | "altro";
+export type ActivityType = "corri" | "cammino" | "altro";
 
 export const ACTIVITY_EMOJI: Record<ActivityType, string> = {
   corri:   "🏃",
   cammino: "🚶",
-  pedalo:  "🚴",
-  nuoto:   "🏊",
   altro:   "💪",
 };
 
 export const ACTIVITY_LABEL: Record<ActivityType, string> = {
   corri:   "Corro",
   cammino: "Cammino",
-  pedalo:  "Pedalo",
-  nuoto:   "Nuoto",
   altro:   "Partecipo",
 };
 
 export const ACTIVITY_GERUND: Record<ActivityType, string> = {
   corri:   "correndo",
   cammino: "camminando",
-  pedalo:  "pedalando",
-  nuoto:   "nuotando",
   altro:   "partecipando",
 };
 
 export const ACTIVITY_COLOR: Record<ActivityType, string> = {
   corri:   "#3b82f6",
   cammino: "#22c55e",
-  pedalo:  "#f97316",
-  nuoto:   "#06b6d4",
   altro:   "#8b5cf6",
 };
 
@@ -152,6 +144,45 @@ export function subscribeCommunityLivePosition(
 }
 
 // ─── Traccia percorso community ───────────────────────────────────────────────
+
+export type CommunityRoutePoint = {
+  user_id:       string;
+  display_name:  string;
+  activity_type: ActivityType;
+  lat:           number;
+  lng:           number;
+  recorded_at:   string;
+  session_id:    string;
+};
+
+/** Carica tutti i punti traccia community per le sessioni fornite, ordinati per tempo. */
+export async function loadCommunityRoutePositions(
+  sessionIds: string[],
+): Promise<CommunityRoutePoint[]> {
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from("community_route_positions")
+    .select("user_id, display_name, activity_type, lat, lng, recorded_at, session_id")
+    .in("session_id", sessionIds)
+    .order("recorded_at", { ascending: true });
+  return (data as CommunityRoutePoint[]) ?? [];
+}
+
+/** Sottoscrizione Realtime a nuovi punti traccia community. */
+export function subscribeCommunityRoutePositions(
+  cb: (point: CommunityRoutePoint) => void,
+): () => void {
+  if (!supabase) return () => {};
+  const channel = supabase
+    .channel("community-route-positions-channel")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "community_route_positions" },
+      (payload) => { cb(payload.new as CommunityRoutePoint); },
+    )
+    .subscribe();
+  return () => { supabase!.removeChannel(channel); };
+}
 
 export async function appendCommunityRoutePoint(
   userId: string,
