@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import ScrollToTop from "./components/ScrollToTop";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
+import NativeRedirect from "./components/NativeRedirect";
 
 const Index = lazy(() => import("./pages/Index"));
 const Percorso = lazy(() => import("./pages/Percorso"));
@@ -34,7 +35,7 @@ const App = () => (
         <ScrollToTop />
         <Suspense fallback={<div className="min-h-screen bg-background" />}>
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/" element={<NativeRedirect><Index /></NativeRedirect>} />
           <Route path="/il-percorso" element={<Percorso />} />
           <Route path="/madonna-di-san-luca" element={<SanLuca />} />
           <Route path="/ss-crocifisso-nero" element={<CrocifissoNero />} />

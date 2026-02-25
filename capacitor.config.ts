@@ -18,6 +18,12 @@ const config: CapacitorConfig = {
       stale: false,
       distanceFilter: 10,
     },
+    SplashScreen: {
+      launchShowDuration: 2000,
+      backgroundColor: '#0d1f2d',
+      showSpinner: true,
+      spinnerColor: '#e87c3e',
+    },
   },
   android: {
     allowMixedContent: true,
