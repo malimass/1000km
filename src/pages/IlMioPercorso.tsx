@@ -14,6 +14,7 @@ import { Heart, Play, Square, Share2, LogOut, MapPin, Loader2, Navigation } from
 import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { startGeoTracking, stopGeoTracking } from "@/lib/capacitorGeo";
 import { todaySessionId, distanceMeters } from "@/lib/liveTracking";
@@ -39,6 +40,7 @@ export default function IlMioPercorso() {
   const [authLoading, setAuthLoading] = useState(true);
 
   const [tracking, setTracking] = useState(false);
+  const [startingGps, setStartingGps] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
 
   // Statistiche live
@@ -87,29 +89,39 @@ export default function IlMioPercorso() {
   async function startTracking() {
     if (!userRef.current || !profile) return;
     setGpsError(null);
+    setStartingGps(true);
     sessionIdRef.current = todaySessionId();
     lastPointRef.current = null;
     lastTimeRef.current  = 0;
     setKmTracked(0);
     setPointsCount(0);
     setElapsed(0);
-    setTracking(true);
 
-    // Timer elapsed
-    timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000);
+    let gotFirstFix = false;
 
     await startGeoTracking(
       async ({ latitude, longitude, speed: spd, accuracy: acc, heading }) => {
+        // Alla prima posizione GPS valida: avvia il timer e imposta lo stato "in diretta"
+        if (!gotFirstFix) {
+          gotFirstFix = true;
+          setStartingGps(false);
+          setTracking(true);
+          timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000);
+        }
+
         setSpeed(spd);
         setAccuracy(acc);
 
         // Upsert posizione live
-        await upsertCommunityLivePosition(
+        const liveErr = await upsertCommunityLivePosition(
           userRef.current!.id,
           profile.display_name,
           profile.activity_type as ActivityType,
           { lat: latitude, lng: longitude, speed: spd, accuracy: acc, heading, is_active: true },
         );
+        if (liveErr) {
+          toast.error("Errore invio posizione", { description: liveErr });
+        }
 
         // Filtra: registra punto ogni 30m oppure ogni 60s
         const now   = Date.now();
@@ -119,13 +131,16 @@ export default function IlMioPercorso() {
         const timeOk = now - lastTimeRef.current >= 60_000;
 
         if (moved >= 30 || timeOk) {
-          await appendCommunityRoutePoint(
+          const routeErr = await appendCommunityRoutePoint(
             userRef.current!.id,
             profile.display_name,
             profile.activity_type as ActivityType,
             latitude, longitude, spd, acc, heading,
             sessionIdRef.current,
           );
+          if (routeErr) {
+            toast.error("Errore salvataggio traccia", { description: routeErr });
+          }
 
           if (lastPointRef.current) {
             const addedKm = distanceMeters(lastPointRef.current, [latitude, longitude]) / 1000;
@@ -141,7 +156,18 @@ export default function IlMioPercorso() {
           setPointsCount(p => p + 1);
         }
       },
-      (err) => { setGpsError(err); },
+      (err) => {
+        setGpsError(err);
+        // Se il GPS fallisce prima della prima posizione, ferma tutto
+        if (!gotFirstFix) {
+          setStartingGps(false);
+          setTracking(false);
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+        }
+      },
     );
   }
 
@@ -315,7 +341,17 @@ export default function IlMioPercorso() {
           )}
 
           {/* Bottone principale avvia/ferma */}
-          {!tracking ? (
+          {startingGps ? (
+            <Button
+              variant="dona"
+              size="lg"
+              className="w-full text-base py-7"
+              disabled
+            >
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Ricerca segnale GPS…
+            </Button>
+          ) : !tracking ? (
             <Button
               variant="dona"
               size="lg"
