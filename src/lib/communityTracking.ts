@@ -15,37 +15,29 @@ import { loadSiteShareSettings } from "./adminSettings";
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
 
-export type ActivityType = "corri" | "cammino" | "pedalo" | "nuoto" | "altro";
+export type ActivityType = "corri" | "cammino" | "altro";
 
 export const ACTIVITY_EMOJI: Record<ActivityType, string> = {
   corri:   "🏃",
   cammino: "🚶",
-  pedalo:  "🚴",
-  nuoto:   "🏊",
   altro:   "💪",
 };
 
 export const ACTIVITY_LABEL: Record<ActivityType, string> = {
   corri:   "Corro",
   cammino: "Cammino",
-  pedalo:  "Pedalo",
-  nuoto:   "Nuoto",
   altro:   "Partecipo",
 };
 
 export const ACTIVITY_GERUND: Record<ActivityType, string> = {
   corri:   "correndo",
   cammino: "camminando",
-  pedalo:  "pedalando",
-  nuoto:   "nuotando",
   altro:   "partecipando",
 };
 
 export const ACTIVITY_COLOR: Record<ActivityType, string> = {
   corri:   "#3b82f6",
   cammino: "#22c55e",
-  pedalo:  "#f97316",
-  nuoto:   "#06b6d4",
   altro:   "#8b5cf6",
 };
 

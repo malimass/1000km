@@ -33,14 +33,14 @@ const loginSchema = z.object({
 
 const registerSchema = loginSchema.extend({
   display_name:  z.string().min(2, "Inserisci il tuo nome (min 2 caratteri)"),
-  activity_type: z.enum(["corri", "cammino", "pedalo", "nuoto", "altro"]),
+  activity_type: z.enum(["corri", "cammino", "altro"]),
   city:          z.string().optional(),
 });
 
 type LoginForm    = z.infer<typeof loginSchema>;
 type RegisterForm = z.infer<typeof registerSchema>;
 
-const activities: ActivityType[] = ["corri", "cammino", "pedalo", "nuoto", "altro"];
+const activities: ActivityType[] = ["corri", "cammino", "altro"];
 
 // ─── Componente ──────────────────────────────────────────────────────────────
 
