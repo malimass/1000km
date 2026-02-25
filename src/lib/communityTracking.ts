@@ -11,6 +11,7 @@
  */
 
 import { supabase } from "./supabase";
+import { loadSiteShareSettings } from "./adminSettings";
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
 
@@ -179,30 +180,31 @@ export async function appendCommunityRoutePoint(
 
 /**
  * Apre il native share sheet (iOS/Android) o copia negli appunti come fallback.
- * Genera un post pre-compilato per social media.
+ * Genera un post pre-compilato con testi configurabili dall'admin.
  */
 export async function shareActivity(
   activityType: ActivityType,
   displayName: string,
   kmTracked?: number,
 ): Promise<void> {
+  const cfg = await loadSiteShareSettings();
   const gerund = ACTIVITY_GERUND[activityType];
   const kmText = kmTracked != null && kmTracked > 0.1
     ? ` Ho percorso ${kmTracked.toFixed(1)} km!`
     : "";
 
   const text =
-    `${displayName} sta ${gerund} per @1000kmdigratitudine!${kmText}\n\n` +
-    `Anch'io cammino per una giusta causa! 💗\n` +
-    `Sostieni Komen Italia nella ricerca sul cancro al seno.\n\n` +
-    `Segui il cammino 👉 @1000kmdigratitudine\n` +
-    `👉 1000kmdigratitudine.it\n\n` +
-    `#1000kmdiGratitudine #Komen #solidarieta #AnchIoCammino #Bologna #Calabria`;
+    `${displayName} sta ${gerund} per ${cfg.shareSocialTag}!${kmText}\n\n` +
+    `${cfg.shareTitle} 💗\n` +
+    `${cfg.shareBody}\n\n` +
+    `Segui il cammino 👉 ${cfg.shareSocialTag}\n` +
+    `👉 ${cfg.shareUrl}\n\n` +
+    `${cfg.shareHashtags}`;
 
   const shareData = {
-    title: "1000km di Gratitudine",
+    title: cfg.shareTitle,
     text,
-    url:   "https://1000kmdigratitudine.it",
+    url:   cfg.shareUrl,
   };
 
   if (navigator.share && navigator.canShare?.(shareData)) {

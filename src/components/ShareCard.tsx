@@ -3,13 +3,15 @@
  * ─────────────
  * Card visiva "Anch'io cammino per una giusta causa" con condivisione social.
  * Mostra attività, km percorsi e invito a sostenere.
+ * I testi sono configurabili dall'admin via /admin-live → Condivisione.
  */
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Share2, Heart, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { isNativeApp } from "@/lib/capacitorGeo";
+import { loadSiteShareSettings, SHARE_DEFAULTS, type ShareSettings } from "@/lib/adminSettings";
 import {
   ACTIVITY_EMOJI,
   ACTIVITY_LABEL,
@@ -37,6 +39,12 @@ export default function ShareCard({
   const color = ACTIVITY_COLOR[activityType];
   const gerund = ACTIVITY_GERUND[activityType];
 
+  // Carica testi configurabili dall'admin
+  const [cfg, setCfg] = useState<ShareSettings>(SHARE_DEFAULTS);
+  useEffect(() => {
+    loadSiteShareSettings().then(setCfg);
+  }, []);
+
   function formatTime(sec: number): string {
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
@@ -44,24 +52,28 @@ export default function ShareCard({
     return `${m} min`;
   }
 
-  async function handleShare() {
+  function buildShareText(): string {
     const kmText = kmTracked > 0.1 ? `${kmTracked.toFixed(1)} km ${gerund}` : "";
     const timeText = elapsed && elapsed > 0 ? ` in ${formatTime(elapsed)}` : "";
     const statsLine = kmText ? `\n${emoji} ${kmText}${timeText}\n` : "\n";
 
-    const text =
-      `Anch'io cammino per una giusta causa! 💗\n` +
+    return (
+      `${cfg.shareTitle} 💗\n` +
       `${statsLine}` +
-      `Sto partecipando a @1000kmdigratitudine — un cammino di solidarietà ` +
-      `da Bologna alla Calabria per sostenere la ricerca sul cancro al seno con Komen Italia.\n\n` +
-      `Segui il cammino 👉 @1000kmdigratitudine\n` +
-      `Unisciti anche tu! 👉 1000kmdigratitudine.it/partecipa\n\n` +
-      `#1000kmdiGratitudine #Komen #solidarieta #AnchIoCammino #Bologna #Calabria`;
+      `Sto partecipando a ${cfg.shareSocialTag} — ${cfg.shareBody}\n\n` +
+      `Segui il cammino 👉 ${cfg.shareSocialTag}\n` +
+      `Unisciti anche tu! 👉 ${cfg.shareUrl}\n\n` +
+      `${cfg.shareHashtags}`
+    );
+  }
+
+  async function handleShare() {
+    const text = buildShareText();
 
     const shareData = {
-      title: "Anch'io cammino per una giusta causa!",
+      title: cfg.shareTitle,
       text,
-      url: "https://1000kmdigratitudine.it/partecipa",
+      url: cfg.shareUrl,
     };
 
     // Prova condivisione nativa (Capacitor Share o Web Share API)
@@ -122,7 +134,7 @@ export default function ShareCard({
 
         {/* Messaggio principale */}
         <h3 className="font-heading text-xl font-bold text-foreground leading-snug mb-3">
-          Anch'io cammino per una giusta causa!
+          {cfg.shareTitle}
         </h3>
 
         {/* Stats */}
