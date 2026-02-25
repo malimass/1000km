@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, type AdminSettings } from "@/lib/adminSettings";
+import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, saveSiteShareSettings, SHARE_DEFAULTS, type AdminSettings } from "@/lib/adminSettings";
 import { loadSosteniPage, saveSosteniPage, type Sostenitore, type SosteniPage } from "@/lib/sostenitori";
 import {
   upsertLivePosition, appendRoutePoint, clearRoutePositions, distanceMeters, todaySessionId,
@@ -11,7 +11,7 @@ import { startGeoTracking, stopGeoTracking, isNativeApp } from "@/lib/capacitorG
 import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
   Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video, LogOut,
-  MapPin, Youtube, Navigation, Users, Upload,
+  MapPin, Youtube, Navigation, Users, Upload, Share2,
 } from "lucide-react";
 
 // ─── Costanti ────────────────────────────────────────────────────────────────
@@ -211,13 +211,14 @@ async function shareToTikTok(file: File, caption: string): Promise<{ ok: boolean
 }
 
 // ─── Tipi sezione ─────────────────────────────────────────────────────────────
-type Section = "live" | "social" | "video" | "sostenitori" | "settings";
+type Section = "live" | "social" | "video" | "sostenitori" | "share" | "settings";
 
 const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
   { key: "live",        label: "Live Tracking", icon: <MapPin className="w-4 h-4" /> },
   { key: "social",      label: "Pubblica",      icon: <Send className="w-4 h-4" /> },
   { key: "video",       label: "Video YouTube", icon: <Youtube className="w-4 h-4" /> },
   { key: "sostenitori", label: "Sostenitori",   icon: <Users className="w-4 h-4" /> },
+  { key: "share",       label: "Condivisione",  icon: <Share2 className="w-4 h-4" /> },
   { key: "settings",    label: "Impostazioni",  icon: <Settings className="w-4 h-4" /> },
 ];
 
@@ -301,6 +302,14 @@ export default function AdminLive() {
   const [ytCn3, setYtCn3] = useState(""); const [ytCn3Title, setYtCn3Title] = useState(""); const [ytCn3Desc, setYtCn3Desc] = useState("");
   const [ytSaved, setYtSaved] = useState(false);
 
+  // ─ Condivisione social ─
+  const [shareTitle,     setShareTitle]     = useState("");
+  const [shareBody,      setShareBody]      = useState("");
+  const [shareSocialTag, setShareSocialTag] = useState("");
+  const [shareHashtags,  setShareHashtags]  = useState("");
+  const [shareUrl,       setShareUrl]       = useState("");
+  const [shareSaved,     setShareSaved]     = useState(false);
+
   // ─ Sostenitori ─
   const [sosteniTitle,    setSosteniTitle]    = useState("I Sostenitori del Cammino");
   const [sosteniIntro,    setSosteniIntro]    = useState("");
@@ -349,6 +358,8 @@ export default function AdminLive() {
       setYtCn1(s.ytCn1); setYtCn1Title(s.ytCn1Title); setYtCn1Desc(s.ytCn1Desc);
       setYtCn2(s.ytCn2); setYtCn2Title(s.ytCn2Title); setYtCn2Desc(s.ytCn2Desc);
       setYtCn3(s.ytCn3); setYtCn3Title(s.ytCn3Title); setYtCn3Desc(s.ytCn3Desc);
+      setShareTitle(s.shareTitle); setShareBody(s.shareBody); setShareSocialTag(s.shareSocialTag);
+      setShareHashtags(s.shareHashtags); setShareUrl(s.shareUrl);
       setSettingsLoading(false);
     });
     loadSosteniPage().then(p => {
@@ -413,20 +424,30 @@ export default function AdminLive() {
     await navigator.clipboard.writeText(url);
   }
 
+  // ─ Costruisce oggetto AdminSettings completo ─
+  function buildAdminSettings(): AdminSettings {
+    return { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset, ytCn1, ytCn1Title, ytCn1Desc, ytCn2, ytCn2Title, ytCn2Desc, ytCn3, ytCn3Title, ytCn3Desc, shareTitle, shareBody, shareSocialTag, shareHashtags, shareUrl };
+  }
+
   // ─ Impostazioni social ─
   async function handleSaveSettings() {
-    const s: AdminSettings = { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset, ytCn1, ytCn1Title, ytCn1Desc, ytCn2, ytCn2Title, ytCn2Desc, ytCn3, ytCn3Title, ytCn3Desc };
-    await saveSettingsDB(s);
+    await saveSettingsDB(buildAdminSettings());
   }
 
   // ─ Video YouTube ─
   async function handleSaveYtVideos() {
-    const s: AdminSettings = { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset, ytCn1, ytCn1Title, ytCn1Desc, ytCn2, ytCn2Title, ytCn2Desc, ytCn3, ytCn3Title, ytCn3Desc };
-    await saveSettingsDB(s);
-    // Salva anche su site_settings (tabella pubblica, senza auth) così i visitatori vedono i video
+    await saveSettingsDB(buildAdminSettings());
     await saveSiteYtVideos({ ytCn1, ytCn1Title, ytCn1Desc, ytCn2, ytCn2Title, ytCn2Desc, ytCn3, ytCn3Title, ytCn3Desc });
     setYtSaved(true);
     setTimeout(() => setYtSaved(false), 2500);
+  }
+
+  // ─ Condivisione social ─
+  async function handleSaveShareSettings() {
+    await saveSettingsDB(buildAdminSettings());
+    await saveSiteShareSettings({ shareTitle, shareBody, shareSocialTag, shareHashtags, shareUrl });
+    setShareSaved(true);
+    setTimeout(() => setShareSaved(false), 2500);
   }
 
   // ─ Sostenitori handlers ─
@@ -1374,6 +1395,86 @@ export default function AdminLive() {
                     pagina pubblica
                   </Link>.
                 </p>
+              </div>
+            )}
+
+            {/* ── SEZIONE: Condivisione social ──────────────────────────────── */}
+            {activeSection === "share" && (
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                <h2 className="font-semibold text-foreground text-sm uppercase tracking-wide">
+                  📤 Testi condivisione social
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Questi testi vengono usati quando un corridore condivide la propria attività sui social.
+                  Lascia vuoto per usare il testo predefinito.
+                </p>
+
+                <Field
+                  label="Titolo del post"
+                  value={shareTitle}
+                  onChange={setShareTitle}
+                  placeholder={SHARE_DEFAULTS.shareTitle}
+                  hint="Es. «Anch'io cammino per una giusta causa!»"
+                />
+
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">Testo del messaggio</label>
+                  <textarea
+                    rows={3}
+                    value={shareBody}
+                    onChange={e => setShareBody(e.target.value)}
+                    placeholder={SHARE_DEFAULTS.shareBody}
+                    className="w-full border border-border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground resize-none"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Descrizione della campagna che accompagna il post</p>
+                </div>
+
+                <Field
+                  label="Tag social (Facebook / Instagram)"
+                  value={shareSocialTag}
+                  onChange={setShareSocialTag}
+                  placeholder={SHARE_DEFAULTS.shareSocialTag}
+                  hint="Es. «@1000kmdigratitudine» — viene inserito nel testo e taggato automaticamente"
+                />
+
+                <Field
+                  label="Hashtag"
+                  value={shareHashtags}
+                  onChange={setShareHashtags}
+                  placeholder={SHARE_DEFAULTS.shareHashtags}
+                  hint="Separati da spazio. Es. «#1000kmdiGratitudine #Komen #AnchIoCammino»"
+                />
+
+                <Field
+                  label="Link condivisione"
+                  value={shareUrl}
+                  onChange={setShareUrl}
+                  placeholder={SHARE_DEFAULTS.shareUrl}
+                  hint="URL della pagina a cui rimandare i post"
+                />
+
+                {/* Anteprima */}
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs font-bold text-foreground mb-2">Anteprima post</p>
+                  <div className="bg-muted/50 rounded-lg p-3 text-xs font-mono text-foreground/80 whitespace-pre-wrap leading-relaxed">
+                    {shareTitle || SHARE_DEFAULTS.shareTitle} 💗{"\n"}
+                    🏃 3.2 km correndo in 25 min{"\n\n"}
+                    Sto partecipando a {shareSocialTag || SHARE_DEFAULTS.shareSocialTag} — {shareBody || SHARE_DEFAULTS.shareBody}{"\n\n"}
+                    Segui il cammino 👉 {shareSocialTag || SHARE_DEFAULTS.shareSocialTag}{"\n"}
+                    Unisciti anche tu! 👉 {shareUrl || SHARE_DEFAULTS.shareUrl}{"\n\n"}
+                    {shareHashtags || SHARE_DEFAULTS.shareHashtags}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSaveShareSettings}
+                  className="w-full flex items-center justify-center gap-2 bg-foreground text-background rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  {shareSaved
+                    ? <><CheckCircle className="w-4 h-4" /> Salvato!</>
+                    : <><Share2 className="w-4 h-4" /> Salva testi condivisione</>
+                  }
+                </button>
               </div>
             )}
 
