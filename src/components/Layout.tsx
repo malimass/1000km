@@ -29,16 +29,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-primary shadow-lg pt-safe">
         <div className="container-narrow flex items-center justify-between px-4 py-3 md:py-4">
-          <Link to="/" className="font-heading text-lg md:text-xl font-bold text-primary-foreground tracking-wider">
+          <Link to="/" className="shrink-0 font-heading text-lg md:text-xl font-bold text-primary-foreground tracking-wider">
             1000<span className="text-accent">KM</span>DIGRATITUDINE
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-6">
+          <nav className="hidden lg:flex items-center gap-3 xl:gap-5">
             {navLinks.map((link) =>
               link.children ? (
                 <div key={link.label} className="relative group">
-                  <button className="text-primary-foreground/80 hover:text-primary-foreground font-body text-sm font-medium tracking-wide transition-colors">
+                  <button className="whitespace-nowrap text-primary-foreground/80 hover:text-primary-foreground font-body text-sm font-medium tracking-wide transition-colors">
                     {link.label}
                   </button>
                   <div className="absolute top-full left-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
@@ -59,7 +59,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Link
                   key={link.to}
                   to={link.to!}
-                  className="flex items-center gap-1.5 text-sm font-body font-medium tracking-wide border border-primary-foreground/40 rounded-md px-3 py-1.5 text-primary-foreground/80 hover:text-primary-foreground hover:border-primary-foreground transition-colors"
+                  className="whitespace-nowrap flex items-center gap-1.5 text-sm font-body font-medium tracking-wide border border-primary-foreground/40 rounded-md px-3 py-1.5 text-primary-foreground/80 hover:text-primary-foreground hover:border-primary-foreground transition-colors"
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   {link.label}
@@ -68,7 +68,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Link
                   key={link.to}
                   to={link.to!}
-                  className={`text-sm font-body font-medium tracking-wide transition-colors ${
+                  className={`whitespace-nowrap text-sm font-body font-medium tracking-wide transition-colors ${
                     location.pathname === link.to
                       ? "text-accent"
                       : "text-primary-foreground/80 hover:text-primary-foreground"
@@ -80,7 +80,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             )}
             <Link
               to="/partecipa"
-              className={`flex items-center gap-1.5 text-sm font-body font-semibold tracking-wide border-2 rounded-md px-3 py-1.5 transition-colors ${
+              className={`whitespace-nowrap flex items-center gap-1.5 text-sm font-body font-semibold tracking-wide border-2 rounded-md px-3 py-1.5 transition-colors ${
                 location.pathname === "/partecipa" || location.pathname === "/il-mio-percorso"
                   ? "border-accent text-accent"
                   : "border-accent/70 text-accent hover:border-accent"
