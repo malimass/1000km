@@ -192,10 +192,12 @@ export async function shareActivity(
     : "";
 
   const text =
-    `${displayName} sta ${gerund} per #1000kmDIGRATITUDINE!${kmText}\n\n` +
-    `Sostieni Komen Italia nella ricerca sul cancro al seno 💗\n\n` +
+    `${displayName} sta ${gerund} per @1000kmdigratitudine!${kmText}\n\n` +
+    `Anch'io cammino per una giusta causa! 💗\n` +
+    `Sostieni Komen Italia nella ricerca sul cancro al seno.\n\n` +
+    `Segui il cammino 👉 @1000kmdigratitudine\n` +
     `👉 1000kmdigratitudine.it\n\n` +
-    `#1000kmdiGratitudine #Komen #solidarieta #cammino #Bologna #Calabria`;
+    `#1000kmdiGratitudine #Komen #solidarieta #AnchIoCammino #Bologna #Calabria`;
 
   const shareData = {
     title: "1000km di Gratitudine",

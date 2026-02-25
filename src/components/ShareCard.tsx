@@ -52,10 +52,11 @@ export default function ShareCard({
     const text =
       `Anch'io cammino per una giusta causa! 💗\n` +
       `${statsLine}` +
-      `Sto partecipando a #1000kmDIGRATITUDINE — un cammino di solidarietà ` +
+      `Sto partecipando a @1000kmdigratitudine — un cammino di solidarietà ` +
       `da Bologna alla Calabria per sostenere la ricerca sul cancro al seno con Komen Italia.\n\n` +
+      `Segui il cammino 👉 @1000kmdigratitudine\n` +
       `Unisciti anche tu! 👉 1000kmdigratitudine.it/partecipa\n\n` +
-      `#1000kmdiGratitudine #Komen #solidarieta #AnchIoCammino`;
+      `#1000kmdiGratitudine #Komen #solidarieta #AnchIoCammino #Bologna #Calabria`;
 
     const shareData = {
       title: "Anch'io cammino per una giusta causa!",
