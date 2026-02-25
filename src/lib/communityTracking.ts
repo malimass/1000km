@@ -119,12 +119,17 @@ export async function setCommunityInactive(userId: string): Promise<string | nul
   return error?.message ?? null;
 }
 
+/** Soglia oltre la quale una posizione viene considerata "stale" (non più attiva). */
+export const COMMUNITY_STALE_MS = 10 * 60 * 1000; // 10 minuti
+
 export async function loadActiveCommunityPositions(): Promise<CommunityLivePosition[]> {
   if (!supabase) return [];
+  const cutoff = new Date(Date.now() - COMMUNITY_STALE_MS).toISOString();
   const { data } = await supabase
     .from("community_live_position")
     .select("*")
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .gte("updated_at", cutoff);
   return (data as CommunityLivePosition[]) ?? [];
 }
 

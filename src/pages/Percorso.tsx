@@ -18,6 +18,7 @@ import {
   subscribeCommunityLivePosition,
   loadCommunityRoutePositions,
   subscribeCommunityRoutePositions,
+  COMMUNITY_STALE_MS,
   type CommunityLivePosition,
   type ActivityType,
 } from "@/lib/communityTracking";
@@ -258,6 +259,15 @@ export default function Percorso() {
         return [...others, updated];
       });
     });
+  }, []);
+
+  // Rimuove ogni minuto le posizioni community diventate stale (is_active rimasto true per crash/chiusura browser)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const cutoff = new Date(Date.now() - COMMUNITY_STALE_MS).toISOString();
+      setCommunityPositions(prev => prev.filter(p => p.updated_at >= cutoff));
+    }, 60_000);
+    return () => clearInterval(interval);
   }, []);
 
   // Carica tracce community di oggi + sottoscrizione Realtime
