@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Heart, ChevronDown, LogIn } from "lucide-react";
+import { Menu, X, Heart, ChevronDown, LogIn, Footprints } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
@@ -78,6 +78,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
               )
             )}
+            <Link
+              to="/partecipa"
+              className={`flex items-center gap-1.5 text-sm font-body font-semibold tracking-wide border-2 rounded-md px-3 py-1.5 transition-colors ${
+                location.pathname === "/partecipa" || location.pathname === "/il-mio-percorso"
+                  ? "border-accent text-accent"
+                  : "border-accent/70 text-accent hover:border-accent"
+              }`}
+            >
+              <Footprints className="w-3.5 h-3.5" />
+              Partecipa
+            </Link>
             <Button asChild variant="dona" size="lg">
               <Link to="/dona">
                 <Heart className="w-4 h-4 mr-2" />
@@ -107,6 +118,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               className="lg:hidden bg-primary border-t border-primary-foreground/10 px-4 overflow-hidden"
             >
               <div className="pb-4">
+                {/* Link Partecipa nel menu mobile — evidenziato */}
+                <Link
+                  to="/partecipa"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 py-3 text-accent font-body text-sm font-bold"
+                >
+                  <Footprints className="w-4 h-4" />
+                  Partecipa alla community
+                </Link>
                 {navLinks.map((link) =>
                   link.children ? (
                     <div key={link.label}>

@@ -13,6 +13,11 @@ import {
   loadAllLivePositions, subscribeLivePosition, type LivePosition,
   loadRoutePositions, subscribeRoutePositions, todaySessionId,
 } from "@/lib/liveTracking";
+import {
+  loadActiveCommunityPositions,
+  subscribeCommunityLivePosition,
+  type CommunityLivePosition,
+} from "@/lib/communityTracking";
 
 // Caricamento lazy per evitare problemi SSR con Leaflet
 const RouteMap = lazy(() => import("@/components/RouteMap"));
@@ -163,6 +168,9 @@ export default function Percorso() {
   const [traveledRoute1, setTraveledRoute1] = useState<[number, number][]>([]);
   const [traveledRoute2, setTraveledRoute2] = useState<[number, number][]>([]);
 
+  // Posizioni live community
+  const [communityPositions, setCommunityPositions] = useState<CommunityLivePosition[]>([]);
+
   // URL LocaToWeb: legge prima dal query param ?ltw=, poi da localStorage, poi fallback vuoto
   const [searchParams] = useSearchParams();
   const [ltwUrl, setLtwUrlState] = useState<string>(() => {
@@ -231,6 +239,19 @@ export default function Percorso() {
     );
   }, []);
 
+  // Carica posizioni live community + sottoscrizione Realtime
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    loadActiveCommunityPositions().then(setCommunityPositions);
+    return subscribeCommunityLivePosition((updated) => {
+      setCommunityPositions(prev => {
+        const others = prev.filter(p => p.user_id !== updated.user_id);
+        if (!updated.is_active) return others;
+        return [...others, updated];
+      });
+    });
+  }, []);
+
   function handleTappaClick(waypointIndex: number) {
     setSelectedWaypoint(waypointIndex);
     mapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -287,7 +308,15 @@ export default function Percorso() {
                   </div>
                 }
               >
-                <RouteMap selectedIndex={selectedWaypoint} iscritti={iscritti} livePos={livePos1} livePos2={livePos2} traveledRoute={traveledRoute1} traveledRoute2={traveledRoute2} />
+                <RouteMap
+                  selectedIndex={selectedWaypoint}
+                  iscritti={iscritti}
+                  livePos={livePos1}
+                  livePos2={livePos2}
+                  traveledRoute={traveledRoute1}
+                  traveledRoute2={traveledRoute2}
+                  communityPositions={communityPositions}
+                />
               </Suspense>
             </div>
 
@@ -396,6 +425,19 @@ export default function Percorso() {
           </div>
         </div>
       </section>
+
+      {/* Contatore community attivi */}
+      {communityPositions.length > 0 && (
+        <section className="py-4 bg-secondary">
+          <div className="container-narrow text-center">
+            <p className="font-body text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{communityPositions.length}</span>{" "}
+              {communityPositions.length === 1 ? "persona sta" : "persone stanno"} camminando / correndo / pedalando
+              in questo momento per <span className="text-dona font-semibold">#1000kmdiGratitudine</span>
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* Sezione live tracking */}
       <LiveTrackingSection ltwUrl={ltwUrl} livePos1={livePos1} livePos2={livePos2} />
