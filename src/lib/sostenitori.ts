@@ -4,19 +4,11 @@
  * Carica e salva i dati della pagina "Sostenitori del cammino".
  * Strategia ibrida: Supabase (fonte di verità) + localStorage (cache/fallback).
  *
- * Tabella Supabase richiesta (esegui nel SQL Editor):
+ * Tabella Supabase richiesta → vedi site-settings.sql
  *
- *   create table if not exists public.sostenitori_page (
- *     id          integer primary key default 1,
- *     data        jsonb not null default '{}',
- *     updated_at  timestamptz default now()
- *   );
- *   alter table public.sostenitori_page enable row level security;
- *   create policy "public read"  on public.sostenitori_page for select using (true);
- *   create policy "write all"    on public.sostenitori_page for all    using (true) with check (true);
- *   insert into public.sostenitori_page (id, data)
- *     values (1, '{"title":"I Sostenitori del Cammino","intro":"","items":[]}')
- *     on conflict (id) do nothing;
+ * Policy RLS:
+ *  - SELECT: pubblico (tutti possono leggere la pagina sostenitori)
+ *  - INSERT/UPDATE/DELETE: solo admin autenticati
  */
 
 import { supabase } from "./supabase";
