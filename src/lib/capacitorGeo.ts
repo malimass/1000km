@@ -28,6 +28,7 @@ export type GeoErrorCallback = (error: string) => void;
 
 let nativeWatchId: string | null = null;
 let webWatchId: number | null = null;
+let webTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Rileva se l'app è in esecuzione come app nativa Capacitor.
@@ -126,8 +127,29 @@ function startWebTracking(
     return;
   }
 
-  webWatchId = navigator.geolocation.watchPosition(
+  // Verifica che la pagina sia servita via HTTPS (richiesto per geolocation)
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    onError('Il GPS richiede una connessione HTTPS. Assicurati che il sito sia servito via HTTPS.');
+    return;
+  }
+
+  let receivedFirstPosition = false;
+
+  // Timeout di sicurezza: se il GPS non risponde entro 20s, segnala errore
+  webTimeoutId = setTimeout(() => {
+    if (!receivedFirstPosition) {
+      onError('Nessun segnale GPS ricevuto. Assicurati di aver autorizzato la geolocalizzazione e di essere all\'aperto.');
+    }
+    webTimeoutId = null;
+  }, 20_000);
+
+  const id = navigator.geolocation.watchPosition(
     ({ coords }) => {
+      receivedFirstPosition = true;
+      if (webTimeoutId) {
+        clearTimeout(webTimeoutId);
+        webTimeoutId = null;
+      }
       onPosition({
         latitude: coords.latitude,
         longitude: coords.longitude,
@@ -136,12 +158,35 @@ function startWebTracking(
         heading: coords.heading,
       });
     },
-    (err) => onError(`Errore GPS: ${err.message}`),
+    (err) => {
+      if (webTimeoutId) {
+        clearTimeout(webTimeoutId);
+        webTimeoutId = null;
+      }
+      switch (err.code) {
+        case err.PERMISSION_DENIED:
+          onError('Permesso GPS negato. Abilitalo nelle impostazioni del browser.');
+          break;
+        case err.POSITION_UNAVAILABLE:
+          onError('Posizione non disponibile. Verifica che il GPS sia attivo.');
+          break;
+        case err.TIMEOUT:
+          onError('Timeout GPS. Riprova in un\'area con migliore copertura.');
+          break;
+        default:
+          onError(`Errore GPS: ${err.message}`);
+      }
+    },
     { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
   );
+  webWatchId = id;
 }
 
 function stopWebTracking(): void {
+  if (webTimeoutId) {
+    clearTimeout(webTimeoutId);
+    webTimeoutId = null;
+  }
   if (webWatchId !== null) {
     navigator.geolocation.clearWatch(webWatchId);
     webWatchId = null;
