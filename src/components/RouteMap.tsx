@@ -3,6 +3,8 @@ import { MapContainer, TileLayer, Polyline, Marker, Popup, ZoomControl, useMap }
 import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { LivePosition } from "@/lib/liveTracking";
+import type { CommunityLivePosition } from "@/lib/communityTracking";
+import { ACTIVITY_EMOJI, ACTIVITY_COLOR } from "@/lib/communityTracking";
 
 // Coordinate delle 15 tappe (Bologna → Via Emilia → SS16 Adriatica → interno Sud → SS18 Tirrenica → Terranova)
 const waypoints: [number, number][] = [
@@ -76,6 +78,21 @@ function makeRunnerIcon(emoji: string, pinColor: string) {
 const runner1Icon = makeRunnerIcon("🏃‍♂️", "#3b82f6");  // blu
 const runner2Icon = makeRunnerIcon("🏃‍♀️", "#f97316");  // arancione
 
+// Genera un'icona community (più piccola dei runner principali)
+function makeCommunityIcon(emoji: string, color: string) {
+  return divIcon({
+    className: "",
+    html: `
+      <div style="position:relative;text-align:center;width:34px">
+        <div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35))">${emoji}</div>
+        <div style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:8px;height:8px;background:${color};border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.35)"></div>
+        <div style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:18px;height:18px;background:${color}44;border-radius:50%;animation:rp2 2s ease-out infinite;margin-left:-5px;margin-top:-5px"></div>
+      </div>`,
+    iconSize:   [34, 38],
+    iconAnchor: [17, 38],
+  });
+}
+
 // Vola alla posizione live quando arriva / cambia
 function LiveController({ pos }: { pos: [number, number] }) {
   const map = useMap();
@@ -138,13 +155,15 @@ export default function RouteMap({
   livePos2 = null,
   traveledRoute = [],
   traveledRoute2 = [],
+  communityPositions = [],
 }: {
-  selectedIndex?:  number | null;
-  iscritti?:       Record<number, number>;
-  livePos?:        LivePosition | null;
-  livePos2?:       LivePosition | null;
-  traveledRoute?:  [number, number][];
-  traveledRoute2?: [number, number][];
+  selectedIndex?:      number | null;
+  iscritti?:           Record<number, number>;
+  livePos?:            LivePosition | null;
+  livePos2?:           LivePosition | null;
+  traveledRoute?:      [number, number][];
+  traveledRoute2?:     [number, number][];
+  communityPositions?: CommunityLivePosition[];
 }) {
   const liveLatlng1: [number, number] | null =
     livePos?.is_active && livePos.lat != null && livePos.lng != null
@@ -228,6 +247,32 @@ export default function RouteMap({
             </Popup>
           </Marker>
         )}
+
+        {/* Marker community — tutti gli utenti attivi */}
+        {communityPositions.map((cp) => {
+          if (!cp.is_active || cp.lat == null || cp.lng == null) return null;
+          const emoji = ACTIVITY_EMOJI[cp.activity_type] ?? "💪";
+          const color = ACTIVITY_COLOR[cp.activity_type] ?? "#8b5cf6";
+          const icon  = makeCommunityIcon(emoji, color);
+          return (
+            <Marker
+              key={cp.user_id}
+              position={[cp.lat, cp.lng]}
+              icon={icon}
+              zIndexOffset={500}
+            >
+              <Popup>
+                <div className="text-sm font-sans space-y-0.5">
+                  <strong>{emoji} {cp.display_name}</strong>
+                  {cp.speed != null && <p>{(cp.speed * 3.6).toFixed(1)} km/h</p>}
+                  {cp.accuracy != null && (
+                    <p className="text-xs text-gray-500">±{Math.round(cp.accuracy)} m</p>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
 
         {/* Marker per ogni tappa */}
         {waypoints.map((pos, i) => {

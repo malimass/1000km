@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">1000km di Gratitudine</string>
+    <string name="title_activity_main">1000km di Gratitudine</string>
+    <string name="package_name">it.gratitudepath.app</string>
+    <string name="custom_url_scheme">it.gratitudepath.app</string>
+</resources>
