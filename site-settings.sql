@@ -15,7 +15,18 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
+-- Rimuovi eventuale constraint "singleton" (CHECK id=1) creato in precedenza,
+-- perché ora servono più righe (id=1 video, id=2 share).
+ALTER TABLE public.site_settings DROP CONSTRAINT IF EXISTS singleton;
+ALTER TABLE public.site_settings DROP CONSTRAINT IF EXISTS single_row;
+
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
+
+-- Le policy vengono create solo se non esistono già (DROP IF EXISTS + CREATE)
+DROP POLICY IF EXISTS "site_settings_public_read" ON public.site_settings;
+DROP POLICY IF EXISTS "site_settings_auth_write"  ON public.site_settings;
+DROP POLICY IF EXISTS "site_settings_auth_update" ON public.site_settings;
+DROP POLICY IF EXISTS "site_settings_auth_delete" ON public.site_settings;
 
 -- Chiunque può leggere (visitatori vedono video e testi social)
 CREATE POLICY "site_settings_public_read"
@@ -42,9 +53,11 @@ CREATE POLICY "site_settings_auth_delete"
 
 -- Righe iniziali (non sovrascrivono se già presenti)
 INSERT INTO public.site_settings (id, data)
-VALUES
-  (1, '{}'),  -- Video YouTube
-  (2, '{}')   -- Testi condivisione social
+VALUES (1, '{}')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.site_settings (id, data)
+VALUES (2, '{}')
 ON CONFLICT (id) DO NOTHING;
 
 
