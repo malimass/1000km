@@ -156,6 +156,7 @@ export default function RouteMap({
   traveledRoute = [],
   traveledRoute2 = [],
   communityPositions = [],
+  containerId,
 }: {
   selectedIndex?:      number | null;
   iscritti?:           Record<number, number>;
@@ -164,6 +165,7 @@ export default function RouteMap({
   traveledRoute?:      [number, number][];
   traveledRoute2?:     [number, number][];
   communityPositions?: CommunityLivePosition[];
+  containerId?:        string;
 }) {
   const liveLatlng1: [number, number] | null =
     livePos?.is_active && livePos.lat != null && livePos.lng != null
@@ -179,7 +181,7 @@ export default function RouteMap({
   const center: [number, number] = [41.5, 14.0];
 
   return (
-    <div className="w-full rounded-xl overflow-hidden shadow-lg border border-border" style={{ height: 480 }}>
+    <div id={containerId} className="w-full rounded-xl overflow-hidden shadow-lg border border-border" style={{ height: 480 }}>
       <MapContainer
         center={center}
         zoom={6}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense, lazy } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -6,13 +6,21 @@ import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, saveSit
 import { loadSosteniPage, saveSosteniPage, type Sostenitore, type SosteniPage } from "@/lib/sostenitori";
 import {
   upsertLivePosition, appendRoutePoint, clearRoutePositions, distanceMeters, todaySessionId,
+  loadAllLivePositions, type LivePosition,
 } from "@/lib/liveTracking";
+import {
+  loadActiveCommunityPositions,
+  type CommunityLivePosition,
+} from "@/lib/communityTracking";
+import { captureMapScreenshot } from "@/lib/mapSnapshot";
 import { startGeoTracking, stopGeoTracking, isNativeApp } from "@/lib/capacitorGeo";
 import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
   Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video, LogOut,
-  MapPin, Youtube, Navigation, Users, Upload, Share2,
+  MapPin, Youtube, Navigation, Users, Upload, Share2, Map,
 } from "lucide-react";
+
+const RouteMap = lazy(() => import("@/components/RouteMap"));
 
 // ─── Costanti ────────────────────────────────────────────────────────────────
 const CAMMINO_START = new Date("2026-04-18T06:00:00");
@@ -70,7 +78,7 @@ function buildMessage(ltwUrl: string, isTraining: boolean): string {
 
 // ─── Upload su Cloudinary (foto o video) ─────────────────────────────────────
 async function uploadToCloudinary(
-  file: File,
+  file: File | string,
   cloudName: string,
   uploadPreset: string,
   resourceType: "image" | "video" = "image",
@@ -346,6 +354,20 @@ export default function AdminLive() {
   const [uploadStatus, setUploadStatus] = useState("");
   const [postResult,   setPostResult]   = useState<{ ok: string[]; err: string[] } | null>(null);
 
+  // ─ Snapshot mappa community ─
+  const [communityPositions, setCommunityPositions] = useState<CommunityLivePosition[]>([]);
+  const [adminLivePos1, setAdminLivePos1] = useState<LivePosition | null>(null);
+  const [adminLivePos2, setAdminLivePos2] = useState<LivePosition | null>(null);
+  const [snapshotAlert, setSnapshotAlert] = useState(false);
+  const [showSnapshotPanel, setShowSnapshotPanel] = useState(false);
+  const [snapshotFile, setSnapshotFile] = useState<string | null>(null);
+  const [snapshotPreview, setSnapshotPreview] = useState<string | null>(null);
+  const [snapshotCaption, setSnapshotCaption] = useState("");
+  const [snapshotPosting, setSnapshotPosting] = useState(false);
+  const [snapshotResult, setSnapshotResult] = useState<{ ok: string[]; err: string[] } | null>(null);
+  const [capturingMap, setCapturingMap] = useState(false);
+  const lastAlertTimeRef = useRef<number>(0);
+
   // Carica impostazioni
   useEffect(() => {
     loadSettings().then(s => {
@@ -375,6 +397,58 @@ export default function AdminLive() {
 
   useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
   useEffect(() => () => { if (videoPreview) URL.revokeObjectURL(videoPreview); }, [videoPreview]);
+  useEffect(() => () => { if (snapshotPreview) URL.revokeObjectURL(snapshotPreview); }, [snapshotPreview]);
+
+  // ─ Monitor posizioni live (admin + community) per snapshot ─
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+    loadAllLivePositions().then(pos => {
+      setAdminLivePos1(pos[1]);
+      setAdminLivePos2(pos[2]);
+    });
+    loadActiveCommunityPositions().then(setCommunityPositions);
+
+    const ch1 = supabase
+      .channel("admin-live-pos-monitor")
+      .on("postgres_changes", { event: "*", schema: "public", table: "live_position" },
+        (payload) => {
+          const row = payload.new as LivePosition & { id: number };
+          if (row.id === 1) setAdminLivePos1(row);
+          else if (row.id === 2) setAdminLivePos2(row);
+        })
+      .subscribe();
+
+    const ch2 = supabase
+      .channel("admin-community-monitor")
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_live_position" },
+        (payload) => {
+          const updated = payload.new as CommunityLivePosition;
+          setCommunityPositions(prev => {
+            const others = prev.filter(p => p.user_id !== updated.user_id);
+            if (!updated.is_active) return others;
+            return [...others, updated];
+          });
+        })
+      .subscribe();
+
+    return () => {
+      supabase!.removeChannel(ch1);
+      supabase!.removeChannel(ch2);
+    };
+  }, []);
+
+  // Conta runner attivi — notifica quando ≥ 3
+  const activeAdminCount = [adminLivePos1, adminLivePos2].filter(p => p?.is_active).length;
+  const activeCommunityCount = communityPositions.filter(p => p.is_active).length;
+  const totalActiveRunners = activeAdminCount + activeCommunityCount;
+
+  useEffect(() => {
+    const now = Date.now();
+    if (totalActiveRunners >= 3 && now - lastAlertTimeRef.current > 30 * 60 * 1000) {
+      setSnapshotAlert(true);
+      lastAlertTimeRef.current = now;
+    }
+  }, [totalActiveRunners]);
 
   // ─ Foto handlers ─
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -698,6 +772,80 @@ export default function AdminLive() {
     setPosting(false);
   }
 
+  // ─ Snapshot mappa → social ─
+  function buildSnapshotCaption(): string {
+    return (
+      `🗺️ ${totalActiveRunners} runner stanno percorrendo il Gratitude Path in questo momento!\n\n` +
+      `Unisciti anche tu: scarica l'app e condividi il tuo cammino 🏃‍♂️\n\n` +
+      `👉 ${MAP_URL}\n\n` +
+      HASHTAGS
+    );
+  }
+
+  function handleCaptureMap() {
+    const url = captureMapScreenshot({ lat: adminLivePos1?.lat, lng: adminLivePos1?.lng });
+    if (url) {
+      setSnapshotFile(url);
+      setSnapshotPreview(url);
+    }
+  }
+
+  async function handlePublishSnapshot() {
+    if (!snapshotFile) return;
+    setSnapshotPosting(true);
+    setSnapshotResult(null);
+    const ok: string[] = [];
+    const err: string[] = [];
+
+    let uploadedUrl: string | null = null;
+    if (cloudName && cloudPreset) {
+      try {
+        uploadedUrl = await uploadToCloudinary(snapshotFile, cloudName, cloudPreset, "image");
+        if (!uploadedUrl) err.push("Cloudinary: upload fallito");
+      } catch (e) {
+        err.push(`Cloudinary: ${String(e)}`);
+      }
+    }
+
+    if (fbPageId && fbToken) {
+      try {
+        const res = uploadedUrl
+          ? await fbPhotoPost(fbPageId, fbToken, snapshotCaption, uploadedUrl)
+          : await fbPhotoPost(fbPageId, fbToken, snapshotCaption, snapshotFile);
+        if (res.error) err.push(`Facebook: ${res.error.message}`);
+        else ok.push("Facebook ✓");
+      } catch (e) {
+        err.push(`Facebook: ${String(e)}`);
+      }
+    } else {
+      err.push("Facebook: credenziali mancanti — configura nelle Impostazioni");
+    }
+
+    if (igUserId && fbToken && uploadedUrl) {
+      try {
+        const res = await igPhotoPost(igUserId, fbToken, uploadedUrl, snapshotCaption);
+        if (res.error) err.push(`Instagram: ${res.error.message}`);
+        else ok.push("Instagram ✓");
+      } catch (e) {
+        err.push(`Instagram: ${String(e)}`);
+      }
+    } else if (!uploadedUrl) {
+      err.push("Instagram: configura Cloudinary per postare lo screenshot");
+    }
+
+    setSnapshotResult({ ok, err });
+    setSnapshotPosting(false);
+  }
+
+  function dismissSnapshot() {
+    if (snapshotPreview) URL.revokeObjectURL(snapshotPreview);
+    setSnapshotFile(null);
+    setSnapshotPreview(null);
+    setSnapshotAlert(false);
+    setShowSnapshotPanel(false);
+    setSnapshotResult(null);
+  }
+
   const canPublish = (() => {
     const anyPlatform = postFb || postIg || (contentType === "reel" && postTt);
     if (!anyPlatform) return false;
@@ -804,6 +952,129 @@ export default function AdminLive() {
             {settingsLoading && (
               <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" /> Caricamento impostazioni…
+              </div>
+            )}
+
+            {/* ── Notifica snapshot mappa community ──────────────────────── */}
+            {snapshotAlert && !showSnapshotPanel && (
+              <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-300 rounded-xl p-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="bg-blue-500 text-white rounded-full p-2 mt-0.5 shrink-0">
+                    <Map className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      🗺️ {totalActiveRunners} runner attivi sulla mappa!
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Cattura uno screenshot della mappa e pubblicalo su Facebook e Instagram.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => {
+                        setShowSnapshotPanel(true);
+                        setSnapshotCaption(buildSnapshotCaption());
+                      }}
+                      className="bg-blue-600 text-white rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-blue-700 transition-colors"
+                    >
+                      Cattura e Posta
+                    </button>
+                    <button onClick={dismissSnapshot} className="text-muted-foreground hover:text-foreground transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Pannello snapshot mappa community ──────────────────────── */}
+            {showSnapshotPanel && (
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-semibold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
+                    <Map className="w-4 h-4" /> Screenshot Mappa Live
+                  </h2>
+                  <button onClick={dismissSnapshot} className="text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  {totalActiveRunners} runner attivi ({activeAdminCount} admin + {activeCommunityCount} community)
+                </p>
+
+                {/* Mappa embedded */}
+                <Suspense fallback={<div className="h-80 bg-muted rounded-xl animate-pulse flex items-center justify-center text-xs text-muted-foreground">Caricamento mappa…</div>}>
+                  <RouteMap
+                    containerId="admin-snapshot-map"
+                    livePos={adminLivePos1}
+                    livePos2={adminLivePos2}
+                    communityPositions={communityPositions}
+                  />
+                </Suspense>
+
+                {/* Cattura */}
+                <button
+                  onClick={handleCaptureMap}
+                  disabled={capturingMap}
+                  className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {capturingMap
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Cattura in corso…</>
+                    : <><Camera className="w-4 h-4" /> Cattura Screenshot</>
+                  }
+                </button>
+
+                {/* Anteprima screenshot */}
+                {snapshotPreview && (
+                  <>
+                    <div className="relative rounded-xl overflow-hidden border border-border">
+                      <img src={snapshotPreview} alt="Screenshot mappa" className="w-full" />
+                      <button
+                        onClick={() => {
+                          if (snapshotPreview) URL.revokeObjectURL(snapshotPreview);
+                          setSnapshotFile(null);
+                          setSnapshotPreview(null);
+                        }}
+                        className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 backdrop-blur-sm"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Testo del post */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1">Testo del post</label>
+                      <textarea
+                        rows={6}
+                        value={snapshotCaption}
+                        onChange={e => setSnapshotCaption(e.target.value)}
+                        className="w-full border border-border rounded-lg px-3 py-2.5 text-sm font-body focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground resize-none"
+                      />
+                    </div>
+
+                    {/* Risultato */}
+                    {snapshotResult && (
+                      <div className="space-y-1">
+                        {snapshotResult.ok.map((p, i) => <p key={i} className="text-xs text-green-600 font-semibold">✓ {p}</p>)}
+                        {snapshotResult.err.map((e, i) => <p key={i} className="text-xs text-red-500">{e}</p>)}
+                      </div>
+                    )}
+
+                    {/* Pubblica */}
+                    <button
+                      onClick={handlePublishSnapshot}
+                      disabled={snapshotPosting || !snapshotFile}
+                      className="w-full flex items-center justify-center gap-2 bg-dona text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-40 transition-opacity"
+                    >
+                      {snapshotPosting
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Pubblicazione…</>
+                        : <><Send className="w-4 h-4" /> Pubblica su Facebook + Instagram</>
+                      }
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
