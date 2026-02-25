@@ -4,7 +4,7 @@ import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { LivePosition } from "@/lib/liveTracking";
 import type { CommunityLivePosition } from "@/lib/communityTracking";
-import { ACTIVITY_EMOJI, ACTIVITY_COLOR, type ActivityType } from "@/lib/communityTracking";
+import { ACTIVITY_EMOJI, ACTIVITY_COLOR, COMMUNITY_STALE_MS, type ActivityType } from "@/lib/communityTracking";
 
 // Coordinate delle 15 tappe (Bologna → Via Emilia → SS16 Adriatica → interno Sud → SS18 Tirrenica → Terranova)
 const waypoints: [number, number][] = [
@@ -265,9 +265,10 @@ export default function RouteMap({
           </Marker>
         )}
 
-        {/* Marker community — tutti gli utenti attivi */}
+        {/* Marker community — tutti gli utenti attivi e con posizione recente */}
         {communityPositions.map((cp) => {
-          if (!cp.is_active || cp.lat == null || cp.lng == null) return null;
+          const isStale = new Date(cp.updated_at).getTime() < Date.now() - COMMUNITY_STALE_MS;
+          if (!cp.is_active || isStale || cp.lat == null || cp.lng == null) return null;
           const emoji = ACTIVITY_EMOJI[cp.activity_type] ?? "💪";
           const color = ACTIVITY_COLOR[cp.activity_type] ?? "#8b5cf6";
           const icon  = makeCommunityIcon(emoji, color);
