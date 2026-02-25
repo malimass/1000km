@@ -1,6 +1,6 @@
 # Funzionalità — 1000km di Gratitudine
 
-> Documento aggiornabile progressivamente. Ultima modifica: 2026-02-25 (v2)
+> Documento aggiornabile progressivamente. Ultima modifica: 2026-02-25 (v3)
 
 ---
 
@@ -72,11 +72,12 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 
 ### 5. Share Card — "Anch'io cammino per una giusta causa"
 - **Card visiva** con attività, km percorsi, tempo e logo campagna
-- Messaggio pre-compilato per social: *"Anch'io cammino per una giusta causa! Sto partecipando a #1000kmDIGRATITUDINE..."*
+- **Testi completamente configurabili da admin** (titolo, corpo, tag social, hashtag, URL)
+- Valori di default usati se l'admin non ha ancora configurato nulla
+- Testi letti da Supabase `site_settings` (id=2, lettura pubblica senza auth)
 - **Condivisione nativa** su iOS/Android tramite `@capacitor/share`
 - Fallback Web Share API su browser
 - Fallback copia negli appunti se share non disponibile
-- Hashtag inclusi: `#1000kmdiGratitudine #Komen #solidarieta #AnchIoCammino`
 
 ### 6. Iscrizione Tappe (`/iscriviti`)
 - Form con: nome, cognome, email, telefono, tappa (1–14)
@@ -97,7 +98,8 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 
 ### 9. Sostenitori (`/sostenitori`)
 - Lista con nome, testo descrittivo, logo
-- Contenuto **modificabile da admin** (salvataggio su Supabase + fallback localStorage)
+- Contenuto **modificabile solo da admin autenticati** (RLS protetta)
+- Salvataggio su Supabase `sostenitori_page` + fallback localStorage
 
 ### 10. Dashboard Admin (`/admin-live`)
 - Accesso protetto via PIN (`VITE_ADMIN_PIN`)
@@ -107,6 +109,15 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 - Instagram: User ID, Access Token
 - Cloudinary: Cloud Name, Upload Preset
 - YouTube: 3 video per la pagina Crocifisso Nero (id, titolo, descrizione)
+
+#### Condivisione Social (tab "Condivisione")
+- Titolo del post (es. "Anch'io cammino per una giusta causa!")
+- Testo del messaggio (corpo descrittivo della campagna)
+- Tag social (es. "@1000kmdigratitudine")
+- Hashtag personalizzabili
+- Link condivisione (URL nel post)
+- **Anteprima live** del post durante la modifica
+- Salvati su Supabase `site_settings` id=2 (lettura pubblica)
 
 #### Gestione GPS
 - Impostare / aggiornare posizione live runner 1 e runner 2
@@ -155,15 +166,24 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 
 ## Database Supabase
 
-| Tabella | Scopo |
-|---------|-------|
-| `admin_settings` | Credenziali admin (FB, IG, Cloudinary, YT) |
-| `iscrizioni` | Iscrizioni alle tappe + stato pagamento Stripe |
-| `live_position` | Posizione corrente runner (singola riga) |
-| `route_positions` | Storico trail runner (append-only) |
-| `profiles` | Profili utenti community |
-| `community_live_position` | Posizione live utenti community |
-| `community_route_positions` | Storico trail utenti community |
+| Tabella | Scopo | RLS |
+|---------|-------|-----|
+| `admin_settings` | Credenziali admin (FB, IG, Cloudinary, YT, share) | Solo il proprio user_id |
+| `site_settings` | Config pubbliche: video YT (id=1), testi share (id=2) | Lettura pubblica, scrittura solo admin |
+| `sostenitori_page` | Pagina sostenitori (nome, testo, logo) | Lettura pubblica, scrittura solo admin |
+| `iscrizioni` | Iscrizioni alle tappe + stato pagamento Stripe | INSERT pubblico, lettura/update solo admin |
+| `live_position` | Posizione corrente runner 1 e 2 | Lettura pubblica, scrittura solo admin |
+| `route_positions` | Storico trail runner (append-only) | Lettura pubblica, scrittura solo admin |
+| `profiles` | Profili utenti community | Lettura pubblica, scrittura proprio profilo |
+| `community_live_position` | Posizione live utenti community | Lettura pubblica, scrittura proprio record |
+| `community_route_positions` | Storico trail utenti community | Lettura pubblica, scrittura proprio record |
+
+### Strategia di persistenza dati
+
+- **Supabase** è la fonte di verità per tutti i dati
+- **localStorage** è usato come cache/fallback (se Supabase non è disponibile)
+- I dati su Supabase **non vengono toccati** durante deploy/aggiornamenti dell'app
+- Script di setup: `supabase-schema.sql` + `live_position.sql` + `community-schema.sql` + `site-settings.sql`
 
 ---
 
@@ -236,3 +256,4 @@ npm run cap:android   # Build + apri Android Studio (per firma e pubblicazione P
 |------|----------|
 | 2026-02-25 | Documento creato |
 | 2026-02-25 | Aggiunta sezione 5 (ShareCard), aggiornata sezione 11 (App Nativa con flusso e componenti), aggiunti comandi Capacitor |
+| 2026-02-25 | Testi condivisione social configurabili da admin. Tabella `site_settings` + fix RLS `sostenitori_page`. Documentata strategia persistenza dati e policy RLS per ogni tabella |
