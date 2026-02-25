@@ -16,7 +16,10 @@ import {
 import {
   loadActiveCommunityPositions,
   subscribeCommunityLivePosition,
+  loadCommunityRoutePositions,
+  subscribeCommunityRoutePositions,
   type CommunityLivePosition,
+  type ActivityType,
 } from "@/lib/communityTracking";
 
 // Caricamento lazy per evitare problemi SSR con Leaflet
@@ -171,6 +174,11 @@ export default function Percorso() {
   // Posizioni live community
   const [communityPositions, setCommunityPositions] = useState<CommunityLivePosition[]>([]);
 
+  // Tracce percorse community: user_id → { points, activityType }
+  const [communityRoutes, setCommunityRoutes] = useState<
+    Record<string, { points: [number, number][]; activityType: ActivityType }>
+  >({});
+
   // URL LocaToWeb: legge prima dal query param ?ltw=, poi da localStorage, poi fallback vuoto
   const [searchParams] = useSearchParams();
   const [ltwUrl, setLtwUrlState] = useState<string>(() => {
@@ -252,6 +260,30 @@ export default function Percorso() {
     });
   }, []);
 
+  // Carica tracce community di oggi + sottoscrizione Realtime
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    loadCommunityRoutePositions([todaySessionId()]).then(pts => {
+      const routes: Record<string, { points: [number, number][]; activityType: ActivityType }> = {};
+      pts.forEach(pt => {
+        if (!routes[pt.user_id]) {
+          routes[pt.user_id] = { points: [], activityType: pt.activity_type };
+        }
+        routes[pt.user_id].points.push([pt.lat, pt.lng]);
+      });
+      setCommunityRoutes(routes);
+    });
+    return subscribeCommunityRoutePositions(pt => {
+      setCommunityRoutes(prev => ({
+        ...prev,
+        [pt.user_id]: {
+          points: [...(prev[pt.user_id]?.points ?? []), [pt.lat, pt.lng]],
+          activityType: pt.activity_type,
+        },
+      }));
+    });
+  }, []);
+
   function handleTappaClick(waypointIndex: number) {
     setSelectedWaypoint(waypointIndex);
     mapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -316,6 +348,7 @@ export default function Percorso() {
                   traveledRoute={traveledRoute1}
                   traveledRoute2={traveledRoute2}
                   communityPositions={communityPositions}
+                  communityRoutes={communityRoutes}
                 />
               </Suspense>
             </div>
