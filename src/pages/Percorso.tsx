@@ -475,7 +475,7 @@ export default function Percorso() {
           <div className="container-narrow text-center">
             <p className="font-body text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">{communityPositions.length}</span>{" "}
-              {communityPositions.length === 1 ? "persona sta" : "persone stanno"} camminando / correndo / pedalando
+              {communityPositions.length === 1 ? "persona sta" : "persone stanno"} camminando / correndo / partecipando
               in questo momento per <span className="text-dona font-semibold">#1000kmdiGratitudine</span>
             </p>
           </div>

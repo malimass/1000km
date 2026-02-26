@@ -82,7 +82,6 @@ export default function IlMioPercorso() {
     return () => {
       if (tracking) stopTracking();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking]);
 
   // ── Avvia tracciamento ──

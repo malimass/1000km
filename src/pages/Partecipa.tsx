@@ -370,7 +370,7 @@ export default function Partecipa() {
               Unisciti al cammino
             </h1>
             <p className="font-body text-muted-foreground text-sm">
-              Registrati, traccia la tua attività e appariresti sulla mappa in diretta
+              Registrati, traccia la tua attività e apparirai sulla mappa in diretta
             </p>
           </div>
 

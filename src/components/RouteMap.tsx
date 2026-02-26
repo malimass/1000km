@@ -75,18 +75,19 @@ function makeRunnerIcon(emoji: string, pinColor: string) {
   });
 }
 
-const runner1Icon = makeRunnerIcon("🏃‍♂️", "#3b82f6");  // blu
-const runner2Icon = makeRunnerIcon("🏃‍♀️", "#f97316");  // arancione
+const runner1Icon = makeRunnerIcon("🏃‍♂️", "#3b82f6");  // blu — Massimo
+const runner2Icon = makeRunnerIcon("🏃‍♂️", "#f97316");  // arancione — Nunzio
 
 // Genera un'icona community (più piccola dei runner principali)
 function makeCommunityIcon(emoji: string, color: string) {
   return divIcon({
     className: "",
     html: `
+      <style>@keyframes cp2{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.4);opacity:0}}</style>
       <div style="position:relative;text-align:center;width:34px">
         <div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.35))">${emoji}</div>
         <div style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:8px;height:8px;background:${color};border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.35)"></div>
-        <div style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:18px;height:18px;background:${color}44;border-radius:50%;animation:rp2 2s ease-out infinite;margin-left:-5px;margin-top:-5px"></div>
+        <div style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:18px;height:18px;background:${color}44;border-radius:50%;animation:cp2 2s ease-out infinite;margin-left:-5px;margin-top:-5px"></div>
       </div>`,
     iconSize:   [34, 38],
     iconAnchor: [17, 38],

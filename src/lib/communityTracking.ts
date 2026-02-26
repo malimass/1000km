@@ -142,7 +142,11 @@ export function subscribeCommunityLivePosition(
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "community_live_position" },
-      (payload) => { cb(payload.new as CommunityLivePosition); },
+      (payload) => {
+        // Ignora DELETE: payload.new è vuoto ({}) e user_id sarebbe undefined
+        if (!(payload.new as Partial<CommunityLivePosition>).user_id) return;
+        cb(payload.new as CommunityLivePosition);
+      },
     )
     .subscribe();
   return () => { supabase!.removeChannel(channel); };
