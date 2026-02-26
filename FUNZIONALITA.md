@@ -90,10 +90,16 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 ### 4. Community Tracking (`/partecipa` + `/il-mio-percorso`)
 
 #### Registrazione / Login
-- Email + password via **Supabase Auth**
+- **OAuth social**: Google, Facebook, Apple — tramite `supabase.auth.signInWithOAuth()`
+  - Redirect a `/partecipa` dopo il provider
+  - Se utente nuovo senza profilo → form di completamento (nome, attività, città)
+  - Se profilo esistente → redirect diretto a `/il-mio-percorso`
+- **Email + password**: signup e login via Supabase Auth
 - Dati profilo: nome visualizzato, tipo attività, città
 - Creazione record `profiles` al signup con `upsertProfile()`
 - Redirect a `/il-mio-percorso` dopo login
+
+> **Nota Supabase**: disabilitare "Enable email confirmations" in Auth Settings per permettere login immediato senza verifica email.
 
 #### Tipi di attività (enum: `ActivityType`)
 | Valore | Emoji | Colore marker |
@@ -101,6 +107,8 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 | `corri` | 🏃 | `#3b82f6` blu |
 | `cammino` | 🚶 | `#22c55e` verde |
 | `altro` | 💪 | `#8b5cf6` viola |
+
+> **Nota SQL**: il commento nel `community-schema.sql` menziona anche `pedalo` e `nuoto` come valori possibili per `activity_type`, ma non esiste un CHECK constraint nel DB e il frontend (TypeScript + UI) espone solo i 3 valori sopra. Eventuali valori aggiuntivi sono estendibili senza migrazioni.
 
 #### Dashboard utente (`/il-mio-percorso`)
 - Start / Stop tracking GPS
