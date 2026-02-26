@@ -109,7 +109,7 @@ export default function Iscriviti() {
         // Iscrizione con donazione: usa Stripe via Edge Function
         if (!EDGE_FUNCTION_URL) throw new Error("Pagamento non configurato.");
 
-        const successUrl = `${window.location.origin}/iscrizione-successo`;
+        const successUrl = `${window.location.origin}/iscrizione-successo?tappa=${tappa.giorno}&nome=${encodeURIComponent(nome.trim())}&tipo=maglia&importo=${donazione}`;
         const cancelUrl = `${window.location.origin}/iscriviti?tappa=${tappa.giorno}`;
 
         const res = await fetch(EDGE_FUNCTION_URL, {

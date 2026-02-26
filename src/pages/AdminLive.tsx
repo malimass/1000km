@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, Suspense, lazy } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
+import { tappe } from "@/lib/tappe";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, saveSiteShareSettings, SHARE_DEFAULTS, type AdminSettings } from "@/lib/adminSettings";
 import { loadSosteniPage, saveSosteniPage, type Sostenitore, type SosteniPage } from "@/lib/sostenitori";
@@ -28,23 +29,6 @@ const CAMMINO_START = new Date("2026-04-18T06:00:00");
 const HASHTAGS =
   "#1000kmdigratitudine #gratitudepath #camminodigratitudine " +
   "#bologna #calabria #italia #solidarietà #raccoltafondi #ciclismo #running";
-
-const tappe = [
-  { giorno: 1,  da: "Bologna",           a: "Faenza",                  km: 55  },
-  { giorno: 2,  da: "Faenza",            a: "Rimini",                  km: 70  },
-  { giorno: 3,  da: "Rimini",            a: "Ancona",                  km: 90  },
-  { giorno: 4,  da: "Ancona",            a: "Porto San Giorgio",       km: 65  },
-  { giorno: 5,  da: "Porto San Giorgio", a: "Pescara",                 km: 85  },
-  { giorno: 6,  da: "Pescara",           a: "Vasto",                   km: 75  },
-  { giorno: 7,  da: "Vasto",             a: "Campobasso",              km: 90  },
-  { giorno: 8,  da: "Campobasso",        a: "Avellino",                km: 90  },
-  { giorno: 9,  da: "Avellino",          a: "Sala Consilina",          km: 70  },
-  { giorno: 10, da: "Sala Consilina",    a: "Scalea",                  km: 85  },
-  { giorno: 11, da: "Scalea",            a: "Paola",                   km: 55  },
-  { giorno: 12, da: "Paola",             a: "Pizzo Calabro",           km: 65  },
-  { giorno: 13, da: "Pizzo Calabro",     a: "Rosarno",                 km: 65  },
-  { giorno: 14, da: "Rosarno",           a: "Terranova Sappo Minulio", km: 40  },
-];
 
 // ─── Template post ────────────────────────────────────────────────────────────
 const MAP_URL = "https://1000kmdigratitudine.it/il-percorso";
@@ -580,14 +564,22 @@ export default function AdminLive() {
     lastRoutePointRef.current = null;
     lastRouteTimeRef.current  = 0;
     setRouteCount(0);
-    setIsTracking(true);
+    // Non impostiamo isTracking=true qui: lo facciamo alla prima posizione GPS
+    // valida, così se il GPS fallisce prima del fix il bottone torna su "Avvia".
     isTrackingRef.current = true;
 
     // Su app nativa il wake lock non serve (lo schermo può spegnersi)
     if (!isNativeApp()) acquireWakeLock();
 
+    let gotFirstFix = false;
+
     await startGeoTracking(
       async ({ latitude: lat, longitude: lng, speed, accuracy, heading }) => {
+        // Prima posizione valida: attiva lo stato tracking
+        if (!gotFirstFix) {
+          gotFirstFix = true;
+          setIsTracking(true);
+        }
         setGpsPos({ lat, lng, speed, accuracy });
 
         // ── Aggiorna posizione live ──────────────────────────────────────────
@@ -609,7 +601,15 @@ export default function AdminLive() {
           setRouteCount(c => c + 1);
         }
       },
-      (errMsg) => setGpsError(errMsg),
+      (errMsg) => {
+        setGpsError(errMsg);
+        // Se GPS fallisce prima del primo fix, resetta lo stato
+        if (!gotFirstFix) {
+          isTrackingRef.current = false;
+          setIsTracking(false);
+          releaseWakeLock();
+        }
+      },
     );
 
     // Aggiorna stato attivo su Supabase

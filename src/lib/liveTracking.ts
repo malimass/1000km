@@ -87,9 +87,10 @@ export function subscribeLivePosition(
     .channel("live-position-channel")
     .on(
       "postgres_changes",
-      { event: "*", schema: "public", table: "live_position" },
+      { event: "UPDATE", schema: "public", table: "live_position" },
       (payload) => {
         const row = payload.new as LivePosition & { id: number };
+        if (row.id !== 1 && row.id !== 2) return;
         cb(row.id as 1 | 2, row);
       },
     )
