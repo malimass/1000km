@@ -16,6 +16,8 @@ const Sponsor = lazy(() => import("./pages/Sponsor"));
 const Sostenitori = lazy(() => import("./pages/Sostenitori"));
 const Contatti = lazy(() => import("./pages/Contatti"));
 const Dona = lazy(() => import("./pages/Dona"));
+const Notizie = lazy(() => import("./pages/Notizie"));
+const Servizi = lazy(() => import("./pages/Servizi"));
 const AdminLive = lazy(() => import("./pages/AdminLive"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const Iscriviti = lazy(() => import("./pages/Iscriviti"));
@@ -43,6 +45,8 @@ const App = () => (
           <Route path="/sostenitori" element={<Sostenitori />} />
           <Route path="/contatti" element={<Contatti />} />
           <Route path="/dona" element={<Dona />} />
+          <Route path="/notizie" element={<Notizie />} />
+          <Route path="/servizi" element={<Servizi />} />
           <Route path="/iscriviti" element={<Iscriviti />} />
           <Route path="/iscrizione-successo" element={<IscrizioneSuccesso />} />
           <Route path="/partecipa" element={<Partecipa />} />

@@ -1,16 +1,16 @@
 /**
  * capacitorGeo.ts
  *
- * Wrapper unificato per il GPS nativo + web.
+ * Wrapper unificato per il GPS nativo (background) + web (foreground).
  *
  * - App nativa (Capacitor / iOS / Android):
- *   Usa @capacitor/geolocation che chiama le API native del sistema.
- *   Su Android con foreground service configurato, continua in background.
- *   Su iOS con "Always" location permission, continua in background.
+ *   Usa @capacitor-community/background-geolocation.
+ *   Su Android mostra una notifica persistente e continua con lo schermo spento.
+ *   Su iOS usa il background mode "location" (Info.plist già configurato).
  *
  * - Browser (PWA / web):
- *   Ricade sul classico navigator.geolocation.watchPosition.
- *   Richiede Wake Lock per tenere lo schermo acceso.
+ *   Usa navigator.geolocation.watchPosition.
+ *   Non può andare in background: la Wake Lock mantiene lo schermo acceso.
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -23,146 +23,153 @@ export interface GeoPosition {
   heading: number | null;
 }
 
-export type GeoCallback = (position: GeoPosition) => void;
+export type GeoCallback      = (position: GeoPosition) => void;
 export type GeoErrorCallback = (error: string) => void;
 
-let nativeWatchId: string | null = null;
-let webWatchId: number | null = null;
-let webTimeoutId: ReturnType<typeof setTimeout> | null = null;
+let bgWatcherId:   string | null = null;   // @capacitor-community/background-geolocation
+let webWatchId:    number | null = null;   // navigator.geolocation
+let webTimeoutId:  ReturnType<typeof setTimeout> | null = null;
 
-/**
- * Rileva se l'app è in esecuzione come app nativa Capacitor.
- */
+/** Ritorna true se il codice gira in un'app Capacitor nativa (Android/iOS). */
 export function isNativeApp(): boolean {
   return Capacitor.isNativePlatform();
 }
 
 /**
  * Avvia il tracciamento GPS.
- * - Su app nativa: usa @capacitor/geolocation (GPS nativo, background-capable)
- * - Su browser:    usa navigator.geolocation.watchPosition
+ * - Nativo: background-geolocation (funziona con schermo spento).
+ * - Browser: watchPosition standard (schermo deve restare acceso).
  */
 export async function startGeoTracking(
   onPosition: GeoCallback,
-  onError: GeoErrorCallback
+  onError: GeoErrorCallback,
 ): Promise<void> {
+  // Evita avvii doppi
+  if (bgWatcherId !== null || webWatchId !== null) return;
+
   if (isNativeApp()) {
-    await startNativeTracking(onPosition, onError);
+    await startBackgroundTracking(onPosition, onError);
   } else {
     startWebTracking(onPosition, onError);
   }
 }
 
-/**
- * Ferma il tracciamento GPS.
- */
+/** Ferma il tracciamento GPS e rilascia le risorse. */
 export async function stopGeoTracking(): Promise<void> {
   if (isNativeApp()) {
-    await stopNativeTracking();
+    await stopBackgroundTracking();
   } else {
     stopWebTracking();
   }
 }
 
-// ─── Native (Capacitor) ──────────────────────────────────────────────────────
+// ─── Native — @capacitor-community/background-geolocation ────────────────────
 
-async function startNativeTracking(
+async function startBackgroundTracking(
   onPosition: GeoCallback,
-  onError: GeoErrorCallback
+  onError: GeoErrorCallback,
 ): Promise<void> {
   try {
-    const { Geolocation } = await import('@capacitor/geolocation');
+    const { BackgroundGeolocation } = await import(
+      '@capacitor-community/background-geolocation'
+    );
 
-    // Richiedi i permessi prima di iniziare
-    const perm = await Geolocation.requestPermissions();
-    if (perm.location === 'denied') {
-      onError('Permesso GPS negato. Abilitalo nelle impostazioni del dispositivo.');
-      return;
-    }
-
-    const id = await Geolocation.watchPosition(
-      { enableHighAccuracy: true, timeout: 15000 },
-      (position, err) => {
-        if (err) {
-          onError(`Errore GPS: ${err.message}`);
+    const id = await BackgroundGeolocation.addWatcher(
+      {
+        backgroundMessage: 'Tracciamento GPS percorso in corso…',
+        backgroundTitle:   '1000km di Gratitudine',
+        requestPermissions: true,
+        stale:  false,
+        distanceFilter: 10,   // minimo 10 m di spostamento tra due update
+      },
+      (position, error) => {
+        if (error) {
+          if (error.code === 'NOT_AUTHORIZED') {
+            onError('Permesso GPS negato. Abilitalo nelle impostazioni del dispositivo.');
+          } else {
+            onError(`Errore GPS: ${error.message}`);
+          }
           return;
         }
         if (position) {
           onPosition({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            speed: position.coords.speed ?? null,
-            accuracy: position.coords.accuracy,
-            heading: position.coords.heading ?? null,
+            latitude:  position.latitude,
+            longitude: position.longitude,
+            speed:     position.speed   ?? null,
+            accuracy:  position.accuracy,
+            heading:   position.bearing ?? null,
           });
         }
-      }
+      },
     );
 
-    nativeWatchId = id;
+    bgWatcherId = id;
   } catch (err) {
-    onError(`Impossibile avviare GPS nativo: ${err}`);
+    onError(`Impossibile avviare GPS in background: ${err}`);
   }
 }
 
-async function stopNativeTracking(): Promise<void> {
-  if (!nativeWatchId) return;
+async function stopBackgroundTracking(): Promise<void> {
+  if (!bgWatcherId) return;
   try {
-    const { Geolocation } = await import('@capacitor/geolocation');
-    await Geolocation.clearWatch({ id: nativeWatchId });
-    nativeWatchId = null;
+    const { BackgroundGeolocation } = await import(
+      '@capacitor-community/background-geolocation'
+    );
+    await BackgroundGeolocation.removeWatcher({ id: bgWatcherId });
   } catch {
     // ignora errori in fase di stop
+  } finally {
+    bgWatcherId = null;
   }
 }
 
-// ─── Web (browser) ───────────────────────────────────────────────────────────
+// ─── Web — navigator.geolocation ─────────────────────────────────────────────
 
 function startWebTracking(
   onPosition: GeoCallback,
-  onError: GeoErrorCallback
+  onError: GeoErrorCallback,
 ): void {
   if (!navigator.geolocation) {
     onError('Geolocalizzazione non supportata da questo browser.');
     return;
   }
 
-  // Verifica che la pagina sia servita via HTTPS (richiesto per geolocation)
-  if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-    onError('Il GPS richiede una connessione HTTPS. Assicurati che il sito sia servito via HTTPS.');
+  // Richiede HTTPS (eccetto localhost)
+  if (
+    location.protocol !== 'https:' &&
+    location.hostname !== 'localhost' &&
+    location.hostname !== '127.0.0.1'
+  ) {
+    onError('Il GPS richiede una connessione HTTPS.');
     return;
   }
 
-  let receivedFirstPosition = false;
+  let gotFirst = false;
 
-  // Timeout di sicurezza: se il GPS non risponde entro 20s, segnala errore
   webTimeoutId = setTimeout(() => {
-    if (!receivedFirstPosition) {
-      onError('Nessun segnale GPS ricevuto. Assicurati di aver autorizzato la geolocalizzazione e di essere all\'aperto.');
+    if (!gotFirst) {
+      onError(
+        "Nessun segnale GPS ricevuto. Assicurati di aver autorizzato la " +
+        "geolocalizzazione e di essere all'aperto.",
+      );
     }
     webTimeoutId = null;
   }, 20_000);
 
-  const id = navigator.geolocation.watchPosition(
+  webWatchId = navigator.geolocation.watchPosition(
     ({ coords }) => {
-      receivedFirstPosition = true;
-      if (webTimeoutId) {
-        clearTimeout(webTimeoutId);
-        webTimeoutId = null;
-      }
+      gotFirst = true;
+      if (webTimeoutId) { clearTimeout(webTimeoutId); webTimeoutId = null; }
       onPosition({
-        latitude: coords.latitude,
+        latitude:  coords.latitude,
         longitude: coords.longitude,
-        speed: coords.speed,
-        accuracy: coords.accuracy,
-        heading: coords.heading,
+        speed:     coords.speed,
+        accuracy:  coords.accuracy,
+        heading:   coords.heading,
       });
     },
     (err) => {
-      if (webTimeoutId) {
-        clearTimeout(webTimeoutId);
-        webTimeoutId = null;
-      }
+      if (webTimeoutId) { clearTimeout(webTimeoutId); webTimeoutId = null; }
       switch (err.code) {
         case err.PERMISSION_DENIED:
           onError('Permesso GPS negato. Abilitalo nelle impostazioni del browser.');
@@ -171,22 +178,18 @@ function startWebTracking(
           onError('Posizione non disponibile. Verifica che il GPS sia attivo.');
           break;
         case err.TIMEOUT:
-          onError('Timeout GPS. Riprova in un\'area con migliore copertura.');
+          onError("Timeout GPS. Riprova in un'area con migliore copertura.");
           break;
         default:
           onError(`Errore GPS: ${err.message}`);
       }
     },
-    { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
+    { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 },
   );
-  webWatchId = id;
 }
 
 function stopWebTracking(): void {
-  if (webTimeoutId) {
-    clearTimeout(webTimeoutId);
-    webTimeoutId = null;
-  }
+  if (webTimeoutId) { clearTimeout(webTimeoutId); webTimeoutId = null; }
   if (webWatchId !== null) {
     navigator.geolocation.clearWatch(webWatchId);
     webWatchId = null;

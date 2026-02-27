@@ -14,6 +14,8 @@ const navLinks = [
       { label: "SS Crocifisso Nero", to: "/ss-crocifisso-nero" },
     ],
   },
+  { label: "Notizie", to: "/notizie" },
+  { label: "Servizi", to: "/servizi" },
   { label: "Sostenitori", to: "/sostenitori" },
   { label: "Contatti", to: "/contatti" },
   { label: "Login", to: "/admin-login" },
@@ -207,6 +209,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <div className="flex flex-col gap-2">
                 {([
                   { to: "/il-percorso",  label: "Il Percorso" },
+                  { to: "/notizie",      label: "Notizie" },
+                  { to: "/servizi",      label: "Servizi" },
                   { to: "/sostenitori",  label: "Sostenitori del cammino" },
                   { to: "/contatti",     label: "Contatti" },
                 ] as const).map(({ to, label }) => (
