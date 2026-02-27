@@ -16,9 +16,12 @@ import {
 import { captureMapScreenshot } from "@/lib/mapSnapshot";
 import { startGeoTracking, stopGeoTracking, isNativeApp } from "@/lib/capacitorGeo";
 import {
+  pubblicaNotizia, aggiornaRaccolta, loadRaccoltaFondi, type Categoria,
+} from "@/lib/notizie";
+import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
   Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video, LogOut,
-  MapPin, Youtube, Navigation, Users, Upload, Share2, Map,
+  MapPin, Youtube, Navigation, Users, Upload, Share2, Map, Bell, TrendingUp,
 } from "lucide-react";
 
 const RouteMap = lazy(() => import("@/components/RouteMap"));
@@ -203,11 +206,13 @@ async function shareToTikTok(file: File, caption: string): Promise<{ ok: boolean
 }
 
 // ─── Tipi sezione ─────────────────────────────────────────────────────────────
-type Section = "live" | "social" | "video" | "sostenitori" | "share" | "settings";
+type Section = "live" | "social" | "notizie" | "raccolta" | "video" | "sostenitori" | "share" | "settings";
 
 const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
   { key: "live",        label: "Live Tracking", icon: <MapPin className="w-4 h-4" /> },
   { key: "social",      label: "Pubblica",      icon: <Send className="w-4 h-4" /> },
+  { key: "notizie",     label: "Notizie",       icon: <Bell className="w-4 h-4" /> },
+  { key: "raccolta",    label: "Raccolta",       icon: <TrendingUp className="w-4 h-4" /> },
   { key: "video",       label: "Video YouTube", icon: <Youtube className="w-4 h-4" /> },
   { key: "sostenitori", label: "Sostenitori",   icon: <Users className="w-4 h-4" /> },
   { key: "share",       label: "Condivisione",  icon: <Share2 className="w-4 h-4" /> },
@@ -311,6 +316,21 @@ export default function AdminLive() {
   const sosteniLogoInputRef    = useRef<HTMLInputElement>(null);
   const sosteniUploadTargetRef = useRef<string | null>(null);
 
+  // ─ Notizie ─
+  const [notiziaTitolo,   setNotiziaTitolo]   = useState("");
+  const [notiziaCorpo,    setNotiziaCorpo]    = useState("");
+  const [notiziaCategoria, setNotiziaCategoria] = useState<Categoria>("generale");
+  const [notiziaTappaNum, setNotiziaTappaNum] = useState<number | "">("");
+  const [notiziaImgUrl,   setNotiziaImgUrl]   = useState("");
+  const [notiziaSaving,   setNotiziaSaving]   = useState(false);
+  const [notiziaDone,     setNotiziaDone]     = useState(false);
+
+  // ─ Raccolta Fondi ─
+  const [raccoltaImporto, setRaccoltaImporto] = useState("");
+  const [raccoltaDonatori, setRaccoltaDonatori] = useState("");
+  const [raccoltaSaving,   setRaccoltaSaving]  = useState(false);
+  const [raccoltaDone,     setRaccoltaDone]    = useState(false);
+
   // ─ Composer ─
   const isTraining = new Date() < CAMMINO_START;
   const [contentType, setContentType] = useState<"photo" | "reel">("photo");
@@ -372,6 +392,12 @@ export default function AdminLive() {
       setSosteniTitle(p.title);
       setSosteniIntro(p.intro);
       setSosteniItems(p.items);
+    });
+    loadRaccoltaFondi().then(r => {
+      if (r) {
+        setRaccoltaImporto(String(r.importo_euro));
+        setRaccoltaDonatori(String(r.donatori));
+      }
     });
   }, []);
 
@@ -506,6 +532,38 @@ export default function AdminLive() {
     await saveSiteShareSettings({ shareTitle, shareBody, shareSocialTag, shareHashtags, shareUrl });
     setShareSaved(true);
     setTimeout(() => setShareSaved(false), 2500);
+  }
+
+  // ─ Notizie handlers ─
+  async function handlePubblicaNotizia() {
+    if (!notiziaTitolo.trim() || !notiziaCorpo.trim()) return;
+    setNotiziaSaving(true);
+    const err = await pubblicaNotizia({
+      titolo:       notiziaTitolo.trim(),
+      corpo:        notiziaCorpo.trim(),
+      categoria:    notiziaCategoria,
+      tappa_num:    notiziaCategoria === "tappa" && notiziaTappaNum !== "" ? Number(notiziaTappaNum) : null,
+      immagine_url: notiziaImgUrl.trim() || null,
+      pubblicata:   true,
+    });
+    setNotiziaSaving(false);
+    if (!err) {
+      setNotiziaTitolo(""); setNotiziaCorpo(""); setNotiziaImgUrl(""); setNotiziaTappaNum("");
+      setNotiziaDone(true);
+      setTimeout(() => setNotiziaDone(false), 3000);
+    }
+  }
+
+  // ─ Raccolta Fondi handler ─
+  async function handleSaveRaccolta() {
+    const importo = parseFloat(raccoltaImporto.replace(",", "."));
+    const donatori = parseInt(raccoltaDonatori, 10);
+    if (isNaN(importo) || isNaN(donatori)) return;
+    setRaccoltaSaving(true);
+    await aggiornaRaccolta(importo, donatori);
+    setRaccoltaSaving(false);
+    setRaccoltaDone(true);
+    setTimeout(() => setRaccoltaDone(false), 2500);
   }
 
   // ─ Sostenitori handlers ─
@@ -1463,6 +1521,202 @@ export default function AdminLive() {
                   {posting
                     ? <><Loader2 className="w-4 h-4 animate-spin" />{uploadStatus || "Pubblicazione…"}</>
                     : <><Send className="w-4 h-4" />{contentType === "reel" ? "Pubblica Reel" : "Pubblica ora"}</>
+                  }
+                </button>
+              </div>
+            )}
+
+            {/* ── SEZIONE: Notizie ───────────────────────────────────────────── */}
+            {activeSection === "notizie" && (
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                <h2 className="font-semibold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
+                  <Bell className="w-4 h-4" /> Pubblica Notizia
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Le notizie vengono pubblicate immediatamente sulla pagina{" "}
+                  <Link to="/notizie" target="_blank" className="underline text-dona">
+                    /notizie
+                  </Link>{" "}
+                  e notificate in tempo reale a tutti i visitatori.
+                </p>
+
+                {/* Titolo */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">Titolo *</label>
+                  <input
+                    type="text"
+                    value={notiziaTitolo}
+                    onChange={e => setNotiziaTitolo(e.target.value)}
+                    placeholder="Es. Massimo ha completato la tappa 3!"
+                    className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+                  />
+                </div>
+
+                {/* Categoria */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">Categoria</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(["generale", "tappa", "raccolta", "emergenza"] as Categoria[]).map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setNotiziaCategoria(cat)}
+                        className={`text-xs px-3 py-1.5 rounded-full font-semibold border transition-colors ${
+                          notiziaCategoria === cat
+                            ? "bg-dona text-white border-dona"
+                            : "border-border text-muted-foreground hover:border-dona/40"
+                        }`}
+                      >
+                        {cat === "generale" ? "Generale" : cat === "tappa" ? "Tappa" : cat === "raccolta" ? "Raccolta" : "Avviso"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Numero tappa (solo se categoria = tappa) */}
+                {notiziaCategoria === "tappa" && (
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground mb-1">Numero tappa</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={14}
+                      value={notiziaTappaNum}
+                      onChange={e => setNotiziaTappaNum(e.target.value === "" ? "" : Number(e.target.value))}
+                      placeholder="Es. 3"
+                      className="w-32 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+                    />
+                  </div>
+                )}
+
+                {/* Corpo */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">Testo *</label>
+                  <textarea
+                    rows={5}
+                    value={notiziaCorpo}
+                    onChange={e => setNotiziaCorpo(e.target.value)}
+                    placeholder="Scrivi qui il testo completo della notizia…"
+                    className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground resize-none"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">{notiziaCorpo.length} caratteri</p>
+                </div>
+
+                {/* URL immagine */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">URL immagine (opzionale)</label>
+                  <input
+                    type="url"
+                    value={notiziaImgUrl}
+                    onChange={e => setNotiziaImgUrl(e.target.value)}
+                    placeholder="https://res.cloudinary.com/…"
+                    className="w-full border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+                  />
+                </div>
+
+                {/* Feedback */}
+                {notiziaDone && (
+                  <div className="flex items-center gap-2 text-sm text-green-600 font-semibold">
+                    <CheckCircle className="w-4 h-4" /> Notizia pubblicata!
+                  </div>
+                )}
+
+                <button
+                  onClick={handlePubblicaNotizia}
+                  disabled={notiziaSaving || !notiziaTitolo.trim() || !notiziaCorpo.trim()}
+                  className="w-full flex items-center justify-center gap-2 bg-dona text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-40 transition-opacity"
+                >
+                  {notiziaSaving
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Pubblicazione…</>
+                    : <><Bell className="w-4 h-4" /> Pubblica notizia</>
+                  }
+                </button>
+              </div>
+            )}
+
+            {/* ── SEZIONE: Raccolta Fondi ─────────────────────────────────────── */}
+            {activeSection === "raccolta" && (
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+                <h2 className="font-semibold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" /> Raccolta Fondi Live
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Aggiorna il contatore live della raccolta fondi visibile sulla pagina{" "}
+                  <Link to="/dona" target="_blank" className="underline text-dona">
+                    /dona
+                  </Link>.
+                  La barra si aggiornerà in tempo reale per tutti i visitatori.
+                </p>
+
+                {/* Importo */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    Importo raccolto (€)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-muted-foreground">€</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={10}
+                      value={raccoltaImporto}
+                      onChange={e => setRaccoltaImporto(e.target.value)}
+                      placeholder="Es. 4500"
+                      className="flex-1 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+                    />
+                  </div>
+                </div>
+
+                {/* Donatori */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    Numero donatori
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={raccoltaDonatori}
+                    onChange={e => setRaccoltaDonatori(e.target.value)}
+                    placeholder="Es. 87"
+                    className="w-40 border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+                  />
+                </div>
+
+                {/* Anteprima barra */}
+                {raccoltaImporto && !isNaN(parseFloat(raccoltaImporto)) && (
+                  <div className="bg-muted/40 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-foreground mb-2">Anteprima barra progresso</p>
+                    <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-dona to-dona/80 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, (parseFloat(raccoltaImporto) / 50000) * 100).toFixed(1)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-1.5">
+                      <span className="text-xs text-muted-foreground">
+                        € {parseFloat(raccoltaImporto || "0").toLocaleString("it-IT")}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {((parseFloat(raccoltaImporto) / 50000) * 100).toFixed(1)}% di € 50.000
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Feedback */}
+                {raccoltaDone && (
+                  <div className="flex items-center gap-2 text-sm text-green-600 font-semibold">
+                    <CheckCircle className="w-4 h-4" /> Raccolta aggiornata!
+                  </div>
+                )}
+
+                <button
+                  onClick={handleSaveRaccolta}
+                  disabled={raccoltaSaving || !raccoltaImporto || !raccoltaDonatori}
+                  className="w-full flex items-center justify-center gap-2 bg-dona text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-40 transition-opacity"
+                >
+                  {raccoltaSaving
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvataggio…</>
+                    : <><TrendingUp className="w-4 h-4" /> Aggiorna raccolta</>
                   }
                 </button>
               </div>

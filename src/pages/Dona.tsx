@@ -1,24 +1,42 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Heart, ArrowLeft, Shield, Users, Clock } from "lucide-react";
+import { Heart, ArrowLeft, Shield, Users, Clock, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
 import { motion } from "framer-motion";
+import { loadRaccoltaFondi, subscribeRaccoltaFondi, type RaccoltaFondi } from "@/lib/notizie";
 
 const donationTiers = [
-  { amount: "€ 10", label: "Un passo", desc: "Sostieni un chilometro del cammino" },
-  { amount: "€ 25", label: "Un tratto", desc: "Copri una tappa della giornata" },
-  { amount: "€ 50", label: "Una giornata", desc: "Sostieni un'intera giornata di cammino" },
+  { amount: "€ 10",  label: "Un passo",     desc: "Sostieni un chilometro del cammino" },
+  { amount: "€ 25",  label: "Un tratto",    desc: "Copri una tappa della giornata" },
+  { amount: "€ 50",  label: "Una giornata", desc: "Sostieni un'intera giornata di cammino" },
   { amount: "€ 100", label: "Un abbraccio", desc: "Un contributo significativo alla ricerca" },
 ];
 
 const trustBadges = [
   { icon: <Shield className="w-5 h-5" />, text: "100% trasparente" },
-  { icon: <Heart className="w-5 h-5" />, text: "100% alla ricerca" },
-  { icon: <Users className="w-5 h-5" />, text: "Rendicontazione pubblica" },
+  { icon: <Heart className="w-5 h-5" />,  text: "100% alla ricerca" },
+  { icon: <Users className="w-5 h-5" />,  text: "Rendicontazione pubblica" },
 ];
 
+function formatEuro(n: number): string {
+  return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+}
+
 export default function Dona() {
+  const [raccolta, setRaccolta] = useState<RaccoltaFondi | null>(null);
+
+  useEffect(() => {
+    loadRaccoltaFondi().then(r => { if (r) setRaccolta(r); });
+    return subscribeRaccoltaFondi(r => setRaccolta(r));
+  }, []);
+
+  const importo  = raccolta?.importo_euro ?? 2500;
+  const target   = raccolta?.target_euro  ?? 50000;
+  const donatori = raccolta?.donatori     ?? 42;
+  const pct      = Math.min(100, (importo / target) * 100);
+
   return (
     <Layout>
       {/* Hero */}
@@ -54,6 +72,7 @@ export default function Dona() {
 
       <section className="section-padding bg-background">
         <div className="container-narrow max-w-3xl">
+
           {/* Trust badges */}
           <AnimatedSection>
             <div className="flex flex-wrap justify-center gap-6 mb-12">
@@ -66,22 +85,59 @@ export default function Dona() {
             </div>
           </AnimatedSection>
 
+          {/* Raccolta fondi live */}
+          <AnimatedSection>
+            <div className="mb-10 bg-primary rounded-xl p-6 md:p-8">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="w-5 h-5 text-dona" />
+                <span className="font-heading text-sm uppercase tracking-widest text-primary-foreground/70 font-bold">
+                  Raccolta fondi in tempo reale
+                </span>
+              </div>
+              <div className="flex justify-between items-end mb-3">
+                <div>
+                  <span className="font-heading text-3xl font-bold text-primary-foreground">
+                    {formatEuro(importo)}
+                  </span>
+                  <span className="font-body text-primary-foreground/50 text-sm ml-2">
+                    raccolti su {formatEuro(target)}
+                  </span>
+                </div>
+                <span className="font-heading text-accent font-bold text-lg">
+                  {pct.toFixed(1)}%
+                </span>
+              </div>
+              <div className="w-full h-4 bg-primary-foreground/10 rounded-full overflow-hidden mb-3">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: "linear-gradient(90deg, hsl(340 82% 52%), hsl(29 87% 67%))" }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                />
+              </div>
+              <p className="font-body text-primary-foreground/50 text-xs text-center">
+                <span className="text-accent font-semibold">{donatori} donatori</span> hanno già contribuito · Obiettivo: {formatEuro(target)} per la ricerca
+              </p>
+            </div>
+          </AnimatedSection>
+
           {/* Donation card */}
           <AnimatedSection>
             <div className="bg-card rounded-xl p-8 md:p-12 shadow-lg border border-border/50">
-              <h2 className="font-heading text-2xl font-bold text-foreground mb-2 text-center">Sostieni la ricerca</h2>
+              <h2 className="font-heading text-2xl font-bold text-foreground mb-2 text-center">Scegli il tuo contributo</h2>
               <p className="text-muted-foreground font-body leading-relaxed mb-10 text-center max-w-lg mx-auto">
                 La raccolta fondi è interamente destinata alla lotta contro i tumori al seno.
               </p>
 
               {/* Tiers */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-                {donationTiers.map((tier, i) => (
-                  <motion.button
+                {donationTiers.map((tier) => (
+                  <motion.div
                     key={tier.amount}
                     whileHover={{ scale: 1.04, borderColor: "hsl(340, 82%, 52%)" }}
                     whileTap={{ scale: 0.97 }}
-                    className="rounded-xl border-2 border-border hover:border-dona bg-card hover:bg-dona/5 p-4 text-left transition-colors group"
+                    className="rounded-xl border-2 border-border hover:border-dona bg-card hover:bg-dona/5 p-4 text-left transition-colors group cursor-pointer"
                   >
                     <span className="font-heading text-2xl font-bold text-foreground block mb-1 group-hover:text-dona transition-colors">
                       {tier.amount}
@@ -92,7 +148,7 @@ export default function Dona() {
                     <span className="font-body text-xs text-muted-foreground leading-snug block">
                       {tier.desc}
                     </span>
-                  </motion.button>
+                  </motion.div>
                 ))}
               </div>
 
@@ -115,41 +171,6 @@ export default function Dona() {
                   </Link>
                 </Button>
               </div>
-            </div>
-          </AnimatedSection>
-
-          {/* Progress bar */}
-          <AnimatedSection delay={0.2}>
-            <div className="mt-12 bg-primary rounded-xl p-8">
-              <div className="flex justify-between text-sm font-body mb-3">
-                <span className="text-primary-foreground/70">Raccolta fondi</span>
-                <span className="text-accent font-bold">€ 2.500 / € 50.000</span>
-              </div>
-              <div className="w-full h-4 bg-primary-foreground/10 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{
-                    background: "linear-gradient(90deg, hsl(340 82% 52%), hsl(29 87% 67%))",
-                  }}
-                  initial={{ width: 0 }}
-                  whileInView={{ width: "5%" }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1.5, delay: 0.3, ease: "easeOut" }}
-                />
-              </div>
-              <p className="text-center text-primary-foreground/50 text-xs font-body mt-3">
-                Ogni euro fa la differenza. Obiettivo: € 50.000 per la ricerca.
-              </p>
-            </div>
-          </AnimatedSection>
-
-          {/* Social proof */}
-          <AnimatedSection delay={0.3}>
-            <div className="mt-8 text-center">
-              <p className="font-body text-sm text-muted-foreground">
-                <span className="text-dona font-bold">42 persone</span> hanno già donato.
-                Unisciti a loro.
-              </p>
             </div>
           </AnimatedSection>
         </div>
