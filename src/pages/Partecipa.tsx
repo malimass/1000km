@@ -182,6 +182,22 @@ export default function Partecipa() {
       email:    data.email,
       password: data.password,
     });
+
+    // Supabase segnala email già registrata in due modi:
+    // a) authErr con messaggio "User already registered"
+    // b) utente restituito ma con identities vuoto (quando email confirmation è attiva)
+    const alreadyRegistered =
+      authErr?.message?.toLowerCase().includes("already registered") ||
+      (authData?.user && (authData.user.identities?.length ?? 0) === 0);
+
+    if (alreadyRegistered) {
+      setLoading(false);
+      setError("Questa email è già registrata. Usa il tab «Accedi» per entrare.");
+      setTab("login");
+      loginForm.setValue("email", data.email);
+      return;
+    }
+
     if (authErr || !authData.user) {
       setLoading(false);
       setError(authErr?.message ?? "Errore durante la registrazione.");
