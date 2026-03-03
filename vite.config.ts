@@ -64,8 +64,21 @@ export default defineConfig(({ mode }) => ({
     exclude: ["@capacitor-community/background-geolocation"],
   },
   build: {
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       external: ["@capacitor-community/background-geolocation"],
+      output: {
+        manualChunks: {
+          // Librerie UI React core
+          "vendor-react": ["react", "react-dom", "react-router-dom"],
+          // Grafici (recharts è la voce più pesante del Coach)
+          "vendor-charts": ["recharts"],
+          // Mappe (leaflet + react-leaflet)
+          "vendor-maps": ["leaflet", "react-leaflet"],
+          // Supabase
+          "vendor-supabase": ["@supabase/supabase-js"],
+        },
+      },
     },
   },
   resolve: {
