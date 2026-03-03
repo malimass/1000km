@@ -917,7 +917,7 @@ export default function Coach() {
           </div>
         )}
 
-        }
+        </>}
 
       </main>
     </div>
