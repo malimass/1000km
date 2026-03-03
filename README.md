@@ -1,73 +1,56 @@
-# Welcome to your Lovable project
+# 1000 KM di Gratitudine
 
-## Project info
+Sito ufficiale della raccolta fondi e cammino solidale **1000kmdigratitudine** — da Bologna alla Calabria, 18 Aprile – 1 Maggio 2026.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Stack tecnologico
 
-## How can I edit this code?
+- **Vite** + **TypeScript** + **React**
+- **Tailwind CSS** + **shadcn/ui**
+- **Framer Motion** (animazioni e parallax)
+- **React Router DOM** (routing SPA)
+- **Lucide React** (icone)
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Sviluppo locale
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
 git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+cd gratitude-path
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Struttura pagine
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+| Route | Descrizione |
+|---|---|
+| `/` | Home page |
+| `/il-percorso` | Mappa e dettagli del percorso |
+| `/madonna-di-san-luca` | Santuario di partenza — Bologna |
+| `/ss-crocifisso-nero` | Santuario di arrivo — Terranova Sappo Minulio |
+| `/notizie` | Blog / aggiornamenti |
+| `/servizi` | Servizi per i partecipanti |
+| `/sostenitori` | Aziende e privati sostenitori |
+| `/contatti` | Modulo contatti |
+| `/dona` | Pagina donazione |
+| `/partecipa` | Registrazione community |
+| `/atleta/accedi` | Login / registrazione atleta |
+| `/coach-login` | Login coach |
+| `/admin-login` | Pannello amministratore |
 
-**Use GitHub Codespaces**
+## Changelog
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### 2026-03-03
+- **Login dropdown in navbar** — il bottone Login in header è ora un menu a tendina con tre voci:
+  - *Area Atleta* → `/atleta/accedi`
+  - *Area Coach* → `/coach-login`
+  - *Admin* → `/admin-login`
+  - Desktop: hover dropdown con icone e descrizioni
+  - Mobile: accordion con animazione
+- File modificato: `src/components/Layout.tsx`
 
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### Precedente
+- Implementazione pagina Home con hero parallax, countdown, sezione "Perché", numeri KPI, santuari, "Come aiutare" e CTA finale
+- Navbar sticky con dropdown "I Santuari", link "Partecipa" evidenziato e bottone DONA ORA
+- Footer con link utili e copyright
+- Mobile: sticky bar DONA ORA in basso
+- Componenti: `AnimatedSection`, `CountUp`, `Countdown`, `Layout`
