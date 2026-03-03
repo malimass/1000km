@@ -1,6 +1,6 @@
 # Funzionalità — 1000km di Gratitudine
 
-> Documento aggiornabile progressivamente. Ultima modifica: 2026-02-26 (v4)
+> Documento aggiornabile progressivamente. Ultima modifica: 2026-03-03 (v5)
 
 ---
 
@@ -28,6 +28,8 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 | `/sostenitori` | `Sostenitori` | Lista sostenitori (modificabile da admin) |
 | `/sponsor` | `Sponsor` | Pacchetti sponsorizzazione |
 | `/contatti` | `Contatti` | Form di contatto |
+| `/atleta/accedi` | `AtletaLogin` | Login / registrazione atleta |
+| `/coach-login` | `CoachLogin` | Login coach |
 | `/admin-login` | `AdminLogin` | Login admin via PIN |
 | `/admin-live` | `AdminLive` | Dashboard admin completa (rotta protetta da `ProtectedAdminRoute`) |
 | `*` | `NotFound` | Pagina 404 |
@@ -98,6 +100,7 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 - Dati profilo: nome visualizzato, tipo attività, città
 - Creazione record `profiles` al signup con `upsertProfile()`
 - Redirect a `/il-mio-percorso` dopo login
+- Messaggio di errore dedicato se email già registrata (guida l'utente al login)
 
 > **Nota Supabase**: disabilitare "Enable email confirmations" in Auth Settings per permettere login immediato senza verifica email.
 
@@ -226,7 +229,35 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 
 ---
 
-### 11. App Nativa iOS / Android (Capacitor)
+### 11. Sistema Atleta / Coach
+
+#### Area Atleta (`/atleta/accedi`)
+- Login e registrazione con email + password (via Supabase Auth)
+- Profilo atleta: dati personali, storico sessioni, rischio infortuni
+- Valutazione per sessione (wellness check-in)
+- Sincronizzazione profilo cross-device tramite Supabase `athlete_profiles`
+
+#### Area Coach (`/coach-login`)
+- Login dedicato per coach
+- Dashboard analisi allenamenti con import file **FIT / TCX**
+- Visualizzazione dati sessioni: km, dislivello, frequenza cardiaca
+- Ring SVG per metriche chiave + KPI cards
+- Sezione valutazione atleti in carico
+- Persistenza sessioni su Supabase (sync cross-device)
+- Gestione profilo coach con upsert su Supabase
+
+#### Login dropdown in navbar
+- Il bottone **Login** in header è ora un menu a tendina con tre voci:
+  - *Area Atleta* → `/atleta/accedi`
+  - *Area Coach* → `/coach-login`
+  - *Admin* → `/admin-login`
+- **Desktop**: hover dropdown con icona + descrizione per ogni voce
+- **Mobile**: accordion animato (framer-motion) che si apre/chiude
+- File: `src/components/Layout.tsx`
+
+---
+
+### 12. App Nativa iOS / Android (Capacitor)
 
 - **App ID**: `it.gratitudepath.app`
 - Build per **iOS** (App Store) e **Android** (Play Store)
@@ -368,3 +399,4 @@ npm run cap:android   # Build + apri Android Studio (per firma e pubblicazione P
 | 2026-02-25 | v2 | Aggiunta sezione 5 (ShareCard), aggiornata sezione 11 (App Nativa con flusso e componenti), aggiunti comandi Capacitor |
 | 2026-02-25 | v3 | Testi condivisione social configurabili da admin. Tabella `site_settings` + fix RLS `sostenitori_page`. Documentata strategia persistenza dati e policy RLS per ogni tabella |
 | 2026-02-26 | v4 | Revisione completa da audit codebase: corretto ActivityType (solo 3 valori: corri/cammino/altro, rimossi pedalo/nuoto non esistenti); completata tabella tappe con tutti i 14 valori reali; aggiunto Geoapify alle integrazioni; aggiunti nomi runner (Massimo/Nunzio) e colori marker; documentata tabella Realtime subscriptions; aggiornata sezione Community con fix marker stale (COMMUNITY_STALE_MS 10 min, cleanup periodico, guard rendering) |
+| 2026-03-03 | v5 | Aggiunto sistema multi-utente: Area Atleta (`/atleta/accedi`) con profilo e sessioni, Area Coach (`/coach-login`) con analisi FIT/TCX, KPI cards e ring SVG. Login dropdown unificato in navbar (desktop hover + mobile accordion) con 3 voci: Atleta / Coach / Admin. Aggiornate route in tabella pagine. Migliorato messaggio errore email già registrata nei form di registrazione. |
