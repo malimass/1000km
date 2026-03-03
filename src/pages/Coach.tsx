@@ -21,7 +21,7 @@ import {
 import {
   Upload, Trash2, LogOut, Activity, TrendingUp, Heart,
   Mountain, Timer, Flame, Footprints, ChevronDown, ChevronUp, RefreshCw,
-  Zap, User, ShieldAlert, Star, X,
+  Zap, User, ShieldAlert, Star, X, Users,
 } from "lucide-react";
 import { parseActivityFile, TrainingSession } from "@/lib/trainingParser";
 import {
@@ -32,6 +32,8 @@ import {
   loadProfile, saveProfile, calculateInjuryRisk, evaluateSession,
   SessionAnalysis, WeeklyStats, CoachProfile,
 } from "@/lib/coachAnalysis";
+import { getCurrentUser, loadCoachAthletes, CoachAthlete } from "@/lib/auth";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 // ─── COSTANTI COLORI ─────────────────────────────────────────────────────────
 
@@ -156,6 +158,19 @@ export default function Coach() {
     return p ? maxHRFromAge(p.age) : defaultMaxHR(35);
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "atleti">("dashboard");
+  const [athletes, setAthletes] = useState<CoachAthlete[]>([]);
+  const [coachUserId, setCoachUserId] = useState<string | null>(null);
+
+  // Carica atleti se coach Supabase
+  useEffect(() => {
+    getCurrentUser().then(u => {
+      if (u?.role === "coach") {
+        setCoachUserId(u.id);
+        loadCoachAthletes(u.id).then(setAthletes);
+      }
+    });
+  }, []);
 
   // Sessioni (metadati persistiti su Supabase + localStorage; trackPoints solo in memoria)
   const [sessions, setSessions] = useState<TrainingSession[]>(() =>
@@ -283,6 +298,20 @@ export default function Coach() {
             <span className="text-primary-foreground/50 text-xs font-body ml-1">Gratitude Path</span>
           </div>
           <div className="flex items-center gap-2">
+            {/* Tab atleti (solo coach Supabase) */}
+            {coachUserId && (
+              <div className="flex bg-primary-foreground/10 rounded-lg p-0.5">
+                <button onClick={() => setActiveTab("dashboard")}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${activeTab === "dashboard" ? "bg-primary-foreground text-primary" : "text-primary-foreground/70 hover:text-primary-foreground"}`}>
+                  Dashboard
+                </button>
+                <button onClick={() => setActiveTab("atleti")}
+                  className={`flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-md transition-colors ${activeTab === "atleti" ? "bg-primary-foreground text-primary" : "text-primary-foreground/70 hover:text-primary-foreground"}`}>
+                  <Users className="w-3 h-3" />
+                  Atleti {athletes.length > 0 && `(${athletes.length})`}
+                </button>
+              </div>
+            )}
             <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-1.5 text-xs text-primary-foreground/70 hover:text-primary-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-primary-foreground/10" title="Profilo atleta">
               <User className="w-4 h-4" />
               {profile ? `${profile.age}a · ${profile.weightKg}kg` : "Profilo"}
@@ -321,6 +350,64 @@ export default function Coach() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
+
+        {/* ── VISTA ATLETI (solo tab atleti) ─────────── */}
+        {activeTab === "atleti" && (
+          <section>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+              I tuoi atleti ({athletes.length})
+            </h2>
+            {athletes.length === 0 ? (
+              <div className="text-center py-16 text-muted-foreground">
+                <Users className="w-12 h-12 mx-auto mb-4 opacity-30" />
+                <p className="font-semibold">Nessun atleta assegnato</p>
+                <p className="text-sm mt-1">Gli atleti ti vedranno nella lista quando si registrano e scelgono il loro coach</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {athletes.map(a => {
+                  const bmi = a.profile.weightKg && a.profile.heightCm
+                    ? (a.profile.weightKg / Math.pow(a.profile.heightCm / 100, 2)).toFixed(1)
+                    : null;
+                  const maxHRAtleta = a.profile.maxHR ?? (a.profile.age ? maxHRFromAge(a.profile.age) : 185);
+                  return (
+                    <div key={a.id} className="bg-card border border-border rounded-xl p-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <p className="font-bold text-foreground">{a.displayName}</p>
+                          <p className="text-xs text-muted-foreground">{a.email}</p>
+                        </div>
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="w-5 h-5 text-primary" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        {[
+                          { label: "Età", value: a.profile.age ? `${a.profile.age}a` : "—" },
+                          { label: "Peso", value: a.profile.weightKg ? `${a.profile.weightKg} kg` : "—" },
+                          { label: "BMI", value: bmi ?? "—" },
+                          { label: "Altezza", value: a.profile.heightCm ? `${a.profile.heightCm} cm` : "—" },
+                          { label: "FC riposo", value: a.profile.restHR ? `${a.profile.restHR} bpm` : "—" },
+                          { label: "FC max", value: `${maxHRAtleta} bpm` },
+                          { label: "Esperienza", value: a.profile.experienceYears ? `${a.profile.experienceYears}a` : "—" },
+                          { label: "Sesso", value: a.profile.gender ?? "—" },
+                        ].map(m => (
+                          <div key={m.label} className="bg-muted rounded-lg px-2 py-1.5">
+                            <span className="text-[10px] text-muted-foreground block">{m.label}</span>
+                            <span className="text-xs font-bold">{m.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Tutto il resto solo in tab dashboard */}
+        {activeTab !== "atleti" && <>
 
         {/* ── VALUTAZIONE ─────────────────────────── */}
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -829,6 +916,8 @@ export default function Coach() {
             <p className="text-sm mt-1">Carica un file .fit o .tcx per iniziare l'analisi</p>
           </div>
         )}
+
+        }
 
       </main>
     </div>

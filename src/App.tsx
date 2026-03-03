@@ -26,7 +26,10 @@ const IscrizioneSuccesso = lazy(() => import("./pages/IscrizioneSuccesso"));
 const Partecipa = lazy(() => import("./pages/Partecipa"));
 const IlMioPercorso = lazy(() => import("./pages/IlMioPercorso"));
 const CoachLogin = lazy(() => import("./pages/CoachLogin"));
+const CoachRegister = lazy(() => import("./pages/CoachRegister"));
 const Coach = lazy(() => import("./pages/Coach"));
+const AtletaAuth = lazy(() => import("./pages/AtletaAuth"));
+const AtletaDashboard = lazy(() => import("./pages/AtletaDashboard"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -56,6 +59,9 @@ const App = () => (
           <Route path="/il-mio-percorso" element={<IlMioPercorso />} />
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/coach-login" element={<CoachLogin />} />
+          <Route path="/coach/registrati" element={<CoachRegister />} />
+          <Route path="/atleta/accedi" element={<AtletaAuth />} />
+          <Route path="/atleta" element={<AtletaDashboard />} />
           <Route path="/coach" element={
             <ProtectedCoachRoute>
               <Coach />
