@@ -12,7 +12,7 @@
  *  8. Readiness score pellegrinaggio
  */
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -26,7 +26,7 @@ import { parseActivityFile, TrainingSession } from "@/lib/trainingParser";
 import {
   analyzeSession, generateRecommendations, calculateFitnessMetrics,
   buildFitnessHistory, buildWeeklyStats, calculateReadiness, buildPaceProfile,
-  calculateHRZones, saveSessions, loadSessions, deleteSession,
+  calculateHRZones, saveSessions, loadSessionsLocal, loadSessionsAsync, deleteSession,
   defaultMaxHR, SessionAnalysis, WeeklyStats,
 } from "@/lib/coachAnalysis";
 
@@ -73,11 +73,17 @@ export default function Coach() {
   });
   const [showSettings, setShowSettings] = useState(false);
 
-  // Sessioni (solo metadati persistiti; trackPoints in memoria per sessione corrente)
-  const [sessions, setSessions] = useState<TrainingSession[]>(() => {
-    const stored = loadSessions();
-    return stored.map(s => ({ ...s, trackPoints: [] })) as TrainingSession[];
-  });
+  // Sessioni (metadati persistiti su Supabase + localStorage; trackPoints solo in memoria)
+  const [sessions, setSessions] = useState<TrainingSession[]>(() =>
+    loadSessionsLocal().map(s => ({ ...s, trackPoints: [] })) as TrainingSession[]
+  );
+
+  // Carica da Supabase al mount (sovrascrive localStorage se ci sono dati più recenti)
+  useEffect(() => {
+    loadSessionsAsync().then(loaded => {
+      setSessions(loaded.map(s => ({ ...s, trackPoints: [] })) as TrainingSession[]);
+    });
+  }, []);
 
   // Sessioni con trackpoint (solo quella corrente/analizzata)
   const [richSessions, setRichSessions] = useState<Map<string, TrainingSession>>(new Map());
