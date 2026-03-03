@@ -23,7 +23,12 @@ export default function CoachRegister() {
     setLoading(true);
     setError(null);
     const { error: err } = await signUpUser(form.email, form.password, form.name, "coach");
-    if (err) { setError(err); setLoading(false); return; }
+    if (err) {
+      const msg = err.toLowerCase().includes("already registered")
+        ? "Email già registrata. Vai al login coach per accedere."
+        : err;
+      setError(msg); setLoading(false); return;
+    }
     setDone(true);
     setLoading(false);
   }

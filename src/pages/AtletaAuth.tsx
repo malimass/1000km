@@ -27,7 +27,12 @@ export default function AtletaAuth() {
 
     if (mode === "register") {
       const { error: err } = await signUpUser(form.email, form.password, form.name, "athlete");
-      if (err) { setError(err); setLoading(false); return; }
+      if (err) {
+        const msg = err.toLowerCase().includes("already registered")
+          ? "Email già registrata. Usa il tab \"Accedi\" per effettuare il login."
+          : err;
+        setError(msg); setLoading(false); return;
+      }
       setInfo("Controlla la tua email per confermare l'account, poi accedi.");
       setMode("login");
     } else {
