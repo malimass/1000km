@@ -1,20 +1,43 @@
+/**
+ * CoachLogin.tsx — Accesso coach
+ *
+ * Supporta due metodi:
+ *  1. Email + password (Supabase Auth) — per coach registrati
+ *  2. PIN (backward compat) — per il coach admin configurato via env
+ */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { signInUser } from "@/lib/auth";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 const COACH_PIN = import.meta.env.VITE_COACH_PIN || "coach2026";
 
 export default function CoachLogin() {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<"email" | "pin">(isSupabaseConfigured ? "email" : "pin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [pin, setPin] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (pin !== COACH_PIN) {
-      setError("PIN non valido. Riprova.");
-      return;
-    }
+    setLoading(true);
+    setError(null);
+    const { user, error: err } = await signInUser(email, password);
+    if (err || !user) { setError(err ?? "Credenziali non valide"); setLoading(false); return; }
+    if (user.role !== "coach") { setError("Questo account non è un coach. Vai all'area atleti."); setLoading(false); return; }
+    localStorage.setItem("gp_coach_auth", "1");
+    navigate("/coach", { replace: true });
+    setLoading(false);
+  }
+
+  function handlePinLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (pin !== COACH_PIN) { setError("PIN non valido. Riprova."); return; }
     localStorage.setItem("gp_coach_auth", "1");
     navigate("/coach", { replace: true });
   }
@@ -30,34 +53,68 @@ export default function CoachLogin() {
           <p className="text-muted-foreground text-sm mt-1 font-body">Gratitude Path – Analisi Allenamenti</p>
         </div>
 
-        <form onSubmit={handleLogin} className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">PIN accesso</label>
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              value={pin}
-              onChange={e => setPin(e.target.value)}
-              placeholder="••••••••"
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 bg-background text-foreground"
-            />
+        {isSupabaseConfigured && (
+          <div className="flex bg-muted rounded-xl p-1 mb-5">
+            {(["email", "pin"] as const).map(m => (
+              <button key={m} onClick={() => { setMode(m); setError(null); }}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${mode === m ? "bg-card shadow text-foreground" : "text-muted-foreground"}`}>
+                {m === "email" ? "Email / Password" : "PIN (admin)"}
+              </button>
+            ))}
           </div>
+        )}
 
-          {error && <p className="text-xs text-red-500 font-semibold">{error}</p>}
+        {mode === "email" ? (
+          <form onSubmit={handleEmailLogin} className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
+            <label className="block">
+              <span className="text-xs font-semibold block mb-1">Email</span>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="coach@esempio.it"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-green-500/40" />
+              </div>
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold block mb-1">Password</span>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input type={showPwd ? "text" : "password"} required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••"
+                  className="w-full pl-9 pr-10 py-2.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-green-500/40" />
+                <button type="button" onClick={() => setShowPwd(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </label>
+            {error && <p className="text-xs text-red-500 font-semibold bg-red-50 dark:bg-red-950/20 rounded-lg px-3 py-2">{error}</p>}
+            <button type="submit" disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-green-600 text-white rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50">
+              <Dumbbell className="w-4 h-4" />
+              {loading ? "Accesso…" : "Accedi"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handlePinLogin} className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-foreground mb-1">PIN accesso</label>
+              <input type="password" required autoComplete="current-password" value={pin} onChange={e => setPin(e.target.value)} placeholder="••••••••"
+                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 bg-background text-foreground" />
+            </div>
+            {error && <p className="text-xs text-red-500 font-semibold">{error}</p>}
+            <button type="submit"
+              className="w-full flex items-center justify-center gap-2 bg-green-600 text-white rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity">
+              <Dumbbell className="w-4 h-4" />
+              Accedi con PIN
+            </button>
+          </form>
+        )}
 
-          <button
-            type="submit"
-            className="w-full flex items-center justify-center gap-2 bg-green-600 text-white rounded-lg py-2.5 text-sm font-semibold transition-opacity hover:opacity-90"
-          >
-            <Dumbbell className="w-4 h-4" />
-            Accedi all'area coach
-          </button>
-        </form>
-
-        <p className="text-center text-xs text-muted-foreground mt-4 font-body">
-          Imposta <code className="bg-muted px-1 rounded">VITE_COACH_PIN</code> nel file <code className="bg-muted px-1 rounded">.env.local</code>
-        </p>
+        <div className="text-center text-xs text-muted-foreground mt-4 space-y-1">
+          {isSupabaseConfigured && (
+            <p>Nuovo coach? <a href="/coach/registrati" className="text-green-600 font-semibold hover:underline">Registrati</a></p>
+          )}
+          <p>Sei un atleta? <a href="/atleta/accedi" className="text-primary font-semibold hover:underline">Area atleti</a></p>
+        </div>
       </div>
     </div>
   );
