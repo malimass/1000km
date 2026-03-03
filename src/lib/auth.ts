@@ -27,22 +27,15 @@ export async function signUpUser(
 ): Promise<{ user: AuthUser | null; error: string | null }> {
   if (!isSupabaseConfigured || !supabase) return { user: null, error: "Supabase non configurato" };
 
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error || !data.user) return { user: null, error: error?.message ?? "Errore registrazione" };
-
-  // Crea profilo
-  const { error: profileErr } = await supabase.from("profiles").insert({
-    id: data.user.id,
-    role,
-    display_name: displayName,
+  // Passa role e displayName come metadata: il trigger DB handle_new_user()
+  // li usa per creare il profilo con SECURITY DEFINER (bypassa RLS).
+  // Questo funziona anche con email-confirmation abilitata (nessuna sessione attiva).
+  const { data, error } = await supabase.auth.signUp({
     email,
+    password,
+    options: { data: { display_name: displayName, role } },
   });
-  if (profileErr) return { user: null, error: profileErr.message };
-
-  // Se atleta, crea riga athlete_profiles vuota
-  if (role === "athlete") {
-    await supabase.from("athlete_profiles").insert({ id: data.user.id });
-  }
+  if (error || !data.user) return { user: null, error: error?.message ?? "Errore registrazione" };
 
   return { user: { id: data.user.id, email, displayName, role }, error: null };
 }
