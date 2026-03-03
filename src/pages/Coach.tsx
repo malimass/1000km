@@ -21,6 +21,7 @@ import {
 import {
   Upload, Trash2, LogOut, Activity, TrendingUp, Heart,
   Mountain, Timer, Flame, Footprints, ChevronDown, ChevronUp, RefreshCw,
+  Zap,
 } from "lucide-react";
 import { parseActivityFile, TrainingSession } from "@/lib/trainingParser";
 import {
@@ -228,51 +229,139 @@ export default function Coach() {
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-8">
 
-        {/* ── READINESS SCORE ──────────────────────── */}
-        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {/* Readiness principale */}
-          <div className="col-span-2 sm:col-span-3 lg:col-span-2 bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center text-center">
-            <p className="text-xs text-muted-foreground font-semibold mb-1 uppercase tracking-wide">Idoneità Pellegrinaggio</p>
+        {/* ── VALUTAZIONE ─────────────────────────── */}
+        <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+          {/* — Readiness card — */}
+          <div
+            className="lg:col-span-2 relative overflow-hidden rounded-2xl p-5"
+            style={{
+              background: `linear-gradient(135deg, ${readiness.color}18, ${readiness.color}06)`,
+              border: `1px solid ${readiness.color}30`,
+            }}
+          >
+            {/* Cerchio decorativo sfondo */}
             <div
-              className="text-5xl font-bold font-heading mb-1"
-              style={{ color: readiness.color }}
-            >
-              {readiness.score}%
+              className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-10 pointer-events-none"
+              style={{ background: readiness.color }}
+            />
+
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-4">
+              Idoneità Pellegrinaggio
+            </p>
+
+            {/* Score ring + label */}
+            <div className="flex items-center gap-5 mb-5">
+              <div className="relative w-20 h-20 flex-shrink-0">
+                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                  <circle cx="50" cy="50" r="42" fill="none" strokeWidth="9"
+                    stroke={readiness.color} strokeOpacity="0.15" />
+                  <circle cx="50" cy="50" r="42" fill="none" strokeWidth="9"
+                    stroke={readiness.color} strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 42 * readiness.score / 100} ${2 * Math.PI * 42}`} />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-xl font-bold font-heading leading-none" style={{ color: readiness.color }}>
+                    {readiness.score}
+                  </span>
+                  <span className="text-[9px] text-muted-foreground">/ 100</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-4xl font-bold font-heading leading-none" style={{ color: readiness.color }}>
+                  {readiness.score}%
+                </p>
+                <p className="text-sm font-semibold mt-1.5" style={{ color: readiness.color }}>
+                  {readiness.label}
+                </p>
+              </div>
             </div>
-            <p className="text-sm font-body" style={{ color: readiness.color }}>{readiness.label}</p>
-            <div className="w-full mt-3 space-y-1.5">
+
+            {/* Breakdown bars */}
+            <div className="space-y-2">
               {(Object.entries(readiness.breakdown) as [string, number][]).map(([k, v]) => (
-                <div key={k} className="flex items-center gap-2 text-xs">
-                  <span className="w-20 text-right text-muted-foreground capitalize">{k}</span>
-                  <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${v}%`, backgroundColor: readiness.color }} />
+                <div key={k} className="flex items-center gap-2">
+                  <span className="w-16 text-right text-[11px] text-muted-foreground capitalize truncate">{k}</span>
+                  <div className="flex-1 rounded-full h-1.5 overflow-hidden" style={{ background: `${readiness.color}20` }}>
+                    <div className="h-full rounded-full" style={{ width: `${v}%`, background: readiness.color }} />
                   </div>
-                  <span className="w-8 text-muted-foreground">{v}%</span>
+                  <span className="w-7 text-[11px] font-bold tabular-nums" style={{ color: readiness.color }}>{v}%</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Metriche KPI */}
-          {[
-            { label: "Forma (CTL)", value: fitness.ctl, icon: <TrendingUp className="w-4 h-4" />, color: "#22c55e", unit: "" },
-            { label: "Fatica (ATL)", value: fitness.atl, icon: <Flame className="w-4 h-4" />, color: "#f97316", unit: "" },
-            { label: "Stato di forma", value: fitness.tsb > 0 ? `+${fitness.tsb}` : String(fitness.tsb), icon: <Activity className="w-4 h-4" />, color: fitness.tsb >= 0 ? "#22c55e" : "#ef4444", unit: "" },
-            { label: "Sessioni totali", value: sessions.length, icon: <Footprints className="w-4 h-4" />, color: "#818cf8", unit: "" },
-          ].map(kpi => (
-            <div key={kpi.label} className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between">
-              <div className="flex items-center gap-1.5 text-muted-foreground mb-2" style={{ color: kpi.color }}>
-                {kpi.icon}
-                <span className="text-xs font-semibold">{kpi.label}</span>
+          {/* — KPI grid 3×2 — */}
+          {(() => {
+            const totalKm = sessions.reduce((acc, s) => acc + s.distanceM / 1000, 0);
+            const totalDeniv = sessions.reduce((acc, s) => acc + s.totalElevationGainM, 0);
+            const kpis = [
+              {
+                label: "Forma", sub: "CTL",
+                value: String(fitness.ctl),
+                icon: <TrendingUp className="w-4 h-4" />,
+                color: "#22c55e",
+                note: fitness.ctl > 50 ? "Buona base" : fitness.ctl > 25 ? "In costruzione" : "Da sviluppare",
+              },
+              {
+                label: "Fatica", sub: "ATL 7gg",
+                value: String(fitness.atl),
+                icon: <Flame className="w-4 h-4" />,
+                color: "#f97316",
+                note: fitness.atl > fitness.ctl ? "Alta" : "Sotto controllo",
+              },
+              {
+                label: "Stato forma", sub: "TSB",
+                value: fitness.tsb > 0 ? `+${fitness.tsb}` : String(fitness.tsb),
+                icon: <Zap className="w-4 h-4" />,
+                color: fitness.tsb >= 5 ? "#22c55e" : fitness.tsb <= -10 ? "#ef4444" : "#f59e0b",
+                note: fitness.tsb > 5 ? "Riposato" : fitness.tsb < -10 ? "Stanco" : "Bilanciato",
+              },
+              {
+                label: "Sessioni", sub: "totali",
+                value: String(sessions.length),
+                icon: <Activity className="w-4 h-4" />,
+                color: "#818cf8",
+                note: sessions.length > 0 ? `ultima: ${fmtDate(sessions[0].startTime)}` : "Nessuna",
+              },
+              {
+                label: "Km totali", sub: "percorsi",
+                value: totalKm.toFixed(0),
+                icon: <Footprints className="w-4 h-4" />,
+                color: "#06b6d4",
+                note: `media ${sessions.length ? (totalKm / sessions.length).toFixed(1) : "0"} km/sessione`,
+              },
+              {
+                label: "Dislivello", sub: "totale",
+                value: totalDeniv > 999 ? `${(totalDeniv / 1000).toFixed(1)}k` : String(Math.round(totalDeniv)),
+                icon: <Mountain className="w-4 h-4" />,
+                color: "#a78bfa",
+                note: `${Math.round(totalDeniv)} m +`,
+              },
+            ];
+            return (
+              <div className="lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {kpis.map(kpi => (
+                  <div
+                    key={kpi.label}
+                    className="bg-card border border-border rounded-xl p-4 flex flex-col justify-between overflow-hidden relative"
+                  >
+                    {/* Bordo colorato superiore */}
+                    <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-xl" style={{ background: kpi.color }} />
+                    <div className="flex items-center gap-1.5 mb-3 mt-1" style={{ color: kpi.color }}>
+                      {kpi.icon}
+                      <span className="text-xs font-bold">{kpi.label}</span>
+                      <span className="text-[10px] text-muted-foreground ml-0.5">· {kpi.sub}</span>
+                    </div>
+                    <div className="text-3xl font-bold font-heading leading-none tabular-nums" style={{ color: kpi.color }}>
+                      {kpi.value}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-2 truncate">{kpi.note}</p>
+                  </div>
+                ))}
               </div>
-              <div className="text-3xl font-bold font-heading" style={{ color: kpi.color }}>{kpi.value}{kpi.unit}</div>
-              {kpi.label === "Stato di forma" && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {fitness.tsb > 5 ? "Riposato" : fitness.tsb < -10 ? "Stanco" : "Bilanciato"}
-                </p>
-              )}
-            </div>
-          ))}
+            );
+          })()}
         </section>
 
         {/* ── UPLOAD AREA ──────────────────────────── */}
