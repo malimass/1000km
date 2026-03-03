@@ -91,6 +91,206 @@ export interface WeeklyStats {
   avgTrimp: number;
 }
 
+// ─── PROFILO ATLETA ──────────────────────────────────────────────────────────
+
+export interface CoachProfile {
+  age: number;              // anni
+  weightKg: number;         // kg
+  heightCm: number;         // cm
+  gender: "M" | "F";
+  restHR: number;           // FC a riposo bpm
+  experienceYears: number;  // anni di allenamento continuativo
+}
+
+export function saveProfile(p: CoachProfile): void {
+  localStorage.setItem("gp_coach_profile", JSON.stringify(p));
+}
+
+export function loadProfile(): CoachProfile | null {
+  try {
+    const raw = localStorage.getItem("gp_coach_profile");
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+export function calcBMI(p: CoachProfile): number {
+  const h = p.heightCm / 100;
+  return Math.round((p.weightKg / (h * h)) * 10) / 10;
+}
+
+/** Formula Tanaka: più accurata di 220-età sopra i 40 anni */
+export function maxHRFromAge(age: number): number {
+  return Math.round(208 - 0.7 * age);
+}
+
+// ─── RISCHIO INFORTUNI ────────────────────────────────────────────────────────
+
+export interface InjuryFactor {
+  label: string;
+  detail: string;
+  risk: "ok" | "warn" | "danger";
+}
+
+export interface InjuryRisk {
+  score: number;    // 0–100, più alto = più a rischio
+  level: "Basso" | "Moderato" | "Elevato" | "Alto";
+  color: string;
+  factors: InjuryFactor[];
+}
+
+export function calculateInjuryRisk(
+  sessions: TrainingSession[],
+  weekly: WeeklyStats[],
+  fitness: FitnessMetrics,
+  profile: CoachProfile | null
+): InjuryRisk {
+  const factors: InjuryFactor[] = [];
+  let pts = 0;
+
+  // 1. BMI
+  if (profile) {
+    const b = calcBMI(profile);
+    if (b >= 30) {
+      pts += 20;
+      factors.push({ label: "BMI elevato", detail: `BMI ${b} — sovrappeso aumenta il carico articolare`, risk: "danger" });
+    } else if (b >= 27) {
+      pts += 10;
+      factors.push({ label: "BMI borderline", detail: `BMI ${b} — leggero sovrappeso`, risk: "warn" });
+    } else if (b < 18.5) {
+      pts += 10;
+      factors.push({ label: "BMI basso", detail: `BMI ${b} — possibili carenze nutrizionali`, risk: "warn" });
+    } else {
+      factors.push({ label: "BMI ottimale", detail: `BMI ${b}`, risk: "ok" });
+    }
+
+    // 2. Età
+    if (profile.age >= 60) {
+      pts += 20;
+      factors.push({ label: "Età ≥ 60", detail: "Recupero più lento — progredire molto gradualmente", risk: "danger" });
+    } else if (profile.age >= 50) {
+      pts += 10;
+      factors.push({ label: "Età ≥ 50", detail: "Attenzione al recupero tra sessioni intense", risk: "warn" });
+    } else {
+      factors.push({ label: "Fascia d'età OK", detail: `${profile.age} anni — buona capacità adattiva`, risk: "ok" });
+    }
+
+    // 3. Esperienza
+    if (profile.experienceYears < 1) {
+      pts += 25;
+      factors.push({ label: "Principiante", detail: "< 1 anno di allenamento — aumenta il carico molto lentamente", risk: "danger" });
+    } else if (profile.experienceYears < 3) {
+      pts += 10;
+      factors.push({ label: "Esperienza limitata", detail: `${profile.experienceYears} anni — costruisci la base con pazienza`, risk: "warn" });
+    } else {
+      factors.push({ label: "Esperienza adeguata", detail: `${profile.experienceYears} anni di allenamento`, risk: "ok" });
+    }
+  }
+
+  // 4. Monotonia (ATL/CTL ratio)
+  if (sessions.length > 3 && fitness.ctl > 0) {
+    const ratio = fitness.atl / fitness.ctl;
+    if (ratio > 1.5) {
+      pts += 20;
+      factors.push({ label: "Carico acuto molto alto", detail: `ATL/CTL = ${ratio.toFixed(2)} — rischio overreaching`, risk: "danger" });
+    } else if (ratio > 1.2) {
+      pts += 10;
+      factors.push({ label: "Carico in aumento", detail: `ATL/CTL = ${ratio.toFixed(2)} — monitorare la fatica`, risk: "warn" });
+    } else {
+      factors.push({ label: "Carico bilanciato", detail: `ATL/CTL = ${ratio.toFixed(2)}`, risk: "ok" });
+    }
+  }
+
+  // 5. Aumento volume settimanale
+  if (weekly.length >= 2) {
+    const last = weekly[weekly.length - 1];
+    const prev = weekly[weekly.length - 2];
+    if (prev.totalKm > 0) {
+      const inc = (last.totalKm - prev.totalKm) / prev.totalKm;
+      if (inc > 0.2) {
+        pts += 15;
+        factors.push({ label: "Volume +20% in 1 sett.", detail: `${prev.totalKm.toFixed(0)} → ${last.totalKm.toFixed(0)} km — troppo rapido`, risk: "danger" });
+      } else if (inc > 0.1) {
+        pts += 5;
+        factors.push({ label: "Volume +10%", detail: "Nella norma, ma monitorare la risposta", risk: "warn" });
+      } else if (inc >= 0) {
+        factors.push({ label: "Volume stabile", detail: "Aumento graduale", risk: "ok" });
+      }
+    }
+  }
+
+  // 6. Fatica cronica (TSB)
+  if (sessions.length > 0) {
+    if (fitness.tsb < -20) {
+      pts += 15;
+      factors.push({ label: "Debito recupero", detail: `TSB ${fitness.tsb} — riposo necessario`, risk: "danger" });
+    } else if (fitness.tsb < -10) {
+      pts += 8;
+      factors.push({ label: "Fatica in accumulo", detail: `TSB ${fitness.tsb}`, risk: "warn" });
+    } else {
+      factors.push({ label: "Recupero adeguato", detail: `TSB ${fitness.tsb}`, risk: "ok" });
+    }
+  }
+
+  const score = Math.min(100, pts);
+  let level: InjuryRisk["level"] = "Basso";
+  let color = "#22c55e";
+  if (score >= 60)      { level = "Alto";     color = "#ef4444"; }
+  else if (score >= 40) { level = "Elevato";  color = "#f97316"; }
+  else if (score >= 20) { level = "Moderato"; color = "#f59e0b"; }
+
+  return { score, level, color, factors };
+}
+
+/** Valutazione qualitativa di una singola sessione */
+export function evaluateSession(
+  analysis: SessionAnalysis,
+  profile: CoachProfile | null,
+  maxHR: number
+): { stars: number; label: string; insights: string[] } {
+  const insights: string[] = [];
+  let stars = 3;
+
+  const { paceMinKm, trimp, effortScore, zoneDist } = analysis;
+  const s = analysis.session;
+
+  // Distanza
+  if (s.distanceM / 1000 >= 25)      { stars++; insights.push("Ottima distanza — sopra la tappa media del pellegrinaggio."); }
+  else if (s.distanceM / 1000 < 5)   { stars--; insights.push("Sessione breve. Buona per recupero attivo."); }
+
+  // Sforzo
+  if (effortScore >= 8)               { insights.push(`Sessione molto intensa (sforzo ${effortScore}/10). Pianifica recupero.`); }
+  else if (effortScore <= 3)          { insights.push(`Sessione leggera (sforzo ${effortScore}/10). Ideale per recupero.`); }
+  else                                { insights.push(`Sforzo moderato (${effortScore}/10). Ben bilanciata.`); }
+
+  // Zone FC
+  if (zoneDist && zoneDist.totalSec > 0) {
+    const z2pct = (zoneDist.z2Sec / zoneDist.totalSec) * 100;
+    const z45pct = ((zoneDist.z4Sec + zoneDist.z5Sec) / zoneDist.totalSec) * 100;
+    if (z2pct >= 50)  { stars++; insights.push(`${Math.round(z2pct)}% in Z2 — ottima costruzione aerobica.`); }
+    if (z45pct > 30)  { insights.push(`${Math.round(z45pct)}% in Z4–Z5 — alta intensità, assicura recupero.`); }
+  }
+
+  // Dislivello
+  const gainPerKm = s.distanceM > 0 ? (s.totalElevationGainM / (s.distanceM / 1000)) : 0;
+  if (gainPerKm > 30) { stars++; insights.push(`Dislivello elevato (${Math.round(gainPerKm)} m D+/km) — ottimo per preparare il terreno.`); }
+
+  // FC
+  if (s.avgHeartRate && s.maxHeartRate) {
+    const drift = s.maxHeartRate - s.avgHeartRate;
+    if (drift < 15 && trimp > 50) insights.push("FC stabile durante la sessione — buona efficienza aerobica.");
+  }
+
+  // Peso (calorie stimate)
+  if (profile && s.calories) {
+    const calPerKm = s.calories / (s.distanceM / 1000);
+    insights.push(`~${Math.round(calPerKm)} kcal/km. Per il tuo peso (${profile.weightKg} kg) nella norma.`);
+  }
+
+  stars = Math.max(1, Math.min(5, stars));
+  const labels = ["", "Da migliorare", "Sufficiente", "Buona", "Ottima", "Eccellente"];
+  return { stars, label: labels[stars], insights };
+}
+
 // ─── ZONE FC ─────────────────────────────────────────────────────────────────
 
 export function calculateHRZones(maxHR: number): HRZones {
