@@ -815,7 +815,13 @@ export function saveSessions(sessions: TrainingSession[]): void {
   } catch { /* quota exceeded */ }
 
   if (!isSupabaseConfigured || !supabase) return;
-  const rows = sessions.map(toRow);
+  // Deduplicate by id — PostgreSQL rejects upserts where the same id appears twice
+  const seen = new Set<string>();
+  const rows = sessions.map(toRow).filter(r => {
+    if (seen.has(r.id)) return false;
+    seen.add(r.id);
+    return true;
+  });
   supabase.from("coach_sessions").upsert(rows, { onConflict: "id" }).then(({ error }) => {
     if (error) console.warn("[Coach] Supabase upsert error:", error.message);
   });
