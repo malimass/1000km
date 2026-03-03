@@ -60,3 +60,37 @@ CREATE POLICY "sessions_coach_read" ON coach_sessions
 -- Retrocompatibilità: sessioni senza athlete_id (vecchio sistema PIN)
 CREATE POLICY "sessions_legacy" ON coach_sessions
   FOR ALL USING (athlete_id IS NULL);
+
+-- ═══════════════════════════════════════════════════════════════
+-- TRIGGER: crea profilo automaticamente alla registrazione
+-- Necessario perché con email-confirmation attiva non esiste
+-- ancora una sessione (auth.uid() = NULL) quando l'utente
+-- viene creato, quindi la client-side insert fallirebbe su RLS.
+-- ═══════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, role, display_name, email)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'role', 'athlete'),
+    COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.email),
+    NEW.email
+  )
+  ON CONFLICT (id) DO NOTHING;
+
+  IF COALESCE(NEW.raw_user_meta_data->>'role', 'athlete') = 'athlete' THEN
+    INSERT INTO public.athlete_profiles (id)
+    VALUES (NEW.id)
+    ON CONFLICT (id) DO NOTHING;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
