@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import ScrollToTop from "./components/ScrollToTop";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
-import ProtectedCoachRoute from "./components/ProtectedCoachRoute";
 import NativeRedirect from "./components/NativeRedirect";
 
 const Index = lazy(() => import("./pages/Index"));
@@ -25,8 +24,6 @@ const Iscriviti = lazy(() => import("./pages/Iscriviti"));
 const IscrizioneSuccesso = lazy(() => import("./pages/IscrizioneSuccesso"));
 const Partecipa = lazy(() => import("./pages/Partecipa"));
 const IlMioPercorso = lazy(() => import("./pages/IlMioPercorso"));
-const CoachLogin = lazy(() => import("./pages/CoachLogin"));
-const Coach = lazy(() => import("./pages/Coach"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -55,12 +52,6 @@ const App = () => (
           <Route path="/partecipa" element={<Partecipa />} />
           <Route path="/il-mio-percorso" element={<IlMioPercorso />} />
           <Route path="/admin-login" element={<AdminLogin />} />
-          <Route path="/coach-login" element={<CoachLogin />} />
-          <Route path="/coach" element={
-            <ProtectedCoachRoute>
-              <Coach />
-            </ProtectedCoachRoute>
-          } />
           <Route path="/admin-live" element={
             <ProtectedAdminRoute>
               <AdminLive />
