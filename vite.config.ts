@@ -57,6 +57,17 @@ export default defineConfig(({ mode }) => ({
       },
     }),
   ].filter(Boolean),
+  // Esclude i plugin Capacitor nativi dall'ottimizzazione Vite/PWA.
+  // @capacitor-community/background-geolocation è solo codice nativo (iOS/Android)
+  // e non ha un entry point JS valido — bundlarlo causa build failure su web/Vercel.
+  optimizeDeps: {
+    exclude: ["@capacitor-community/background-geolocation"],
+  },
+  build: {
+    rollupOptions: {
+      external: ["@capacitor-community/background-geolocation"],
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
