@@ -12,6 +12,7 @@
  */
 
 import { TrainingSession, TrackPoint } from "./trainingParser";
+import { supabase, isSupabaseConfigured } from "./supabase";
 
 // ─── COSTANTI ────────────────────────────────────────────────────────────────
 
@@ -544,21 +545,105 @@ export function buildPaceProfile(session: TrainingSession): PaceChartPoint[] {
   return result;
 }
 
-// ─── STORAGE LOCALE ──────────────────────────────────────────────────────────
+// ─── STORAGE (localStorage + Supabase) ───────────────────────────────────────
 
 const STORAGE_KEY = "gp_coach_sessions";
 
+type SessionRow = Omit<TrainingSession, "trackPoints" | "startTime" | "hrZonesSec"> & {
+  start_time: string;
+  file_name: string;
+  duration_sec: number;
+  distance_m: number;
+  avg_speed_kmh: number;
+  max_speed_kmh: number;
+  avg_heart_rate?: number;
+  max_heart_rate?: number;
+  total_elevation_gain_m: number;
+  total_elevation_loss_m: number;
+  hr_zones_sec?: number[] | null;
+};
+
+function toRow(s: TrainingSession): SessionRow {
+  return {
+    id: s.id,
+    file_name: s.fileName,
+    sport: s.sport,
+    start_time: s.startTime.toISOString(),
+    duration_sec: s.durationSec,
+    distance_m: s.distanceM,
+    avg_speed_kmh: s.avgSpeedKmh,
+    max_speed_kmh: s.maxSpeedKmh,
+    avg_heart_rate: s.avgHeartRate,
+    max_heart_rate: s.maxHeartRate,
+    total_elevation_gain_m: s.totalElevationGainM,
+    total_elevation_loss_m: s.totalElevationLossM,
+    calories: s.calories,
+    trimp: s.trimp,
+    tss: s.tss,
+    hr_zones_sec: s.hrZonesSec ? Array.from(s.hrZonesSec) : null,
+  };
+}
+
+function fromRow(r: SessionRow): Omit<TrainingSession, "trackPoints"> {
+  return {
+    id: r.id,
+    fileName: r.file_name,
+    sport: r.sport,
+    startTime: new Date(r.start_time),
+    durationSec: r.duration_sec,
+    distanceM: r.distance_m,
+    avgSpeedKmh: r.avg_speed_kmh,
+    maxSpeedKmh: r.max_speed_kmh,
+    avgHeartRate: r.avg_heart_rate,
+    maxHeartRate: r.max_heart_rate,
+    totalElevationGainM: r.total_elevation_gain_m,
+    totalElevationLossM: r.total_elevation_loss_m,
+    calories: r.calories,
+    trimp: r.trimp,
+    tss: r.tss,
+    hrZonesSec: r.hr_zones_sec
+      ? (r.hr_zones_sec as [number, number, number, number, number])
+      : undefined,
+  };
+}
+
+/** Salva in localStorage (sincrono) e Supabase (fire-and-forget). */
 export function saveSessions(sessions: TrainingSession[]): void {
-  // Non salviamo trackPoints (troppo pesanti) – solo metadati
   const light = sessions.map(({ trackPoints: _, ...rest }) => rest);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(light));
-  } catch {
-    // quota exceeded – ignora
-  }
+  } catch { /* quota exceeded */ }
+
+  if (!isSupabaseConfigured || !supabase) return;
+  const rows = sessions.map(toRow);
+  supabase.from("coach_sessions").upsert(rows, { onConflict: "id" }).then(({ error }) => {
+    if (error) console.warn("[Coach] Supabase upsert error:", error.message);
+  });
 }
 
-export function loadSessions(): Omit<TrainingSession, "trackPoints">[] {
+/** Prova a caricare da Supabase; se non configurato o errore, usa localStorage. */
+export async function loadSessionsAsync(): Promise<Omit<TrainingSession, "trackPoints">[]> {
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase
+      .from("coach_sessions")
+      .select("*")
+      .order("start_time", { ascending: false });
+    if (!error && data && data.length > 0) {
+      // Aggiorna anche localStorage per uso offline
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(
+          (data as SessionRow[]).map(r => ({ ...fromRow(r), trackPoints: [] }))
+        ));
+      } catch { /* ignore */ }
+      return (data as SessionRow[]).map(fromRow);
+    }
+  }
+  // Fallback localStorage
+  return loadSessionsLocal();
+}
+
+/** Lettura sincrona da localStorage (usata solo come fallback/inizializzatore). */
+export function loadSessionsLocal(): Omit<TrainingSession, "trackPoints">[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
@@ -573,8 +658,14 @@ export function loadSessions(): Omit<TrainingSession, "trackPoints">[] {
   }
 }
 
+/** Elimina da localStorage e Supabase. */
 export function deleteSession(id: string, sessions: TrainingSession[]): TrainingSession[] {
   const updated = sessions.filter(s => s.id !== id);
   saveSessions(updated);
+  if (isSupabaseConfigured && supabase) {
+    supabase.from("coach_sessions").delete().eq("id", id).then(({ error }) => {
+      if (error) console.warn("[Coach] Supabase delete error:", error.message);
+    });
+  }
   return updated;
 }
