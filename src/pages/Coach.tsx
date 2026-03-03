@@ -32,7 +32,7 @@ import {
   loadProfile, saveProfile, calculateInjuryRisk, evaluateSession,
   SessionAnalysis, WeeklyStats, CoachProfile,
 } from "@/lib/coachAnalysis";
-import { getCurrentUser, loadCoachAthletes, CoachAthlete } from "@/lib/auth";
+import { getCurrentUser, loadCoachAthletes, CoachAthlete, saveAthleteProfile, loadAthleteProfile } from "@/lib/auth";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 // ─── COSTANTI COLORI ─────────────────────────────────────────────────────────
@@ -141,13 +141,14 @@ export default function Coach() {
   const [showProfileModal, setShowProfileModal] = useState(() => !loadProfile());
 
   const handleSaveProfile = (p: CoachProfile) => {
-    saveProfile(p);
+    saveProfile(p); // localStorage
     setProfile(p);
     setShowProfileModal(false);
-    // Aggiorna maxHR con formula Tanaka se disponibile
     const hr = maxHRFromAge(p.age);
     setMaxHR(hr);
     localStorage.setItem("gp_coach_maxhr", String(hr));
+    // Salva su Supabase se autenticato (sincronizza tra browser)
+    if (coachUserId) saveAthleteProfile(coachUserId, p);
   };
 
   // FC max (auto-calcolata da età, o manuale)
@@ -162,12 +163,28 @@ export default function Coach() {
   const [athletes, setAthletes] = useState<CoachAthlete[]>([]);
   const [coachUserId, setCoachUserId] = useState<string | null>(null);
 
-  // Carica atleti se coach Supabase
+  // Carica atleti e profilo da Supabase se coach autenticato
   useEffect(() => {
-    getCurrentUser().then(u => {
+    getCurrentUser().then(async u => {
       if (u?.role === "coach") {
         setCoachUserId(u.id);
         loadCoachAthletes(u.id).then(setAthletes);
+        // Carica profilo da Supabase (sincronizza tra browser)
+        const remote = await loadAthleteProfile(u.id);
+        if (remote && (remote.age || remote.weightKg)) {
+          const p: CoachProfile = {
+            age: remote.age ?? 35,
+            weightKg: remote.weightKg ?? 70,
+            heightCm: remote.heightCm ?? 170,
+            gender: (remote.gender as "M" | "F") ?? "M",
+            restHR: remote.restHR ?? 60,
+            experienceYears: remote.experienceYears ?? 2,
+          };
+          saveProfile(p); // aggiorna localStorage locale
+          setProfile(p);
+          setShowProfileModal(false);
+          setMaxHR(maxHRFromAge(p.age));
+        }
       }
     });
   }, []);
