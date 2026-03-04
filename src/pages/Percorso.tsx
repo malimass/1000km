@@ -8,7 +8,6 @@ import AnimatedSection from "@/components/AnimatedSection";
 import percorsoHero from "@/assets/percorso-hero.jpg";
 import { motion } from "framer-motion";
 import { tappe } from "@/lib/tappe";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import {
   loadAllLivePositions, subscribeLivePosition, type LivePosition,
   loadRoutePositions, subscribeRoutePositions, todaySessionId,
@@ -161,6 +160,9 @@ export default function Percorso() {
   const [selectedWaypoint, setSelectedWaypoint] = useState<number | null>(null);
   const mapRef = useRef<HTMLDivElement>(null);
 
+  // Tappe salvate dall'admin via PercorsoBuilder (sovrascrivono quelle hardcoded)
+  const [savedTappe, setSavedTappe] = useState<{ tappaNum: number; lat: number; lng: number; kmProgr: number; label: string }[] | null>(null);
+
   // Contatori iscritti per tappa (chiave = tappa_numero 1-14)
   const [iscritti, setIscritti] = useState<Record<number, number>>({});
 
@@ -196,24 +198,18 @@ export default function Percorso() {
     }
   }, [searchParams]);
 
-  // Carica contatori iscritti da Supabase
+  // Carica percorso salvato dall'admin
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    supabase!
-      .rpc("get_iscritti_per_tappa")
-      .then(({ data }) => {
-        if (!data) return;
-        const map: Record<number, number> = {};
-        (data as { tappa_numero: number; totale: number }[]).forEach(
-          (row) => { map[row.tappa_numero] = Number(row.totale); }
-        );
-        setIscritti(map);
-      });
+    fetch("/api/percorso-config")
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.tappe?.length) setSavedTappe(data.tappe);
+      })
+      .catch(() => {});
   }, []);
 
-  // Carica posizioni live iniziali (entrambi i corridori) + sottoscrizione Realtime
+  // Carica posizioni live iniziali (entrambi i corridori) + polling
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
     loadAllLivePositions().then(({ 1: p1, 2: p2 }) => {
       if (p1) setLivePos1(p1);
       if (p2) setLivePos2(p2);
@@ -224,9 +220,8 @@ export default function Percorso() {
     });
   }, []);
 
-  // Carica tracce percorse (corridore 1) + sottoscrizione Realtime
+  // Carica tracce percorse (corridore 1) + polling
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
     loadRoutePositions([todaySessionId()], 1).then(pts =>
       setTraveledRoute1(pts.map(p => [p.lat, p.lng] as [number, number]))
     );
@@ -236,9 +231,8 @@ export default function Percorso() {
     );
   }, []);
 
-  // Carica tracce percorse (corridore 2) + sottoscrizione Realtime
+  // Carica tracce percorse (corridore 2) + polling
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
     loadRoutePositions([todaySessionId()], 2).then(pts =>
       setTraveledRoute2(pts.map(p => [p.lat, p.lng] as [number, number]))
     );
@@ -248,9 +242,8 @@ export default function Percorso() {
     );
   }, []);
 
-  // Carica posizioni live community + sottoscrizione Realtime
+  // Carica posizioni live community + polling
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
     loadActiveCommunityPositions().then(setCommunityPositions);
     return subscribeCommunityLivePosition((updated) => {
       setCommunityPositions(prev => {
@@ -270,9 +263,8 @@ export default function Percorso() {
     return () => clearInterval(interval);
   }, []);
 
-  // Carica tracce community di oggi + sottoscrizione Realtime
+  // Carica tracce community di oggi + polling
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
     loadCommunityRoutePositions([todaySessionId()]).then(pts => {
       const routes: Record<string, { points: [number, number][]; activityType: ActivityType }> = {};
       pts.forEach(pt => {
@@ -399,72 +391,117 @@ export default function Percorso() {
         <div className="container-narrow">
           <AnimatedSection>
             <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-2 text-center">
-              Le 14 tappe
+              Le {savedTappe ? savedTappe.filter(t => t.tappaNum > 0).length : 14} tappe
             </h2>
             <p className="text-center text-muted-foreground font-body text-sm mb-8">
-              Clicca sulla tappa per vederla sulla mappa · premi <strong>Iscriviti</strong> per partecipare
+              Clicca sulla tappa per vederla sulla mappa · premi <strong>Partecipa</strong> per iscriverti
             </p>
           </AnimatedSection>
           <div className="space-y-4 max-w-3xl mx-auto">
-            {tappe.map((t, i) => {
-              // waypoint i+1 è la destinazione della tappa i
-              const wpIndex = i + 1;
-              const isSelected = selectedWaypoint === wpIndex;
-              const numIscritti = iscritti[t.giorno] ?? 0;
-              return (
-                <AnimatedSection key={t.giorno} delay={i * 0.05}>
-                  <div
-                    className={`w-full flex items-center gap-3 bg-card rounded-lg p-4 shadow-sm border transition-all
-                      ${isSelected
-                        ? "border-dona ring-2 ring-dona/30 shadow-md"
-                        : "border-border hover:shadow-md hover:border-dona/50"
-                      }`}
-                  >
-                    {/* Area cliccabile per centrare la mappa */}
-                    <button
-                      type="button"
-                      onClick={() => handleTappaClick(wpIndex)}
-                      className="flex items-start gap-3 flex-1 text-left min-w-0"
+            {savedTappe ? (
+              /* Tappe calcolate dall'admin via PercorsoBuilder */
+              savedTappe.filter(t => t.tappaNum > 0).map((t, i) => {
+                const isSelected = selectedWaypoint === i;
+                const numIscritti = iscritti[t.tappaNum] ?? 0;
+                return (
+                  <AnimatedSection key={`${t.tappaNum}-${t.lat}`} delay={i * 0.05}>
+                    <div
+                      className={`w-full flex items-center gap-3 bg-card rounded-lg p-4 shadow-sm border transition-all
+                        ${isSelected
+                          ? "border-dona ring-2 ring-dona/30 shadow-md"
+                          : "border-border hover:shadow-md hover:border-dona/50"
+                        }`}
                     >
-                      <div className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center font-heading font-bold text-base transition-colors
-                        ${isSelected ? "bg-dona text-white" : "bg-dona/10 text-dona"}`}>
-                        {t.giorno}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-body font-semibold text-foreground text-sm leading-snug truncate">
-                          {t.da} → {t.a}
+                      <button
+                        type="button"
+                        onClick={() => handleTappaClick(i)}
+                        className="flex items-start gap-3 flex-1 text-left min-w-0"
+                      >
+                        <div className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center font-heading font-bold text-base transition-colors
+                          ${isSelected ? "bg-dona text-white" : "bg-dona/10 text-dona"}`}>
+                          {t.tappaNum}
                         </div>
-                        <div className="text-muted-foreground text-xs font-body mt-0.5">
-                          {t.data} · {t.km} km
-                        </div>
-                        {numIscritti > 0 && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <Users className="w-3 h-3 text-dona" />
-                            <span className="text-dona text-xs font-body font-medium">
-                              {numIscritti} iscritti
-                            </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-body font-semibold text-foreground text-sm leading-snug">
+                            {t.label}
                           </div>
-                        )}
+                          <div className="text-muted-foreground text-xs font-body mt-0.5">
+                            km {t.kmProgr.toFixed(1)}
+                          </div>
+                          {numIscritti > 0 && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <Users className="w-3 h-3 text-dona" />
+                              <span className="text-dona text-xs font-body font-medium">{numIscritti} iscritti</span>
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                      <div className="flex-shrink-0 flex items-center gap-2">
+                        <MapPin className={`w-4 h-4 transition-colors ${isSelected ? "text-dona" : "text-muted-foreground/30"}`} />
+                        <Link to={`/iscriviti?tappa=${t.tappaNum}`}>
+                          <Button size="sm" className="text-xs h-8 px-3 bg-dona hover:bg-dona/90 text-white">
+                            <UserPlus className="w-3.5 h-3.5 mr-1" />
+                            Partecipa
+                          </Button>
+                        </Link>
                       </div>
-                    </button>
-
-                    {/* Azioni destra */}
-                    <div className="flex-shrink-0 flex items-center gap-2">
-                      <MapPin className={`w-4 h-4 transition-colors ${isSelected ? "text-dona" : "text-muted-foreground/30"}`} />
-                      <Link to={`/iscriviti?tappa=${t.giorno}`}>
-                        <Button
-                          size="sm"
-                          className="text-xs h-8 px-3 bg-dona hover:bg-dona/90 text-white"
-                        >
-                          <UserPlus className="w-3.5 h-3.5 mr-1" />
-                          Iscriviti
-                        </Button>
-                      </Link>
                     </div>
-                  </div>
-                </AnimatedSection>
-              );
-            })}
+                  </AnimatedSection>
+                );
+              })
+            ) : (
+              /* Tappe hardcoded di fallback */
+              tappe.map((t, i) => {
+                const wpIndex = i + 1;
+                const isSelected = selectedWaypoint === wpIndex;
+                const numIscritti = iscritti[t.giorno] ?? 0;
+                return (
+                  <AnimatedSection key={t.giorno} delay={i * 0.05}>
+                    <div
+                      className={`w-full flex items-center gap-3 bg-card rounded-lg p-4 shadow-sm border transition-all
+                        ${isSelected
+                          ? "border-dona ring-2 ring-dona/30 shadow-md"
+                          : "border-border hover:shadow-md hover:border-dona/50"
+                        }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleTappaClick(wpIndex)}
+                        className="flex items-start gap-3 flex-1 text-left min-w-0"
+                      >
+                        <div className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center font-heading font-bold text-base transition-colors
+                          ${isSelected ? "bg-dona text-white" : "bg-dona/10 text-dona"}`}>
+                          {t.giorno}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-body font-semibold text-foreground text-sm leading-snug truncate">
+                            {t.da} → {t.a}
+                          </div>
+                          <div className="text-muted-foreground text-xs font-body mt-0.5">
+                            {t.data} · {t.km} km
+                          </div>
+                          {numIscritti > 0 && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <Users className="w-3 h-3 text-dona" />
+                              <span className="text-dona text-xs font-body font-medium">{numIscritti} iscritti</span>
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                      <div className="flex-shrink-0 flex items-center gap-2">
+                        <MapPin className={`w-4 h-4 transition-colors ${isSelected ? "text-dona" : "text-muted-foreground/30"}`} />
+                        <Link to={`/iscriviti?tappa=${t.giorno}`}>
+                          <Button size="sm" className="text-xs h-8 px-3 bg-dona hover:bg-dona/90 text-white">
+                            <UserPlus className="w-3.5 h-3.5 mr-1" />
+                            Partecipa
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  </AnimatedSection>
+                );
+              })
+            )}
           </div>
         </div>
       </section>

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, Suspense, lazy } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import { tappe } from "@/lib/tappe";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, saveSiteShareSettings, SHARE_DEFAULTS, type AdminSettings } from "@/lib/adminSettings";
 import { loadSosteniPage, saveSosteniPage, type Sostenitore, type SosteniPage } from "@/lib/sostenitori";
 import {
@@ -233,7 +232,7 @@ export default function AdminLive() {
   const [ltwSaved, setLtwSaved] = useState(false);
 
   // ─ Settings ─
-  const [settingsLoading, setSettingsLoading] = useState(isSupabaseConfigured);
+  const [settingsLoading, setSettingsLoading] = useState(false);
   const [fbPageId,    setFbPageId]    = useState("");
   const [fbToken,     setFbToken]     = useState("");
   const [igUserId,    setIgUserId]    = useState("");
@@ -411,42 +410,18 @@ export default function AdminLive() {
   useEffect(() => () => { if (videoPreview) URL.revokeObjectURL(videoPreview); }, [videoPreview]);
   useEffect(() => () => { if (snapshotPreview) URL.revokeObjectURL(snapshotPreview); }, [snapshotPreview]);
 
-  // ─ Monitor posizioni live (admin + community) per snapshot ─
+  // ─ Monitor posizioni live (admin + community) per snapshot — polling ─
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return;
-    loadAllLivePositions().then(pos => {
+    const poll = async () => {
+      const pos = await loadAllLivePositions();
       setAdminLivePos1(pos[1]);
       setAdminLivePos2(pos[2]);
-    });
-    loadActiveCommunityPositions().then(setCommunityPositions);
-
-    const ch1 = supabase
-      .channel("admin-live-pos-monitor")
-      .on("postgres_changes", { event: "*", schema: "public", table: "live_position" },
-        (payload) => {
-          const row = payload.new as LivePosition & { id: number };
-          if (row.id === 1) setAdminLivePos1(row);
-          else if (row.id === 2) setAdminLivePos2(row);
-        })
-      .subscribe();
-
-    const ch2 = supabase
-      .channel("admin-community-monitor")
-      .on("postgres_changes", { event: "*", schema: "public", table: "community_live_position" },
-        (payload) => {
-          const updated = payload.new as CommunityLivePosition;
-          setCommunityPositions(prev => {
-            const others = prev.filter(p => p.user_id !== updated.user_id);
-            if (!updated.is_active) return others;
-            return [...others, updated];
-          });
-        })
-      .subscribe();
-
-    return () => {
-      supabase!.removeChannel(ch1);
-      supabase!.removeChannel(ch2);
+      const cp = await loadActiveCommunityPositions();
+      setCommunityPositions(cp);
     };
+    poll();
+    const timer = setInterval(poll, 5_000);
+    return () => clearInterval(timer);
   }, []);
 
   // Conta runner attivi — notifica quando ≥ 3
@@ -712,7 +687,6 @@ export default function AdminLive() {
   // ─ Logout ─
   async function handleLogout() {
     localStorage.removeItem("gp_admin_auth");
-    if (supabase) await supabase.auth.signOut();
     navigate("/admin-login", { replace: true });
   }
 
@@ -1146,11 +1120,7 @@ export default function AdminLive() {
                   <Navigation className="w-4 h-4" /> GPS Diretto
                 </h2>
 
-                {!isSupabaseConfigured ? (
-                  <p className="text-xs text-amber-600">
-                    ⚠️ Supabase non configurato — il GPS diretto non è disponibile.
-                  </p>
-                ) : !isTracking ? (
+                {!isTracking ? (
                   <>
                     {/* Selettore corridore */}
                     <div className="mb-3">
@@ -2079,7 +2049,7 @@ export default function AdminLive() {
                   onClick={handleSaveSettings}
                   className="w-full bg-foreground text-background rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
                 >
-                  {isSupabaseConfigured ? "Salva e sincronizza" : "Salva impostazioni"}
+                  Salva impostazioni
                 </button>
               </div>
             )}

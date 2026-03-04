@@ -30,6 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/route-positions") return await routePositions(req, res);
     if (path === "/community/live-position") return await communityLivePosition(req, res);
     if (path === "/community/route-positions") return await communityRoutePositions(req, res);
+    if (path === "/percorso-config") return await percorsoConfig(req, res);
     return res.status(404).json({ error: "Not found" });
   } catch (err: any) {
     console.error(err);
@@ -645,6 +646,27 @@ async function communityRoutePositions(req: VercelRequest, res: VercelResponse) 
          ${heading ?? null}, ${session_id}, now())
     `;
     return res.status(201).json({ ok: true });
+  }
+  return res.status(405).end();
+}
+
+// ─── PERCORSO CONFIG ──────────────────────────────────────────────────────────
+
+async function percorsoConfig(req: VercelRequest, res: VercelResponse) {
+  if (req.method === "GET") {
+    const rows = await sql`SELECT data FROM site_settings WHERE id = 3 LIMIT 1`;
+    return res.json(rows[0]?.data ?? null);
+  }
+  if (req.method === "POST") {
+    const { pin, tappe, coords, distanceM } = req.body ?? {};
+    const adminPin = process.env.VITE_ADMIN_PIN || process.env.ADMIN_PIN || "gratitude2026";
+    if (!pin || pin !== adminPin) return res.status(401).json({ error: "PIN non valido" });
+    await sql`
+      INSERT INTO site_settings (id, data, updated_at)
+      VALUES (3, ${JSON.stringify({ tappe, coords, distanceM })}, now())
+      ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()
+    `;
+    return res.json({ ok: true });
   }
   return res.status(405).end();
 }
