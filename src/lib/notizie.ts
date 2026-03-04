@@ -1,8 +1,9 @@
 /**
- * notizie.ts — Helper Supabase per news feed, raccolta fondi e servizi.
+ * notizie.ts — News feed e raccolta fondi via Neon API Routes.
+ * Il "realtime" è sostituito da polling (setInterval).
  */
 
-import { supabase } from "./supabase";
+import { apiFetch } from "./supabase";
 
 // ─── Notizie ─────────────────────────────────────────────────────────────────
 
@@ -20,62 +21,63 @@ export interface Notizia {
   updated_at:   string;
 }
 
-/** Carica le ultime N notizie pubblicate, ordinate dalla più recente. */
 export async function loadNotizie(limit = 30): Promise<Notizia[]> {
-  if (!supabase) return [];
-  const { data } = await supabase
-    .from("notizie")
-    .select("*")
-    .eq("pubblicata", true)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return (data as Notizia[]) ?? [];
+  try {
+    const res = await fetch("/api/notizie");
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data as Notizia[]).slice(0, limit);
+  } catch {
+    return [];
+  }
 }
 
-/** Sottoscrizione Realtime al feed notizie. */
+/** Polling ogni 30 s — chiama cb per ogni notizia nuova. Ritorna cleanup. */
 export function subscribeNotizie(cb: (n: Notizia) => void): () => void {
-  if (!supabase) return () => {};
-  const channel = supabase
-    .channel("notizie-feed")
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "notizie" },
-      (payload) => {
-        const n = payload.new as Notizia;
-        if (n.pubblicata) cb(n);
-      },
-    )
-    .subscribe();
-  return () => { supabase!.removeChannel(channel); };
+  const lastSeen = new Set<string>();
+
+  const poll = async () => {
+    const list = await loadNotizie(30);
+    for (const n of list) {
+      if (!lastSeen.has(n.id)) { cb(n); lastSeen.add(n.id); }
+    }
+  };
+
+  poll();
+  const timer = setInterval(poll, 30_000);
+  return () => clearInterval(timer);
 }
 
-/** (Admin) Pubblica una nuova notizia. */
 export async function pubblicaNotizia(
-  n: Omit<Notizia, "id" | "created_at" | "updated_at">,
+  n: Omit<Notizia, "id" | "created_at" | "updated_at">
 ): Promise<string | null> {
-  if (!supabase) return null;
-  const { error } = await supabase.from("notizie").insert(n);
-  return error?.message ?? null;
+  try {
+    const res = await apiFetch("/api/notizie", { method: "POST", body: JSON.stringify(n) });
+    if (!res.ok) { const d = await res.json(); return d.error ?? "Errore"; }
+    return null;
+  } catch { return "Errore di rete"; }
 }
 
-/** (Admin) Aggiorna una notizia esistente. */
 export async function aggiornaNotizia(
   id: string,
-  patch: Partial<Omit<Notizia, "id" | "created_at">>,
+  patch: Partial<Omit<Notizia, "id" | "created_at">>
 ): Promise<string | null> {
-  if (!supabase) return null;
-  const { error } = await supabase
-    .from("notizie")
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  return error?.message ?? null;
+  try {
+    const res = await apiFetch("/api/notizie", {
+      method: "PATCH",
+      body: JSON.stringify({ id, ...patch }),
+    });
+    if (!res.ok) { const d = await res.json(); return d.error ?? "Errore"; }
+    return null;
+  } catch { return "Errore di rete"; }
 }
 
-/** (Admin) Elimina una notizia. */
 export async function eliminaNotizia(id: string): Promise<string | null> {
-  if (!supabase) return null;
-  const { error } = await supabase.from("notizie").delete().eq("id", id);
-  return error?.message ?? null;
+  try {
+    const res = await apiFetch(`/api/notizie?id=${id}`, { method: "DELETE" });
+    if (!res.ok) { const d = await res.json(); return d.error ?? "Errore"; }
+    return null;
+  } catch { return "Errore di rete"; }
 }
 
 // ─── Raccolta fondi ──────────────────────────────────────────────────────────
@@ -88,54 +90,46 @@ export interface RaccoltaFondi {
 }
 
 export async function loadRaccoltaFondi(): Promise<RaccoltaFondi | null> {
-  if (!supabase) return null;
-  const { data } = await supabase
-    .from("raccolta_fondi")
-    .select("importo_euro, target_euro, donatori, updated_at")
-    .eq("id", 1)
-    .single();
-  return (data as RaccoltaFondi) ?? null;
+  try {
+    const res = await fetch("/api/raccolta-fondi");
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
 }
 
-export function subscribeRaccoltaFondi(
-  cb: (r: RaccoltaFondi) => void,
-): () => void {
-  if (!supabase) return () => {};
-  const channel = supabase
-    .channel("raccolta-fondi-channel")
-    .on(
-      "postgres_changes",
-      { event: "UPDATE", schema: "public", table: "raccolta_fondi" },
-      (payload) => { cb(payload.new as RaccoltaFondi); },
-    )
-    .subscribe();
-  return () => { supabase!.removeChannel(channel); };
+/** Polling ogni 30 s. Ritorna cleanup. */
+export function subscribeRaccoltaFondi(cb: (r: RaccoltaFondi) => void): () => void {
+  let lastAt = "";
+  const poll = async () => {
+    const data = await loadRaccoltaFondi();
+    if (data && data.updated_at !== lastAt) { lastAt = data.updated_at; cb(data); }
+  };
+  poll();
+  const timer = setInterval(poll, 30_000);
+  return () => clearInterval(timer);
 }
 
-/** (Admin) Aggiorna i dati della raccolta fondi. */
 export async function aggiornaRaccolta(
   importo_euro: number,
-  donatori: number,
+  donatori: number
 ): Promise<string | null> {
-  if (!supabase) return null;
-  const { error } = await supabase
-    .from("raccolta_fondi")
-    .update({ importo_euro, donatori, updated_at: new Date().toISOString() })
-    .eq("id", 1);
-  return error?.message ?? null;
+  try {
+    const res = await apiFetch("/api/raccolta-fondi", {
+      method: "PATCH",
+      body: JSON.stringify({ importo_euro, donatori }),
+    });
+    if (!res.ok) { const d = await res.json(); return d.error ?? "Errore"; }
+    return null;
+  } catch { return "Errore di rete"; }
 }
 
 // ─── Push Tokens ─────────────────────────────────────────────────────────────
 
-/** Salva il token push (FCM/APNs) per l'utente corrente. */
 export async function savePushToken(
   userId: string,
   token: string,
-  platform: "android" | "ios" | "web",
+  platform: "android" | "ios" | "web"
 ): Promise<void> {
-  if (!supabase) return;
-  await supabase.from("push_tokens").upsert(
-    { user_id: userId, token, platform, updated_at: new Date().toISOString() },
-    { onConflict: "token" },
-  );
+  // Implementazione futura tramite API route dedicata.
+  console.log("[push token]", { userId, token, platform });
 }

@@ -1,12 +1,11 @@
 /**
  * adminSettings.ts
  * ─────────────────
- * Carica e salva le impostazioni admin con strategia ibrida:
- *  - Se Supabase è configurato  → Supabase (fonte di verità) + localStorage (cache)
- *  - Se Supabase non è presente → solo localStorage (comportamento precedente)
+ * Carica e salva le impostazioni admin via Neon API Routes.
+ * Fallback su localStorage se non autenticato.
  */
 
-import { supabase, isSupabaseConfigured } from "./supabase";
+import { apiFetch, getAuthToken } from "./supabase";
 
 export type AdminSettings = {
   fbPageId:    string;
@@ -15,16 +14,14 @@ export type AdminSettings = {
   igImageUrl:  string;
   cloudName:   string;
   cloudPreset: string;
-  // Video YouTube — Crocifisso Nero (id · titolo · descrizione)
   ytCn1: string; ytCn1Title: string; ytCn1Desc: string;
   ytCn2: string; ytCn2Title: string; ytCn2Desc: string;
   ytCn3: string; ytCn3Title: string; ytCn3Desc: string;
-  // Condivisione social — testi configurabili
-  shareTitle:     string;  // titolo del post (es. "Anch'io cammino per una giusta causa!")
-  shareBody:      string;  // corpo del messaggio
-  shareSocialTag: string;  // handle social (es. "@1000kmdigratitudine")
-  shareHashtags:  string;  // hashtag (es. "#1000kmdiGratitudine #Komen …")
-  shareUrl:       string;  // link condivisione (es. "https://1000kmdigratitudine.it/partecipa")
+  shareTitle:     string;
+  shareBody:      string;
+  shareSocialTag: string;
+  shareHashtags:  string;
+  shareUrl:       string;
 };
 
 const EMPTY: AdminSettings = {
@@ -45,7 +42,7 @@ const EMPTY: AdminSettings = {
 };
 
 // ─── localStorage ─────────────────────────────────────────────────────────────
-const LS = {
+const LS: Record<keyof AdminSettings, string> = {
   fbPageId:    "gp_fb_page_id",
   fbToken:     "gp_fb_token",
   igUserId:    "gp_ig_user_id",
@@ -70,93 +67,46 @@ function lsSet(k: string, v: string) {
 }
 
 export function loadFromLocalStorage(): AdminSettings {
-  return {
-    fbPageId:    lsGet(LS.fbPageId),
-    fbToken:     lsGet(LS.fbToken),
-    igUserId:    lsGet(LS.igUserId),
-    igImageUrl:  lsGet(LS.igImageUrl),
-    cloudName:   lsGet(LS.cloudName),
-    cloudPreset: lsGet(LS.cloudPreset),
-    ytCn1: lsGet(LS.ytCn1), ytCn1Title: lsGet(LS.ytCn1Title), ytCn1Desc: lsGet(LS.ytCn1Desc),
-    ytCn2: lsGet(LS.ytCn2), ytCn2Title: lsGet(LS.ytCn2Title), ytCn2Desc: lsGet(LS.ytCn2Desc),
-    ytCn3: lsGet(LS.ytCn3), ytCn3Title: lsGet(LS.ytCn3Title), ytCn3Desc: lsGet(LS.ytCn3Desc),
-    shareTitle:     lsGet(LS.shareTitle),
-    shareBody:      lsGet(LS.shareBody),
-    shareSocialTag: lsGet(LS.shareSocialTag),
-    shareHashtags:  lsGet(LS.shareHashtags),
-    shareUrl:       lsGet(LS.shareUrl),
-  };
+  return Object.fromEntries(
+    Object.entries(LS).map(([key, lsKey]) => [key, lsGet(lsKey)])
+  ) as AdminSettings;
 }
 
 function cacheToLocalStorage(s: AdminSettings) {
-  lsSet(LS.fbPageId,    s.fbPageId);
-  lsSet(LS.fbToken,     s.fbToken);
-  lsSet(LS.igUserId,    s.igUserId);
-  lsSet(LS.igImageUrl,  s.igImageUrl);
-  lsSet(LS.cloudName,   s.cloudName);
-  lsSet(LS.cloudPreset, s.cloudPreset);
-  lsSet(LS.ytCn1, s.ytCn1); lsSet(LS.ytCn1Title, s.ytCn1Title); lsSet(LS.ytCn1Desc, s.ytCn1Desc);
-  lsSet(LS.ytCn2, s.ytCn2); lsSet(LS.ytCn2Title, s.ytCn2Title); lsSet(LS.ytCn2Desc, s.ytCn2Desc);
-  lsSet(LS.ytCn3, s.ytCn3); lsSet(LS.ytCn3Title, s.ytCn3Title); lsSet(LS.ytCn3Desc, s.ytCn3Desc);
-  lsSet(LS.shareTitle,     s.shareTitle);
-  lsSet(LS.shareBody,      s.shareBody);
-  lsSet(LS.shareSocialTag, s.shareSocialTag);
-  lsSet(LS.shareHashtags,  s.shareHashtags);
-  lsSet(LS.shareUrl,       s.shareUrl);
+  for (const [key, lsKey] of Object.entries(LS)) {
+    lsSet(lsKey, (s as any)[key] ?? "");
+  }
 }
 
 // ─── API pubblica ──────────────────────────────────────────────────────────────
-/**
- * Carica le impostazioni.
- * Priorità: Supabase → localStorage → default vuoti.
- */
+
 export async function loadSettings(): Promise<AdminSettings> {
-  if (!isSupabaseConfigured || !supabase) return loadFromLocalStorage();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return loadFromLocalStorage();
-
-  const { data, error } = await supabase
-    .from("admin_settings")
-    .select("data")
-    .eq("user_id", user.id)
-    .single();
-
-  if (error || !data) return loadFromLocalStorage();
-
-  const settings = { ...EMPTY, ...(data.data as Partial<AdminSettings>) };
-  cacheToLocalStorage(settings); // aggiorna cache locale
-  return settings;
+  if (!getAuthToken()) return loadFromLocalStorage();
+  try {
+    const res = await apiFetch("/api/admin-settings");
+    if (!res.ok) return loadFromLocalStorage();
+    const data = await res.json();
+    const settings = { ...EMPTY, ...(data as Partial<AdminSettings>) };
+    cacheToLocalStorage(settings);
+    return settings;
+  } catch {
+    return loadFromLocalStorage();
+  }
 }
 
-/**
- * Salva le impostazioni sia su Supabase (se disponibile) che su localStorage.
- */
 export async function saveSettings(settings: AdminSettings): Promise<void> {
   cacheToLocalStorage(settings);
-
-  if (!isSupabaseConfigured || !supabase) return;
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
-  await supabase
-    .from("admin_settings")
-    .upsert({
-      user_id:    user.id,
-      data:       settings,
-      updated_at: new Date().toISOString(),
+  if (!getAuthToken()) return;
+  try {
+    await apiFetch("/api/admin-settings", {
+      method: "POST",
+      body: JSON.stringify(settings),
     });
+  } catch { /* noop */ }
 }
 
 export type YtVideoData = { id: string; titolo: string; descrizione: string };
 
-/**
- * Legge id, titolo e descrizione dei 3 video YouTube del Crocifisso Nero.
- * Funziona anche senza autenticazione (solo localStorage).
- * Le stringhe vuote indicano che il valore non è ancora stato impostato
- * — la pagina usa i testi di default in quel caso.
- */
 export function loadYtCrocifissoVideos(): [YtVideoData, YtVideoData, YtVideoData] {
   return [
     { id: lsGet(LS.ytCn1), titolo: lsGet(LS.ytCn1Title), descrizione: lsGet(LS.ytCn1Desc) },
@@ -173,45 +123,25 @@ type SiteYtData = {
   ytCn3: string; ytCn3Title: string; ytCn3Desc: string;
 };
 
-/**
- * Salva i video YouTube nella tabella `site_settings` (riga singleton id=1).
- * Questa tabella è leggibile pubblicamente senza autenticazione,
- * così i visitatori della pagina CrocifissoNero vedono i video aggiornati.
- */
 export async function saveSiteYtVideos(s: SiteYtData): Promise<void> {
-  if (!supabase) return;
-  await supabase.from("site_settings").upsert({
-    id: 1,
-    data: {
-      ytCn1: s.ytCn1, ytCn1Title: s.ytCn1Title, ytCn1Desc: s.ytCn1Desc,
-      ytCn2: s.ytCn2, ytCn2Title: s.ytCn2Title, ytCn2Desc: s.ytCn2Desc,
-      ytCn3: s.ytCn3, ytCn3Title: s.ytCn3Title, ytCn3Desc: s.ytCn3Desc,
-    },
-    updated_at: new Date().toISOString(),
-  });
+  await apiFetch("/api/site-settings?id=1", { method: "POST", body: JSON.stringify(s) });
 }
 
-/**
- * Legge i video YouTube da Supabase `site_settings` senza richiedere autenticazione.
- * Ritorna null se Supabase non è configurato o la riga non esiste ancora.
- */
 export async function loadSiteYtVideos(): Promise<[YtVideoData, YtVideoData, YtVideoData] | null> {
-  if (!supabase) return null;
-  const { data } = await supabase
-    .from("site_settings")
-    .select("data")
-    .eq("id", 1)
-    .single();
-  if (!data?.data) return null;
-  const d = data.data as Record<string, string>;
-  return [
-    { id: d.ytCn1 ?? "", titolo: d.ytCn1Title ?? "", descrizione: d.ytCn1Desc ?? "" },
-    { id: d.ytCn2 ?? "", titolo: d.ytCn2Title ?? "", descrizione: d.ytCn2Desc ?? "" },
-    { id: d.ytCn3 ?? "", titolo: d.ytCn3Title ?? "", descrizione: d.ytCn3Desc ?? "" },
-  ];
+  try {
+    const res = await fetch("/api/site-settings?id=1");
+    if (!res.ok) return null;
+    const d = await res.json() as Record<string, string>;
+    if (!d || !d.ytCn1) return null;
+    return [
+      { id: d.ytCn1 ?? "", titolo: d.ytCn1Title ?? "", descrizione: d.ytCn1Desc ?? "" },
+      { id: d.ytCn2 ?? "", titolo: d.ytCn2Title ?? "", descrizione: d.ytCn2Desc ?? "" },
+      { id: d.ytCn3 ?? "", titolo: d.ytCn3Title ?? "", descrizione: d.ytCn3Desc ?? "" },
+    ];
+  } catch { return null; }
 }
 
-// ─── Condivisione social (site_settings, lettura pubblica) ─────────────────────
+// ─── Condivisione social (site_settings id=2, lettura pubblica) ────────────────
 
 export type ShareSettings = {
   shareTitle:     string;
@@ -221,7 +151,6 @@ export type ShareSettings = {
   shareUrl:       string;
 };
 
-/** Valori di default usati se l'admin non ha ancora configurato nulla. */
 export const SHARE_DEFAULTS: ShareSettings = {
   shareTitle:     "Anch'io cammino per una giusta causa!",
   shareBody:      "un cammino di solidarietà da Bologna alla Calabria per sostenere la ricerca sul cancro al seno con Komen Italia.",
@@ -230,26 +159,19 @@ export const SHARE_DEFAULTS: ShareSettings = {
   shareUrl:       "https://1000kmdigratitudine.it/partecipa",
 };
 
-/**
- * Salva i testi di condivisione social nella tabella `site_settings` (id=2).
- * Leggibili pubblicamente senza autenticazione.
- */
 export async function saveSiteShareSettings(s: ShareSettings): Promise<void> {
-  if (!supabase) return;
-  await supabase.from("site_settings").upsert({
-    id: 2,
-    data: s,
-    updated_at: new Date().toISOString(),
-  });
+  await apiFetch("/api/site-settings?id=2", { method: "POST", body: JSON.stringify(s) });
 }
 
-/**
- * Legge i testi di condivisione social da Supabase `site_settings` senza auth.
- * Ritorna i default se Supabase non è configurato o la riga non esiste ancora.
- */
 export async function loadSiteShareSettings(): Promise<ShareSettings> {
-  if (!supabase) {
-    // Prova localStorage
+  try {
+    const res = await fetch("/api/site-settings?id=2");
+    if (!res.ok) return SHARE_DEFAULTS;
+    const data = await res.json();
+    if (!data || Object.keys(data).length === 0) return SHARE_DEFAULTS;
+    return { ...SHARE_DEFAULTS, ...(data as Partial<ShareSettings>) };
+  } catch {
+    // Prova localStorage come fallback
     const ls: ShareSettings = {
       shareTitle:     lsGet(LS.shareTitle),
       shareBody:      lsGet(LS.shareBody),
@@ -257,15 +179,7 @@ export async function loadSiteShareSettings(): Promise<ShareSettings> {
       shareHashtags:  lsGet(LS.shareHashtags),
       shareUrl:       lsGet(LS.shareUrl),
     };
-    // Se tutto vuoto → default
-    if (!ls.shareTitle && !ls.shareBody && !ls.shareSocialTag) return SHARE_DEFAULTS;
+    if (!ls.shareTitle && !ls.shareBody) return SHARE_DEFAULTS;
     return { ...SHARE_DEFAULTS, ...Object.fromEntries(Object.entries(ls).filter(([, v]) => v)) };
   }
-  const { data } = await supabase
-    .from("site_settings")
-    .select("data")
-    .eq("id", 2)
-    .single();
-  if (!data?.data) return SHARE_DEFAULTS;
-  return { ...SHARE_DEFAULTS, ...(data.data as Partial<ShareSettings>) };
 }

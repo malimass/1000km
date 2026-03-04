@@ -1,11 +1,42 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+/**
+ * supabase.ts — MIGRATO A NEON
+ * ─────────────────────────────
+ * Questo file non usa più Supabase. Esporta le utility per
+ * chiamare le API routes Vercel che si connettono a Neon PostgreSQL.
+ */
 
-const supabaseUrl     = import.meta.env.VITE_SUPABASE_URL     ?? "";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
+/** URL base delle API (stringa vuota = same-origin su Vercel). */
+export const API_BASE = "";
 
-/** true quando le variabili d'ambiente Supabase sono configurate */
-export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
+/** Token JWT in localStorage. */
+const TOKEN_KEY = "gp_jwt";
 
-export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+export function getAuthToken(): string | null {
+  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+
+export function setAuthToken(token: string): void {
+  try { localStorage.setItem(TOKEN_KEY, token); } catch { /* noop */ }
+}
+
+export function clearAuthToken(): void {
+  try { localStorage.removeItem(TOKEN_KEY); } catch { /* noop */ }
+}
+
+/** Esegue un fetch verso un'API route con Authorization header. */
+export async function apiFetch(
+  path: string,
+  init: RequestInit = {}
+): Promise<Response> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init.headers as Record<string, string>),
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return fetch(`${API_BASE}${path}`, { ...init, headers });
+}
+
+// Manteniamo exports compatibili con il codice legacy che importa supabase
+export const supabase = null;
+export const isSupabaseConfigured = false;
