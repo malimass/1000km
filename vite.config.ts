@@ -75,8 +75,6 @@ export default defineConfig(({ mode }) => ({
           "vendor-charts": ["recharts"],
           // Mappe (leaflet + react-leaflet)
           "vendor-maps": ["leaflet", "react-leaflet"],
-          // Supabase
-          "vendor-supabase": ["@supabase/supabase-js"],
         },
       },
     },
