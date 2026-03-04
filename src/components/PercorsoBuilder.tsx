@@ -11,7 +11,7 @@
  * Richiede: VITE_GOOGLE_MAPS_API_KEY nel file .env
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -21,6 +21,25 @@ import {
 } from "lucide-react";
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+
+// ─── Carica Google Maps JS API (con Places) una sola volta ───────────────────
+
+let _gmapsPromise: Promise<void> | null = null;
+
+function loadGoogleMapsScript(key: string): Promise<void> {
+  if (_gmapsPromise) return _gmapsPromise;
+  _gmapsPromise = new Promise((resolve, reject) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((window as any).google?.maps?.places) { resolve(); return; }
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=it`;
+    script.async = true;
+    script.onload  = () => resolve();
+    script.onerror = () => { _gmapsPromise = null; reject(new Error("Impossibile caricare Google Maps")); };
+    document.head.appendChild(script);
+  });
+  return _gmapsPromise;
+}
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
 
@@ -167,6 +186,37 @@ export default function PercorsoBuilder() {
 
   const noKey = !GOOGLE_KEY;
 
+  const partenzaRef = useRef<HTMLInputElement>(null);
+  const arrivoRef   = useRef<HTMLInputElement>(null);
+
+  // ── Inizializza Google Places Autocomplete sugli input ──────────────────
+  useEffect(() => {
+    if (!GOOGLE_KEY) return;
+    loadGoogleMapsScript(GOOGLE_KEY).then(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const G = (window as any).google.maps.places;
+
+      if (partenzaRef.current) {
+        const ac = new G.Autocomplete(partenzaRef.current, { language: "it" });
+        ac.addListener("place_changed", () => {
+          const place = ac.getPlace();
+          const addr  = place.formatted_address || place.name || "";
+          if (addr) setPartenza(addr);
+        });
+      }
+
+      if (arrivoRef.current) {
+        const ac = new G.Autocomplete(arrivoRef.current, { language: "it" });
+        ac.addListener("place_changed", () => {
+          const place = ac.getPlace();
+          const addr  = place.formatted_address || place.name || "";
+          if (addr) setArrivo(addr);
+        });
+      }
+    }).catch(() => {/* errore già gestito nel banner noKey */});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Calcola percorso ──────────────────────────────────────────────────────
   const handleCalcola = useCallback(async () => {
     if (noKey) { setError("Imposta VITE_GOOGLE_MAPS_API_KEY nel file .env"); return; }
@@ -230,7 +280,7 @@ export default function PercorsoBuilder() {
             <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">API key mancante</p>
             <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
               Aggiungi <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">VITE_GOOGLE_MAPS_API_KEY=&lt;chiave&gt;</code> nel file <code>.env</code> e riavvia il server.
-              Attiva "Directions API" e "Geocoding API" sulla Google Cloud Console.
+              Attiva <strong>Directions API</strong>, <strong>Geocoding API</strong> e <strong>Places API</strong> sulla Google Cloud Console.
             </p>
           </div>
         </div>
@@ -262,7 +312,7 @@ export default function PercorsoBuilder() {
           <label className="block text-xs font-semibold text-foreground mb-1">Partenza</label>
           <div className="relative">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-green-500" />
-            <input type="text" value={partenza} onChange={e => setPartenza(e.target.value)}
+            <input ref={partenzaRef} type="text" value={partenza} onChange={e => setPartenza(e.target.value)}
               placeholder="Es. Bologna, Piazza Maggiore"
               onKeyDown={e => e.key === "Enter" && handleCalcola()}
               className="w-full pl-8 pr-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-dona/40" />
@@ -274,7 +324,7 @@ export default function PercorsoBuilder() {
           <label className="block text-xs font-semibold text-foreground mb-1">Arrivo</label>
           <div className="relative">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-red-500" />
-            <input type="text" value={arrivo} onChange={e => setArrivo(e.target.value)}
+            <input ref={arrivoRef} type="text" value={arrivo} onChange={e => setArrivo(e.target.value)}
               placeholder="Es. Terranova Sappo Minulio, Reggio Calabria"
               onKeyDown={e => e.key === "Enter" && handleCalcola()}
               className="w-full pl-8 pr-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-dona/40" />
