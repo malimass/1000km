@@ -124,6 +124,7 @@ type SiteYtData = {
 };
 
 export async function saveSiteYtVideos(s: SiteYtData): Promise<void> {
+  if (!getAuthToken()) return;
   await apiFetch("/api/site-settings?id=1", { method: "POST", body: JSON.stringify(s) });
 }
 
@@ -160,6 +161,7 @@ export const SHARE_DEFAULTS: ShareSettings = {
 };
 
 export async function saveSiteShareSettings(s: ShareSettings): Promise<void> {
+  if (!getAuthToken()) return;
   await apiFetch("/api/site-settings?id=2", { method: "POST", body: JSON.stringify(s) });
 }
 
