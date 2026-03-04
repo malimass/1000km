@@ -39,7 +39,7 @@ const Index = () => {
             transition={{ duration: 0.6 }}
             className="font-body text-xs md:text-sm uppercase tracking-[0.3em] text-accent mb-6"
           >
-            18 Aprile – 1 Maggio 2026
+            15 Aprile – 1 Maggio 2026
           </motion.p>
           <motion.h1
             initial={{ opacity: 0, y: 30 }}
@@ -81,7 +81,7 @@ const Index = () => {
           </motion.div>
 
           {/* Countdown */}
-          <Countdown targetDate="2026-04-18T06:00:00" className="mb-6" />
+          <Countdown targetDate="2026-04-15T06:00:00" className="mb-6" />
 
           <motion.p
             initial={{ opacity: 0 }}

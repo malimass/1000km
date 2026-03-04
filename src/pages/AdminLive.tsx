@@ -28,7 +28,7 @@ const RouteMap = lazy(() => import("@/components/RouteMap"));
 const PercorsoBuilder = lazy(() => import("@/components/PercorsoBuilder"));
 
 // ─── Costanti ────────────────────────────────────────────────────────────────
-const CAMMINO_START = new Date("2026-04-18T06:00:00");
+const CAMMINO_START = new Date("2026-04-15T06:00:00");
 
 const HASHTAGS =
   "#1000kmdigratitudine #gratitudepath #camminodigratitudine " +
@@ -45,7 +45,7 @@ function buildMessage(ltwUrl: string, isTraining: boolean): string {
   if (isTraining) {
     return (
       `🚴‍♂️ Allenamento in preparazione per i 1000 Km di Gratitudine!\n\n` +
-      `Il 18 aprile partirò da Bologna per raggiungere Terranova Sappo Minulio (RC): ` +
+      `Il 15 aprile partirò da Bologna per raggiungere Terranova Sappo Minulio (RC): ` +
       `1000 km, 14 tappe, 1 obiettivo.\n\n` +
       `${liveLines}\n\n` +
       HASHTAGS
