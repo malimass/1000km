@@ -142,8 +142,8 @@ async function googleDirections(start: [number, number], end: [number, number]):
   try {
     const { Route } = await (window as any).google.maps.importLibrary("routes");
     const response: any = await Route.computeRoutes({
-      origin:      { location: { latLng: { latitude: start[0], longitude: start[1] } } },
-      destination: { location: { latLng: { latitude: end[0], longitude: end[1] } } },
+      origin:      { lat: start[0], lng: start[1] },
+      destination: { lat: end[0], lng: end[1] },
       travelMode:  "WALK",
       routeModifiers: { avoidHighways: true, avoidTolls: false, avoidFerries: false },
     });

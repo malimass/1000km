@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { setAuthToken } from "@/lib/supabase";
 import { LogIn } from "lucide-react";
 
 // PIN letto da env (VITE_ADMIN_PIN) con fallback sicuro.
@@ -29,9 +29,19 @@ export default function AdminLogin() {
     // Segna accesso nel localStorage (valido per questo dispositivo)
     localStorage.setItem("gp_admin_auth", "1");
 
-    // Auth Supabase in background per mantenere i permessi RLS di scrittura GPS
-    if (supabase && ADMIN_EMAIL && ADMIN_PASS) {
-      await supabase.auth.signInWithPassword({ email: ADMIN_EMAIL, password: ADMIN_PASS });
+    // Ottieni JWT tramite l'endpoint Neon auth per le chiamate API protette
+    if (ADMIN_EMAIL && ADMIN_PASS) {
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASS }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.token) setAuthToken(data.token);
+        }
+      } catch { /* login JWT fallito — le operazioni di lettura funzioneranno comunque */ }
     }
 
     navigate("/admin-live", { replace: true });
