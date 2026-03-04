@@ -131,6 +131,33 @@ export default function Partecipa() {
         </div>
       </section>
 
+      {/* ── Endorsement Komen ───────────────────────────────────────────────── */}
+      <section className="bg-background py-14 px-4">
+        <div className="container-narrow max-w-2xl mx-auto">
+          <motion.div
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            variants={fadeUp}
+            className="bg-dona/5 border border-dona/25 rounded-2xl p-8 text-center"
+          >
+            <Ribbon className="w-8 h-8 text-dona mx-auto mb-4" />
+            <blockquote className="font-body text-base md:text-lg text-foreground italic leading-relaxed mb-6">
+              "Grazie per la vostra bellissima mail e per aver deciso di supportare i progetti di Komen Comitato Emilia Romagna,
+              che da <strong>18 anni</strong> portiamo avanti con tanto amore e restituzione alle tantissime donne
+              che ogni anno incontrano il tumore al seno.
+              Siamo felici di condividere il nostro logo e di menzionare questa <strong>nobile iniziativa</strong>."
+            </blockquote>
+            <div>
+              <p className="font-heading text-sm font-bold text-foreground">Rossella Magliulo</p>
+              <p className="font-body text-xs text-muted-foreground mt-0.5">
+                Manager &amp; Secretary Committee Coordinator — Komen Comitato Emilia Romagna
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* ── Perché partecipare ───────────────────────────────────────────────── */}
       <section className="section-padding px-4 bg-background">
         <div className="container-narrow max-w-4xl mx-auto">
