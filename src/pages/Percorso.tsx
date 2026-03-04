@@ -29,8 +29,8 @@ const RouteMap = lazy(() => import("@/components/RouteMap"));
 // Fallback usato solo se non è stato salvato nulla tramite /admin-live
 const LOCATOWEB_FALLBACK = "";
 
-const CAMMINO_START = new Date("2026-04-18T06:00:00");
-const CAMMINO_END   = new Date("2026-05-01T23:59:00");
+const CAMMINO_START = new Date("2026-04-15T06:00:00");
+const CAMMINO_END   = new Date("2026-05-01T18:00:00");
 
 function LiveTrackingSection({
   ltwUrl,
@@ -126,7 +126,7 @@ function LiveTrackingSection({
             // ── Prima del cammino ──
             <div className="text-center mt-6">
               <p className="font-body text-primary-foreground/70 mb-8 max-w-xl mx-auto">
-                Dal <strong className="text-accent">18 aprile</strong> al <strong className="text-accent">1 maggio 2026</strong>{" "}
+                Dal <strong className="text-accent">15 aprile</strong> al <strong className="text-accent">1 maggio 2026</strong>{" "}
                 potrai seguire ogni tappa in tempo reale direttamente qui, con aggiornamento live della posizione.
               </p>
               <Button asChild variant="dona" size="lg">
@@ -140,7 +140,7 @@ function LiveTrackingSection({
             // ── Dopo il cammino ──
             <div className="text-center mt-6">
               <p className="font-body text-primary-foreground/70 mb-8 max-w-xl mx-auto">
-                Il cammino si è concluso il 1 maggio 2026. Grazie a tutti coloro che hanno seguito e donato!
+                Il cammino si è concluso il 1 maggio 2026 nel pomeriggio. Grazie a tutti coloro che hanno seguito e donato!
               </p>
               <Button asChild variant="dona" size="lg">
                 <Link to="/dona">

@@ -66,7 +66,7 @@ export default function Partecipa() {
           >
             <span className="inline-flex items-center gap-2 text-accent font-heading text-xs uppercase tracking-widest font-bold mb-4">
               <Ribbon className="w-4 h-4" />
-              18 aprile — 1 maggio 2026
+              15 aprile — 1 maggio 2026
             </span>
             <h1 className="font-heading text-4xl md:text-5xl font-bold leading-tight mb-5">
               Partecipa al cammino.<br />

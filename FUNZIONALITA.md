@@ -1,12 +1,12 @@
 # Funzionalità — 1000km di Gratitudine
 
-> Documento aggiornabile progressivamente. Ultima modifica: 2026-03-03 (v5)
+> Documento aggiornabile progressivamente. Ultima modifica: 2026-03-04 (v6)
 
 ---
 
 ## Panoramica
 
-App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spirituale da Bologna a Terranova Sappo Minulio (Calabria), 1000 km in 14 tappe, dal 18 aprile al 1° maggio 2026. Raccolta fondi per Komen Italia (ricerca cancro al seno).
+App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spirituale da Bologna a Terranova Sappo Minulio (Calabria), 1000 km in 14 tappe, dal 15 aprile al 1° maggio 2026 (pomeriggio). Raccolta fondi per Komen Italia (ricerca cancro al seno).
 
 **Dominio live:** https://1000kmdigratitudine.it
 
@@ -42,8 +42,8 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 
 ### 1. Countdown & Stato Evento
 
-- Countdown in tempo reale al **18 aprile 2026 ore 06:00** (`CAMMINO_START`)
-- Evento termina il **1 maggio 2026** (`CAMMINO_END`)
+- Countdown in tempo reale al **15 aprile 2026 ore 06:00** (`CAMMINO_START`)
+- Evento termina il **1 maggio 2026 pomeriggio (18:00)** (`CAMMINO_END`)
 - Logica di stato: `prima dell'evento` → `in corso` → `concluso`
 - Se GPS runner attivo → mostra tracking live anche fuori dalle date ufficiali
 - Badge "In diretta" rosso pulsante visibile quando GPS è attivo o LocaToWeb è configurato
@@ -333,20 +333,20 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 
 | # | Da | A | Km | Data |
 |---|----|---|----|------|
-| 1 | Bologna | Faenza | 55 | 18 aprile |
-| 2 | Faenza | Rimini | 70 | 19 aprile |
-| 3 | Rimini | Ancona | 90 | 20 aprile |
-| 4 | Ancona | Porto San Giorgio | 65 | 21 aprile |
-| 5 | Porto San Giorgio | Pescara | 85 | 22 aprile |
-| 6 | Pescara | Vasto | 75 | 23 aprile |
-| 7 | Vasto | Campobasso | 90 | 24 aprile |
-| 8 | Campobasso | Avellino | 90 | 25 aprile |
-| 9 | Avellino | Sala Consilina | 70 | 26 aprile |
-| 10 | Sala Consilina | Scalea | 85 | 27 aprile |
-| 11 | Scalea | Paola | 55 | 28 aprile |
-| 12 | Paola | Pizzo Calabro | 65 | 29 aprile |
-| 13 | Pizzo Calabro | Rosarno | 65 | 30 aprile |
-| 14 | Rosarno | Terranova Sappo Minulio | 40 | 1 maggio |
+| 1 | Bologna | Faenza | 55 | 15 aprile |
+| 2 | Faenza | Rimini | 70 | 16 aprile |
+| 3 | Rimini | Ancona | 90 | 17 aprile |
+| 4 | Ancona | Porto San Giorgio | 65 | 18 aprile |
+| 5 | Porto San Giorgio | Pescara | 85 | 19 aprile |
+| 6 | Pescara | Vasto | 75 | 20 aprile |
+| 7 | Vasto | Campobasso | 90 | 21 aprile |
+| 8 | Campobasso | Avellino | 90 | 22 aprile |
+| 9 | Avellino | Sala Consilina | 70 | 23 aprile |
+| 10 | Sala Consilina | Scalea | 85 | 24 aprile |
+| 11 | Scalea | Paola | 55 | 25 aprile |
+| 12 | Paola | Pizzo Calabro | 65 | 26 aprile |
+| 13 | Pizzo Calabro | Rosarno | 65 | 27 aprile |
+| 14 | Rosarno | Terranova Sappo Minulio | 40 | 28 aprile |
 | **Totale** | | | **1000** | |
 
 **Waypoint sulla mappa**: 15 (Bologna + 14 destinazioni tappe)
@@ -400,3 +400,4 @@ npm run cap:android   # Build + apri Android Studio (per firma e pubblicazione P
 | 2026-02-25 | v3 | Testi condivisione social configurabili da admin. Tabella `site_settings` + fix RLS `sostenitori_page`. Documentata strategia persistenza dati e policy RLS per ogni tabella |
 | 2026-02-26 | v4 | Revisione completa da audit codebase: corretto ActivityType (solo 3 valori: corri/cammino/altro, rimossi pedalo/nuoto non esistenti); completata tabella tappe con tutti i 14 valori reali; aggiunto Geoapify alle integrazioni; aggiunti nomi runner (Massimo/Nunzio) e colori marker; documentata tabella Realtime subscriptions; aggiornata sezione Community con fix marker stale (COMMUNITY_STALE_MS 10 min, cleanup periodico, guard rendering) |
 | 2026-03-03 | v5 | Aggiunto sistema multi-utente: Area Atleta (`/atleta/accedi`) con profilo e sessioni, Area Coach (`/coach-login`) con analisi FIT/TCX, KPI cards e ring SVG. Login dropdown unificato in navbar (desktop hover + mobile accordion) con 3 voci: Atleta / Coach / Admin. Aggiornate route in tabella pagine. Migliorato messaggio errore email già registrata nei form di registrazione. |
+| 2026-03-04 | v6 | Aggiornate date evento: partenza **15 aprile 2026** (era 18 aprile), arrivo **1 maggio 2026 pomeriggio (18:00)**. Aggiornate tutte le 14 tappe con date corrette (shift -3 giorni: 15 apr → 28 apr). Aggiornati `CAMMINO_START`, countdown e tutti i testi nelle pagine. |
