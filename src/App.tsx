@@ -24,6 +24,7 @@ const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const Iscriviti = lazy(() => import("./pages/Iscriviti"));
 const IscrizioneSuccesso = lazy(() => import("./pages/IscrizioneSuccesso"));
 const Partecipa = lazy(() => import("./pages/Partecipa"));
+const Accedi = lazy(() => import("./pages/Accedi"));
 const IlMioPercorso = lazy(() => import("./pages/IlMioPercorso"));
 const CoachLogin = lazy(() => import("./pages/CoachLogin"));
 const CoachRegister = lazy(() => import("./pages/CoachRegister"));
@@ -56,6 +57,7 @@ const App = () => (
           <Route path="/iscriviti" element={<Iscriviti />} />
           <Route path="/iscrizione-successo" element={<IscrizioneSuccesso />} />
           <Route path="/partecipa" element={<Partecipa />} />
+          <Route path="/accedi" element={<Accedi />} />
           <Route path="/il-mio-percorso" element={<IlMioPercorso />} />
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/coach-login" element={<CoachLogin />} />
