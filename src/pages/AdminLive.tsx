@@ -163,15 +163,17 @@ async function igReelPost(igUserId: string, token: string, videoUrl: string, cap
   const created = await createRes.json();
   if (created.error) throw new Error(created.error.message);
 
+  let isFinished = false;
   for (let i = 0; i < 15; i++) {
     await new Promise(r => setTimeout(r, 2000));
     const statusRes = await fetch(
       `https://graph.facebook.com/v20.0/${created.id}?fields=status_code&access_token=${token}`,
     );
     const status = await statusRes.json();
-    if (status.status_code === "FINISHED") break;
+    if (status.status_code === "FINISHED") { isFinished = true; break; }
     if (status.status_code === "ERROR") throw new Error("Errore elaborazione video su Instagram");
   }
+  if (!isFinished) throw new Error("Timeout elaborazione video Instagram: riprova tra qualche secondo");
 
   const publishRes = await fetch(`https://graph.facebook.com/v20.0/${igUserId}/media_publish`, {
     method: "POST",
@@ -232,7 +234,7 @@ export default function AdminLive() {
   const [ltwSaved, setLtwSaved] = useState(false);
 
   // ─ Settings ─
-  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(true);
   const [fbPageId,    setFbPageId]    = useState("");
   const [fbToken,     setFbToken]     = useState("");
   const [igUserId,    setIgUserId]    = useState("");
@@ -647,11 +649,6 @@ export default function AdminLive() {
       },
     );
 
-    // Aggiorna stato attivo su Supabase
-    const startErr = await upsertLivePosition({ is_active: true }, runnerId);
-    if (startErr) {
-      setDbError(`Salvataggio GPS bloccato (RLS): ${startErr} — vedi istruzioni admin.`);
-    }
   }
 
   async function stopGpsTracking() {
