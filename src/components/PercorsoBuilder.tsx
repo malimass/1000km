@@ -209,7 +209,7 @@ export default function PercorsoBuilder() {
     loadGoogleMapsScript(GOOGLE_KEY).then(() => setMapsReady(true)).catch(() => {});
   }, []);
 
-  // ── Autocomplete via AutocompleteService (niente widget, niente deprecation) ─
+  // ── Autocomplete via AutocompleteSuggestion (nuova API, niente deprecation) ─
   function fetchSugg(
     input: string,
     setter: (s: Suggestion[]) => void,
@@ -217,14 +217,26 @@ export default function PercorsoBuilder() {
   ) {
     clearTimeout(timerRef.current);
     if (!mapsReady || input.length < 3) { setter([]); return; }
-    timerRef.current = setTimeout(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const svc = new (window as any).google.maps.places.AutocompleteService();
-      svc.getPlacePredictions({ input, language: "it" }, (preds: any[], status: string) => {
-        setter(status === "OK"
-          ? preds.map((p: any) => ({ description: p.description, place_id: p.place_id }))
-          : []);
-      });
+    timerRef.current = setTimeout(async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { AutocompleteSuggestion } = await (window as any).google.maps.importLibrary("places");
+        const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input,
+          language: "it",
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setter(suggestions
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .filter((s: any) => s.placePrediction)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((s: any) => ({
+            description: s.placePrediction.text.toString(),
+            place_id: s.placePrediction.placeId,
+          })));
+      } catch {
+        setter([]);
+      }
     }, 300);
   }
 
