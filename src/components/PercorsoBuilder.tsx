@@ -5,12 +5,12 @@
  * suddividerlo in tappe di N km e visualizzarle su mappa Leaflet.
  *
  * APIs Google Maps (JS SDK — niente CORS):
- *  - AutocompleteService → suggerimenti mentre si digita
- *  - Geocoder            → converte indirizzo in coordinate
- *  - DirectionsService   → calcola percorso a piedi
+ *  - AutocompleteSuggestion → suggerimenti mentre si digita
+ *  - Geocoder               → converte indirizzo in coordinate
+ *  - Routes API (Route.computeRoutes) → calcola percorso a piedi
  *
  * Richiede: VITE_GOOGLE_MAPS_API_KEY nel file .env
- * Abilita su Cloud Console: Directions API, Geocoding API, Places API
+ * Abilita su Cloud Console: Routes API, Geocoding API, Places API
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -136,27 +136,30 @@ function googleGeocode(address: string): Promise<[number, number] | null> {
   });
 }
 
-// ─── Google DirectionsService JS SDK (niente CORS) ───────────────────────────
+// ─── Google Routes API JS SDK (nuova API, niente CORS) ───────────────────────
 
-function googleDirections(start: [number, number], end: [number, number]): Promise<RouteResult | null> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const G = (window as any).google.maps;
-  return new Promise((resolve) => {
-    new G.DirectionsService().route({
-      origin:      { lat: start[0], lng: start[1] },
-      destination: { lat: end[0],   lng: end[1]   },
-      travelMode:  "WALKING",
-    }, (result: any, status: string) => {
-      if (status === "OK" && result.routes?.length) {
-        const route     = result.routes[0];
-        const coords    = decodePolyline(route.overview_polyline.points);
-        const distanceM = route.legs.reduce((sum: number, leg: any) => sum + leg.distance.value, 0);
-        resolve({ coords, distanceM });
-      } else {
-        resolve(null);
-      }
+async function googleDirections(start: [number, number], end: [number, number]): Promise<RouteResult | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { Route } = await (window as any).google.maps.importLibrary("routes");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response: any = await Route.computeRoutes({
+      origin:      { location: { latLng: { latitude: start[0], longitude: start[1] } } },
+      destination: { location: { latLng: { latitude: end[0],   longitude: end[1]   } } },
+      travelMode:  "WALK",
+      languageCode: "it",
+      units: "METRIC",
     });
-  });
+    if (!response?.routes?.length) return null;
+    const route    = response.routes[0];
+    const encoded  = route.polyline?.encodedPolyline;
+    if (!encoded) return null;
+    const coords    = decodePolyline(encoded);
+    const distanceM = route.distanceMeters ?? 0;
+    return { coords, distanceM };
+  } catch {
+    return null;
+  }
 }
 
 // ─── MapFit — adatta bounds dopo il calcolo ───────────────────────────────────
