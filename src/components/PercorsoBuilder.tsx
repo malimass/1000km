@@ -136,22 +136,26 @@ function googleGeocode(address: string): Promise<[number, number] | null> {
   });
 }
 
-// ─── Google Routes API (DirectionsService JS SDK) ────────────────────────────
+// ─── Google Routes API (Route.computeRoutes — nuova API) ─────────────────────
 
 async function googleDirections(start: [number, number], end: [number, number]): Promise<RouteResult | null> {
   try {
-    const { DirectionsService } = await (window as any).google.maps.importLibrary("routes");
-    const response: any = await new DirectionsService().route({
-      origin:      { lat: start[0], lng: start[1] },
-      destination: { lat: end[0], lng: end[1] },
-      travelMode:  "WALKING",
+    const { Route } = await (window as any).google.maps.importLibrary("routes");
+    const response: any = await Route.computeRoutes({
+      origin:      { location: { latLng: { latitude: start[0], longitude: start[1] } } },
+      destination: { location: { latLng: { latitude: end[0], longitude: end[1] } } },
+      travelMode:  "WALK",
+      languageCode: "it",
+      routeModifiers: { avoidHighways: true, avoidTolls: false, avoidFerries: false },
     });
     if (!response?.routes?.length) return null;
     const route = response.routes[0];
-    if (!route.overview_path?.length) return null;
-    const coords: [number, number][] = route.overview_path.map((p: any) => [p.lat(), p.lng()]);
+    const encoded = route.polyline?.encodedPolyline;
+    if (!encoded) return null;
+    const coords = decodePolyline(encoded);
+    if (!coords.length) return null;
     const distanceM = (route.legs as any[]).reduce(
-      (s: number, leg: any) => s + (leg.distance?.value ?? 0), 0
+      (s: number, leg: any) => s + (leg.distanceMeters ?? 0), 0
     );
     return { coords, distanceM };
   } catch (err) {
@@ -194,7 +198,10 @@ export default function PercorsoBuilder() {
 
   const [route,  setRoute]  = useState<RouteResult | null>(null);
   const [tappe,  setTappe]  = useState<TappaPoint[]>([]);
-  const [copied, setCopied] = useState(false);
+  const [copied,   setCopied]   = useState(false);
+  const [savePin,  setSavePin]  = useState("");
+  const [saving,   setSaving]   = useState(false);
+  const [saveMsg,  setSaveMsg]  = useState<{ ok: boolean; text: string } | null>(null);
 
   const [mapsReady,    setMapsReady]    = useState(false);
   const [partenzaSugg, setPartenzaSugg] = useState<Suggestion[]>([]);
@@ -278,6 +285,28 @@ export default function PercorsoBuilder() {
     await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function savePercorso() {
+    if (!route || !tappe.length) return;
+    setSaving(true); setSaveMsg(null);
+    try {
+      const res = await fetch("/api/percorso-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: savePin, tappe, coords: route.coords, distanceM: route.distanceM }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSaveMsg({ ok: true, text: "Percorso salvato! Visibile su /il-percorso." });
+        setSavePin("");
+      } else {
+        setSaveMsg({ ok: false, text: data.error ?? "Errore durante il salvataggio." });
+      }
+    } catch {
+      setSaveMsg({ ok: false, text: "Errore di rete." });
+    }
+    setSaving(false);
   }
 
   const totalKm = route ? Math.round(route.distanceM / 100) / 10 : null;
@@ -430,7 +459,7 @@ export default function PercorsoBuilder() {
               center={route.coords[Math.floor(route.coords.length / 2)]}
               zoom={7}
               style={{ height: "100%", width: "100%" }}
-              scrollWheelZoom={false}
+              scrollWheelZoom={true}
             >
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -501,6 +530,33 @@ export default function PercorsoBuilder() {
                 );
               })}
             </div>
+          </div>
+          {/* Salva percorso */}
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <p className="text-xs font-bold text-foreground">Salva percorso sul sito</p>
+            <p className="text-[10px] text-muted-foreground">Inserisci il PIN admin per salvare questo percorso e renderlo visibile sulla pagina pubblica.</p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                placeholder="PIN admin"
+                value={savePin}
+                onChange={e => setSavePin(e.target.value)}
+                className="flex-1 px-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-dona/40"
+              />
+              <button
+                onClick={savePercorso}
+                disabled={saving || !savePin}
+                className="flex items-center gap-1.5 bg-dona text-white rounded-lg px-4 py-2 text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                Salva
+              </button>
+            </div>
+            {saveMsg && (
+              <p className={`text-xs rounded-lg px-3 py-2 ${saveMsg.ok ? "bg-green-50 text-green-700" : "bg-destructive/10 text-destructive"}`}>
+                {saveMsg.text}
+              </p>
+            )}
           </div>
         </>
       )}
