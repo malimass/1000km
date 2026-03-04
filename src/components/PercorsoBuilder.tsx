@@ -136,28 +136,26 @@ function googleGeocode(address: string): Promise<[number, number] | null> {
   });
 }
 
-// ─── Google Routes API JS SDK (nuova API, niente CORS) ───────────────────────
+// ─── Google Routes API (DirectionsService JS SDK) ────────────────────────────
 
 async function googleDirections(start: [number, number], end: [number, number]): Promise<RouteResult | null> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { Route } = await (window as any).google.maps.importLibrary("routes");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response: any = await Route.computeRoutes({
-      origin:      { location: { latLng: { latitude: start[0], longitude: start[1] } } },
-      destination: { location: { latLng: { latitude: end[0],   longitude: end[1]   } } },
-      travelMode:  "WALK",
-      languageCode: "it",
-      units: "METRIC",
+    const { DirectionsService } = await (window as any).google.maps.importLibrary("routes");
+    const response: any = await new DirectionsService().route({
+      origin:      { lat: start[0], lng: start[1] },
+      destination: { lat: end[0], lng: end[1] },
+      travelMode:  "WALKING",
     });
     if (!response?.routes?.length) return null;
-    const route    = response.routes[0];
-    const encoded  = route.polyline?.encodedPolyline;
-    if (!encoded) return null;
-    const coords    = decodePolyline(encoded);
-    const distanceM = route.distanceMeters ?? 0;
+    const route = response.routes[0];
+    if (!route.overview_path?.length) return null;
+    const coords: [number, number][] = route.overview_path.map((p: any) => [p.lat(), p.lng()]);
+    const distanceM = (route.legs as any[]).reduce(
+      (s: number, leg: any) => s + (leg.distance?.value ?? 0), 0
+    );
     return { coords, distanceM };
-  } catch {
+  } catch (err) {
+    console.error("[PercorsoBuilder] directions error:", err);
     return null;
   }
 }
