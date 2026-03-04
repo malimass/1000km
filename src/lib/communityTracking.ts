@@ -1,16 +1,11 @@
 /**
  * communityTracking.ts
  * ─────────────────────
- * Funzioni Supabase per la community pubblica:
- * - profili utenti
- * - posizioni live community (una riga per utente)
- * - tracce percorso community
- * - condivisione social
- *
- * Tabelle richieste: vedi community-schema.sql nella root del progetto.
+ * Funzioni community via Neon API Routes.
+ * Il realtime Supabase è sostituito da polling (setInterval).
  */
 
-import { supabase } from "./supabase";
+import { apiFetch } from "./supabase";
 import { loadSiteShareSettings } from "./adminSettings";
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
@@ -63,31 +58,33 @@ export type CommunityLivePosition = {
 
 // ─── Profili ──────────────────────────────────────────────────────────────────
 
-export async function upsertProfile(
-  profile: UserProfile,
-): Promise<string | null> {
-  if (!supabase) return null;
-  const { error } = await supabase.from("profiles").upsert({
-    ...profile,
-    updated_at: new Date().toISOString(),
-  });
-  return error?.message ?? null;
+export async function upsertProfile(profile: UserProfile): Promise<string | null> {
+  try {
+    const res = await apiFetch("/api/profiles", {
+      method: "POST",
+      body: JSON.stringify({
+        display_name:  profile.display_name,
+        activity_type: profile.activity_type,
+        city:          profile.city,
+      }),
+    });
+    if (!res.ok) { const d = await res.json(); return d.error ?? "Errore"; }
+    return null;
+  } catch { return "Errore di rete"; }
 }
 
 export async function loadProfile(userId: string): Promise<UserProfile | null> {
-  if (!supabase) return null;
-  const { data } = await supabase
-    .from("profiles")
-    .select("id, display_name, activity_type, city")
-    .eq("id", userId)
-    .single();
-  return (data as UserProfile) ?? null;
+  try {
+    const res = await fetch(`/api/profiles?id=${userId}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
 }
 
 // ─── Posizioni live community ──────────────────────────────────────────────────
 
 export async function upsertCommunityLivePosition(
-  userId: string,
+  _userId: string,
   displayName: string,
   activityType: ActivityType,
   fields: {
@@ -99,57 +96,56 @@ export async function upsertCommunityLivePosition(
     is_active?: boolean;
   },
 ): Promise<string | null> {
-  if (!supabase) return null;
-  const { error } = await supabase.from("community_live_position").upsert({
-    user_id:       userId,
-    display_name:  displayName,
-    activity_type: activityType,
-    ...fields,
-    updated_at: new Date().toISOString(),
-  });
-  return error?.message ?? null;
+  try {
+    const res = await apiFetch("/api/community/live-position", {
+      method: "POST",
+      body: JSON.stringify({
+        display_name:  displayName,
+        activity_type: activityType,
+        ...fields,
+      }),
+    });
+    if (!res.ok) { const d = await res.json(); return d.error ?? "Errore"; }
+    return null;
+  } catch { return "Errore di rete"; }
 }
 
-export async function setCommunityInactive(userId: string): Promise<string | null> {
-  if (!supabase) return null;
-  const { error } = await supabase
-    .from("community_live_position")
-    .update({ is_active: false, updated_at: new Date().toISOString() })
-    .eq("user_id", userId);
-  return error?.message ?? null;
+export async function setCommunityInactive(_userId: string): Promise<string | null> {
+  return upsertCommunityLivePosition(_userId, "", "altro", { lat: 0, lng: 0, is_active: false });
 }
 
-/** Soglia oltre la quale una posizione viene considerata "stale" (non più attiva). */
 export const COMMUNITY_STALE_MS = 10 * 60 * 1000; // 10 minuti
 
 export async function loadActiveCommunityPositions(): Promise<CommunityLivePosition[]> {
-  if (!supabase) return [];
-  const cutoff = new Date(Date.now() - COMMUNITY_STALE_MS).toISOString();
-  const { data } = await supabase
-    .from("community_live_position")
-    .select("*")
-    .eq("is_active", true)
-    .gte("updated_at", cutoff);
-  return (data as CommunityLivePosition[]) ?? [];
+  try {
+    const res = await fetch("/api/community/live-position");
+    if (!res.ok) return [];
+    return await res.json();
+  } catch { return []; }
 }
 
+/**
+ * Polling ogni 5 s (sostituisce Supabase Realtime).
+ * Ritorna cleanup.
+ */
 export function subscribeCommunityLivePosition(
   cb: (pos: CommunityLivePosition) => void,
 ): () => void {
-  if (!supabase) return () => {};
-  const channel = supabase
-    .channel("community-live-channel")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "community_live_position" },
-      (payload) => {
-        // Ignora DELETE: payload.new è vuoto ({}) e user_id sarebbe undefined
-        if (!(payload.new as Partial<CommunityLivePosition>).user_id) return;
-        cb(payload.new as CommunityLivePosition);
-      },
-    )
-    .subscribe();
-  return () => { supabase!.removeChannel(channel); };
+  const seen = new Map<string, string>(); // user_id → updated_at
+
+  const poll = async () => {
+    const positions = await loadActiveCommunityPositions();
+    for (const pos of positions) {
+      if (seen.get(pos.user_id) !== pos.updated_at) {
+        seen.set(pos.user_id, pos.updated_at);
+        cb(pos);
+      }
+    }
+  };
+
+  poll();
+  const timer = setInterval(poll, 5_000);
+  return () => clearInterval(timer);
 }
 
 // ─── Traccia percorso community ───────────────────────────────────────────────
@@ -164,37 +160,45 @@ export type CommunityRoutePoint = {
   session_id:    string;
 };
 
-/** Carica tutti i punti traccia community per le sessioni fornite, ordinati per tempo. */
 export async function loadCommunityRoutePositions(
   sessionIds: string[],
 ): Promise<CommunityRoutePoint[]> {
-  if (!supabase) return [];
-  const { data } = await supabase
-    .from("community_route_positions")
-    .select("user_id, display_name, activity_type, lat, lng, recorded_at, session_id")
-    .in("session_id", sessionIds)
-    .order("recorded_at", { ascending: true });
-  return (data as CommunityRoutePoint[]) ?? [];
+  try {
+    const results: CommunityRoutePoint[] = [];
+    for (const sid of sessionIds) {
+      const res = await fetch(`/api/community/route-positions?session_id=${sid}`);
+      if (res.ok) {
+        const data = await res.json();
+        results.push(...(data as CommunityRoutePoint[]));
+      }
+    }
+    return results.sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
+  } catch { return []; }
 }
 
-/** Sottoscrizione Realtime a nuovi punti traccia community. */
+/** Polling ogni 10 s (sostituisce Supabase Realtime). */
 export function subscribeCommunityRoutePositions(
   cb: (point: CommunityRoutePoint) => void,
 ): () => void {
-  if (!supabase) return () => {};
-  const channel = supabase
-    .channel("community-route-positions-channel")
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "community_route_positions" },
-      (payload) => { cb(payload.new as CommunityRoutePoint); },
-    )
-    .subscribe();
-  return () => { supabase!.removeChannel(channel); };
+  const seen = new Set<number>();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const poll = async () => {
+    const res = await fetch(`/api/community/route-positions?session_id=${today}`);
+    if (!res.ok) return;
+    const points = await res.json() as any[];
+    for (const p of points) {
+      if (!seen.has(p.id)) { seen.add(p.id); cb(p); }
+    }
+  };
+
+  poll();
+  const timer = setInterval(poll, 10_000);
+  return () => clearInterval(timer);
 }
 
 export async function appendCommunityRoutePoint(
-  userId: string,
+  _userId: string,
   displayName: string,
   activityType: ActivityType,
   lat: number,
@@ -204,24 +208,23 @@ export async function appendCommunityRoutePoint(
   heading: number | null,
   sessionId: string,
 ): Promise<string | null> {
-  if (!supabase) return null;
-  const { error } = await supabase.from("community_route_positions").insert({
-    user_id:       userId,
-    display_name:  displayName,
-    activity_type: activityType,
-    lat, lng, speed, accuracy, heading,
-    session_id:  sessionId,
-    recorded_at: new Date().toISOString(),
-  });
-  return error?.message ?? null;
+  try {
+    const res = await apiFetch("/api/community/route-positions", {
+      method: "POST",
+      body: JSON.stringify({
+        display_name:  displayName,
+        activity_type: activityType,
+        lat, lng, speed, accuracy, heading,
+        session_id: sessionId,
+      }),
+    });
+    if (!res.ok) { const d = await res.json(); return d.error ?? "Errore"; }
+    return null;
+  } catch { return "Errore di rete"; }
 }
 
 // ─── Condivisione social ──────────────────────────────────────────────────────
 
-/**
- * Apre il native share sheet (iOS/Android) o copia negli appunti come fallback.
- * Genera un post pre-compilato con testi configurabili dall'admin.
- */
 export async function shareActivity(
   activityType: ActivityType,
   displayName: string,
@@ -241,18 +244,10 @@ export async function shareActivity(
     `👉 ${cfg.shareUrl}\n\n` +
     `${cfg.shareHashtags}`;
 
-  const shareData = {
-    title: cfg.shareTitle,
-    text,
-    url:   cfg.shareUrl,
-  };
+  const shareData = { title: cfg.shareTitle, text, url: cfg.shareUrl };
 
   if (navigator.share && navigator.canShare?.(shareData)) {
-    try {
-      await navigator.share(shareData);
-    } catch {
-      // L'utente ha chiuso il dialog — nessun errore da mostrare
-    }
+    try { await navigator.share(shareData); } catch { /* dialog chiuso */ }
   } else if (navigator.clipboard) {
     await navigator.clipboard.writeText(`${text}\n\n${shareData.url}`);
   }

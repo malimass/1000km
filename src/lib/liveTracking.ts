@@ -1,15 +1,11 @@
 /**
  * liveTracking.ts
  * ────────────────
- * Helper per GPS live e registrazione del percorso su Supabase.
- *
- * Tabelle richieste: vedi live_position.sql nella root del progetto.
- *
- *  • live_position   — due righe (id=1 corridore 1, id=2 corridore 2)
- *  • route_positions — append-only con colonna runner_id
+ * Helper GPS live e traccia percorso via Neon API Routes.
+ * Il realtime Supabase è sostituito da polling (setInterval).
  */
 
-import { supabase } from "./supabase";
+import { apiFetch } from "./supabase";
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
 
@@ -34,79 +30,71 @@ export type RoutePoint = {
 
 // ─── live_position ─────────────────────────────────────────────────────────────
 
-/** Upsert posizione corrente per il corridore specificato (1 o 2).
- *  Restituisce il messaggio di errore Supabase, o null se ok. */
 export async function upsertLivePosition(
   fields: Partial<Omit<LivePosition, "updated_at">>,
   runnerId: 1 | 2 = 1,
 ): Promise<string | null> {
-  if (!supabase) return null;
-  const { error } = await supabase.from("live_position").upsert({
-    id: runnerId,
-    ...fields,
-    updated_at: new Date().toISOString(),
-  });
-  return error?.message ?? null;
+  try {
+    const res = await apiFetch("/api/live-position", {
+      method: "POST",
+      body: JSON.stringify({ runner_id: runnerId, ...fields }),
+    });
+    if (!res.ok) { const d = await res.json(); return d.error ?? "Errore"; }
+    return null;
+  } catch { return "Errore di rete"; }
 }
 
-/** Carica l'ultima posizione nota di un corridore. */
 export async function loadLivePosition(runnerId: 1 | 2 = 1): Promise<LivePosition | null> {
-  if (!supabase) return null;
-  const { data } = await supabase
-    .from("live_position")
-    .select("*")
-    .eq("id", runnerId)
-    .single();
-  return (data as LivePosition) ?? null;
+  try {
+    const res = await fetch(`/api/live-position?runner_id=${runnerId}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
 }
 
-/** Carica le posizioni di entrambi i corridori. */
 export async function loadAllLivePositions(): Promise<{ 1: LivePosition | null; 2: LivePosition | null }> {
-  if (!supabase) return { 1: null, 2: null };
-  const { data } = await supabase
-    .from("live_position")
-    .select("*")
-    .in("id", [1, 2]);
-  const result: { 1: LivePosition | null; 2: LivePosition | null } = { 1: null, 2: null };
-  (data ?? []).forEach((row: LivePosition & { id: number }) => {
-    result[row.id as 1 | 2] = row;
-  });
-  return result;
+  try {
+    const res = await fetch("/api/live-position");
+    if (!res.ok) return { 1: null, 2: null };
+    return await res.json();
+  } catch { return { 1: null, 2: null }; }
 }
 
 /**
- * Sottoscrizione Realtime a live_position (entrambi i corridori).
- * Il callback riceve l'id del corridore e la nuova posizione.
+ * Polling ogni 5 s su live_position (sostituisce Supabase Realtime).
  * Ritorna cleanup.
  */
 export function subscribeLivePosition(
   cb: (runnerId: 1 | 2, pos: LivePosition) => void,
 ): () => void {
-  if (!supabase) return () => {};
-  const channel = supabase
-    .channel("live-position-channel")
-    .on(
-      "postgres_changes",
-      { event: "UPDATE", schema: "public", table: "live_position" },
-      (payload) => {
-        const row = payload.new as LivePosition & { id: number };
-        if (row.id !== 1 && row.id !== 2) return;
-        cb(row.id as 1 | 2, row);
-      },
-    )
-    .subscribe();
-  return () => { supabase!.removeChannel(channel); };
+  let prev1: string | null = null;
+  let prev2: string | null = null;
+
+  const poll = async () => {
+    const all = await loadAllLivePositions();
+    for (const id of [1, 2] as const) {
+      const pos = all[id];
+      if (!pos) continue;
+      const key = id === 1 ? prev1 : prev2;
+      if (pos.updated_at !== key) {
+        if (id === 1) prev1 = pos.updated_at;
+        else          prev2 = pos.updated_at;
+        cb(id, pos);
+      }
+    }
+  };
+
+  poll();
+  const timer = setInterval(poll, 5_000);
+  return () => clearInterval(timer);
 }
 
 // ─── route_positions ───────────────────────────────────────────────────────────
 
-/** session_id = data del giorno corrente (es. "2026-04-18"). */
 export function todaySessionId(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Aggiunge un punto alla traccia del corridore specificato.
- *  Restituisce il messaggio di errore Supabase, o null se ok. */
 export async function appendRoutePoint(
   lat: number,
   lng: number,
@@ -116,81 +104,70 @@ export async function appendRoutePoint(
   sessionId: string,
   runnerId: 1 | 2 = 1,
 ): Promise<string | null> {
-  if (!supabase) return null;
-  const { error } = await supabase.from("route_positions").insert({
-    lat, lng, speed, accuracy, heading,
-    session_id: sessionId,
-    recorded_at: new Date().toISOString(),
-    runner_id: runnerId,
-  });
-  return error?.message ?? null;
+  try {
+    const res = await apiFetch("/api/route-positions", {
+      method: "POST",
+      body: JSON.stringify({ lat, lng, speed, accuracy, heading, session_id: sessionId, runner_id: runnerId }),
+    });
+    if (!res.ok) { const d = await res.json(); return d.error ?? "Errore"; }
+    return null;
+  } catch { return "Errore di rete"; }
 }
 
-/**
- * Carica tutti i punti della traccia per le sessioni fornite,
- * opzionalmente filtrati per corridore. Ordinati per tempo crescente.
- */
 export async function loadRoutePositions(
   sessionIds?: string[],
   runnerId?: 1 | 2,
 ): Promise<RoutePoint[]> {
-  if (!supabase) return [];
-  const ids = sessionIds ?? [todaySessionId()];
-  let query = supabase
-    .from("route_positions")
-    .select("id, lat, lng, recorded_at, session_id, runner_id")
-    .in("session_id", ids)
-    .order("recorded_at", { ascending: true });
-  if (runnerId !== undefined) query = query.eq("runner_id", runnerId);
-  const { data } = await query;
-  return (data as RoutePoint[]) ?? [];
+  try {
+    const ids = (sessionIds ?? [todaySessionId()]).join(",");
+    const url = runnerId
+      ? `/api/route-positions?session_ids=${ids}&runner_id=${runnerId}`
+      : `/api/route-positions?session_ids=${ids}`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch { return []; }
 }
 
-/** Sottoscrizione Realtime a nuovi punti, opzionalmente filtrati per corridore. */
+/**
+ * Polling ogni 10 s su route_positions (sostituisce Supabase Realtime).
+ * Ritorna cleanup.
+ */
 export function subscribeRoutePositions(
   cb: (point: RoutePoint) => void,
   runnerId?: 1 | 2,
 ): () => void {
-  if (!supabase) return () => {};
-  const channelName = runnerId
-    ? `route-positions-channel-${runnerId}`
-    : "route-positions-channel";
-  const channel = supabase
-    .channel(channelName)
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "route_positions" },
-      (payload) => {
-        const pt = payload.new as RoutePoint;
-        if (runnerId === undefined || pt.runner_id === runnerId) cb(pt);
-      },
-    )
-    .subscribe();
-  return () => { supabase!.removeChannel(channel); };
+  const seen = new Set<number>();
+
+  const poll = async () => {
+    const points = await loadRoutePositions([todaySessionId()], runnerId);
+    for (const p of points) {
+      if (!seen.has(p.id)) { seen.add(p.id); cb(p); }
+    }
+  };
+
+  poll();
+  const timer = setInterval(poll, 10_000);
+  return () => clearInterval(timer);
 }
 
-/** Cancella tutti i punti della traccia per la sessione e il corridore indicati.
- *  Usato dal pannello admin per eliminare dati di test. */
 export async function clearRoutePositions(
   sessionId: string,
   runnerId: 1 | 2,
 ): Promise<string | null> {
-  if (!supabase) return null;
-  const { error } = await supabase
-    .from("route_positions")
-    .delete()
-    .eq("session_id", sessionId)
-    .eq("runner_id", runnerId);
-  return error?.message ?? null;
+  try {
+    const res = await apiFetch(
+      `/api/route-positions?session_id=${sessionId}&runner_id=${runnerId}`,
+      { method: "DELETE" }
+    );
+    if (!res.ok) { const d = await res.json(); return d.error ?? "Errore"; }
+    return null;
+  } catch { return "Errore di rete"; }
 }
 
 // ─── Utility distanza (Haversine) ─────────────────────────────────────────────
 
-/** Distanza in metri tra due coordinate [lat, lng]. */
-export function distanceMeters(
-  a: [number, number],
-  b: [number, number],
-): number {
+export function distanceMeters(a: [number, number], b: [number, number]): number {
   const R = 6_371_000;
   const φ1 = (a[0] * Math.PI) / 180;
   const φ2 = (b[0] * Math.PI) / 180;
