@@ -12,7 +12,7 @@
  */
 
 import { TrainingSession, TrackPoint } from "./trainingParser";
-import { supabase, isSupabaseConfigured } from "./supabase";
+import { apiFetch } from "./supabase";
 
 // ─── COSTANTI ────────────────────────────────────────────────────────────────
 
@@ -807,43 +807,44 @@ function fromRow(r: SessionRow): Omit<TrainingSession, "trackPoints"> {
   };
 }
 
-/** Salva in localStorage (sincrono) e Supabase (fire-and-forget). */
+/** Salva in localStorage (sincrono) e API Neon (fire-and-forget). */
 export function saveSessions(sessions: TrainingSession[]): void {
   const light = sessions.map(({ trackPoints: _, ...rest }) => rest);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(light));
   } catch { /* quota exceeded */ }
 
-  if (!isSupabaseConfigured || !supabase) return;
-  // Deduplicate by id — PostgreSQL rejects upserts where the same id appears twice
+  // Deduplicate by id
   const seen = new Set<string>();
   const rows = sessions.map(toRow).filter(r => {
     if (seen.has(r.id)) return false;
     seen.add(r.id);
     return true;
   });
-  supabase.from("coach_sessions").upsert(rows, { onConflict: "id" }).then(({ error }) => {
-    if (error) console.warn("[Coach] Supabase upsert error:", error.message);
-  });
+  for (const row of rows) {
+    apiFetch("/api/coach-sessions", {
+      method: "POST",
+      body: JSON.stringify(row),
+    }).catch(() => {});
+  }
 }
 
-/** Prova a caricare da Supabase; se non configurato o errore, usa localStorage. */
+/** Carica da API Neon; se non disponibile, usa localStorage. */
 export async function loadSessionsAsync(): Promise<Omit<TrainingSession, "trackPoints">[]> {
-  if (isSupabaseConfigured && supabase) {
-    const { data, error } = await supabase
-      .from("coach_sessions")
-      .select("*")
-      .order("start_time", { ascending: false });
-    if (!error && data && data.length > 0) {
-      // Aggiorna anche localStorage per uso offline
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(
-          (data as SessionRow[]).map(r => ({ ...fromRow(r), trackPoints: [] }))
-        ));
-      } catch { /* ignore */ }
-      return (data as SessionRow[]).map(fromRow);
+  try {
+    const res = await apiFetch("/api/coach-sessions");
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(
+            (data as SessionRow[]).map(r => ({ ...fromRow(r), trackPoints: [] }))
+          ));
+        } catch { /* ignore */ }
+        return (data as SessionRow[]).map(fromRow);
+      }
     }
-  }
+  } catch { /* ignore */ }
   // Fallback localStorage
   return loadSessionsLocal();
 }
@@ -864,14 +865,10 @@ export function loadSessionsLocal(): Omit<TrainingSession, "trackPoints">[] {
   }
 }
 
-/** Elimina da localStorage e Supabase. */
+/** Elimina da localStorage e API Neon. */
 export function deleteSession(id: string, sessions: TrainingSession[]): TrainingSession[] {
   const updated = sessions.filter(s => s.id !== id);
   saveSessions(updated);
-  if (isSupabaseConfigured && supabase) {
-    supabase.from("coach_sessions").delete().eq("id", id).then(({ error }) => {
-      if (error) console.warn("[Coach] Supabase delete error:", error.message);
-    });
-  }
+  apiFetch(`/api/coach-sessions?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
   return updated;
 }

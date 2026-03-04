@@ -10,7 +10,7 @@ import NativeLayout from "@/components/NativeLayout";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
 import { isNativeApp } from "@/lib/capacitorGeo";
-import { supabase } from "@/lib/supabase";
+import { apiFetch } from "@/lib/supabase";
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
 
@@ -215,17 +215,9 @@ export default function Servizi() {
   const [page, setPage] = useState<ServiziPage>(FALLBACK);
 
   useEffect(() => {
-    if (!supabase) return;
-    supabase
-      .from("servizi_page")
-      .select("data")
-      .eq("id", 1)
-      .single()
-      .then(({ data }) => {
-        if (data?.data?.sections?.length) {
-          setPage(data.data as ServiziPage);
-        }
-      });
+    apiFetch("/api/servizi").then(res => res.ok ? res.json() : null).then(data => {
+      if (data?.sections?.length) setPage(data as ServiziPage);
+    }).catch(() => {});
   }, []);
 
   const Wrapper = isNativeApp() ? NativeLayout : Layout;

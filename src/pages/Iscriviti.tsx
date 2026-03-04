@@ -4,16 +4,12 @@ import { ArrowLeft, Shirt, Heart, Users, Loader2, AlertCircle, CheckCircle2 } fr
 import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { apiFetch } from "@/lib/supabase";
 import { tappe } from "@/lib/tappe";
 
 const TAGLIE = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 type Taglia = (typeof TAGLIE)[number];
 
-// URL dell'edge function Supabase per creare la sessione Stripe
-const EDGE_FUNCTION_URL = import.meta.env.VITE_SUPABASE_URL
-  ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-payment`
-  : null;
 
 export default function Iscriviti() {
   const [searchParams] = useSearchParams();
@@ -78,18 +74,13 @@ export default function Iscriviti() {
     const err = validate();
     if (err) { setErrore(err); return; }
 
-    if (!isSupabaseConfigured) {
-      setErrore("Il sistema di iscrizione non è ancora attivo. Contattaci via email.");
-      return;
-    }
-
     setLoading(true);
     try {
       if (opzione === "gratuita") {
-        // Iscrizione gratuita: salva direttamente in Supabase
-        const { error: insertErr } = await supabase!
-          .from("iscrizioni")
-          .insert({
+        // Iscrizione gratuita
+        const res = await apiFetch("/api/iscrizioni", {
+          method: "POST",
+          body: JSON.stringify({
             tappa_numero: tappa.giorno,
             nome: nome.trim(),
             cognome: cognome.trim(),
@@ -98,21 +89,21 @@ export default function Iscriviti() {
             vuole_maglia: false,
             donazione_euro: 0,
             pagamento_stato: "gratuito",
-          });
-
-        if (insertErr) throw new Error(insertErr.message);
-
+          }),
+        });
+        if (!res.ok) {
+          const d = await res.json();
+          throw new Error(d.error ?? "Errore durante l'iscrizione.");
+        }
         navigate(
           `/iscrizione-successo?tappa=${tappa.giorno}&nome=${encodeURIComponent(nome.trim())}&tipo=gratuita`
         );
       } else {
-        // Iscrizione con donazione: usa Stripe via Edge Function
-        if (!EDGE_FUNCTION_URL) throw new Error("Pagamento non configurato.");
-
+        // Iscrizione con donazione: usa Stripe via API route
         const successUrl = `${window.location.origin}/iscrizione-successo?tappa=${tappa.giorno}&nome=${encodeURIComponent(nome.trim())}&tipo=maglia&importo=${donazione}`;
         const cancelUrl = `${window.location.origin}/iscriviti?tappa=${tappa.giorno}`;
 
-        const res = await fetch(EDGE_FUNCTION_URL, {
+        const res = await fetch("/api/create-payment", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -132,9 +123,9 @@ export default function Iscriviti() {
 
         if (!res.ok || data.error) {
           // Fallback: iscrizione con stato "in_attesa_bonifico"
-          const { error: insertErr } = await supabase!
-            .from("iscrizioni")
-            .insert({
+          const fallback = await apiFetch("/api/iscrizioni", {
+            method: "POST",
+            body: JSON.stringify({
               tappa_numero: tappa.giorno,
               nome: nome.trim(),
               cognome: cognome.trim(),
@@ -144,10 +135,12 @@ export default function Iscriviti() {
               taglia_maglia: taglia,
               donazione_euro: donazione,
               pagamento_stato: "in_attesa_bonifico",
-            });
-
-          if (insertErr) throw new Error(insertErr.message);
-
+            }),
+          });
+          if (!fallback.ok) {
+            const d = await fallback.json();
+            throw new Error(d.error ?? "Errore durante l'iscrizione.");
+          }
           navigate(
             `/iscrizione-successo?tappa=${tappa.giorno}&nome=${encodeURIComponent(nome.trim())}&tipo=bonifico&importo=${donazione}`
           );

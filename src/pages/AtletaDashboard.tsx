@@ -25,7 +25,7 @@ import {
   getCurrentUser, signOutUser, listCoaches, saveAthleteProfile,
   loadAthleteProfile, AuthUser, AthleteProfile,
 } from "@/lib/auth";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { apiFetch } from "@/lib/supabase";
 
 // ─── helpers ─────────────────────────────────────────────────
 function fmtDuration(sec: number) {
@@ -43,34 +43,34 @@ function sportIcon(s: string) {
 }
 const ZONE_COLORS = ["#6ee7b7", "#34d399", "#f59e0b", "#f97316", "#ef4444"];
 
-// ─── Caricamento sessioni da Supabase per questo atleta ───────
+// ─── Caricamento sessioni dell'atleta via API ────────────────
 async function loadAthleteSessions(athleteId: string): Promise<Omit<TrainingSession, "trackPoints">[]> {
-  if (!isSupabaseConfigured || !supabase) return [];
-  const { data, error } = await supabase
-    .from("coach_sessions")
-    .select("*")
-    .eq("athlete_id", athleteId)
-    .order("start_time", { ascending: false });
-  if (error || !data) return [];
-  return data.map((r: any) => ({
-    id: r.id,
-    fileName: r.file_name,
-    sport: r.sport,
-    startTime: new Date(r.start_time),
-    durationSec: r.duration_sec,
-    distanceM: r.distance_m,
-    avgSpeedKmh: r.avg_speed_kmh,
-    maxSpeedKmh: r.max_speed_kmh,
-    avgHeartRate: r.avg_heart_rate,
-    maxHeartRate: r.max_heart_rate,
-    totalElevationGainM: r.total_elevation_gain_m,
-    totalElevationLossM: r.total_elevation_loss_m,
-    calories: r.calories,
-    trimp: r.trimp,
-    tss: r.tss,
-    hrZonesSec: r.hr_zones_sec ?? undefined,
-    trackPoints: [],
-  }));
+  try {
+    const res = await apiFetch(`/api/coach-sessions?user_id=${athleteId}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data as any[]).map((r) => ({
+      id: r.id,
+      fileName: r.file_name,
+      sport: r.sport,
+      startTime: new Date(r.start_time),
+      durationSec: r.duration_sec,
+      distanceM: r.distance_m,
+      avgSpeedKmh: r.avg_speed_kmh,
+      maxSpeedKmh: r.max_speed_kmh,
+      avgHeartRate: r.avg_heart_rate,
+      maxHeartRate: r.max_heart_rate,
+      totalElevationGainM: r.total_elevation_gain_m,
+      totalElevationLossM: r.total_elevation_loss_m,
+      calories: r.calories,
+      trimp: r.trimp,
+      tss: r.tss,
+      hrZonesSec: r.hr_zones_sec ?? undefined,
+      trackPoints: [],
+    }));
+  } catch {
+    return [];
+  }
 }
 
 // ─── COMPONENTE PRINCIPALE ────────────────────────────────────
@@ -142,30 +142,29 @@ export default function AtletaDashboard() {
       const existing = new Set(prev.map(s => s.id));
       const merged = [...prev, ...toAdd.filter(s => !existing.has(s.id))]
         .sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
-      // Salva su Supabase con athlete_id
-      if (isSupabaseConfigured && supabase) {
-        const rows = merged.map(s => ({
-          id: s.id,
-          file_name: s.fileName,
-          sport: s.sport,
-          start_time: s.startTime.toISOString(),
-          duration_sec: s.durationSec,
-          distance_m: s.distanceM,
-          avg_speed_kmh: s.avgSpeedKmh,
-          max_speed_kmh: s.maxSpeedKmh,
-          avg_heart_rate: s.avgHeartRate,
-          max_heart_rate: s.maxHeartRate,
-          total_elevation_gain_m: s.totalElevationGainM,
-          total_elevation_loss_m: s.totalElevationLossM,
-          calories: s.calories,
-          trimp: s.trimp,
-          tss: s.tss,
-          hr_zones_sec: s.hrZonesSec ? Array.from(s.hrZonesSec) : null,
-          athlete_id: user.id,
-        }));
-        supabase.from("coach_sessions").upsert(rows, { onConflict: "id" }).then(({ error }) => {
-          if (error) console.warn("[Atleta] upsert error:", error.message);
-        });
+      // Salva via API
+      for (const s of toAdd) {
+        apiFetch("/api/coach-sessions", {
+          method: "POST",
+          body: JSON.stringify({
+            id: s.id,
+            file_name: s.fileName,
+            sport: s.sport,
+            start_time: s.startTime.toISOString(),
+            duration_sec: s.durationSec,
+            distance_m: s.distanceM,
+            avg_speed_kmh: s.avgSpeedKmh,
+            max_speed_kmh: s.maxSpeedKmh,
+            avg_heart_rate: s.avgHeartRate,
+            max_heart_rate: s.maxHeartRate,
+            total_elevation_gain_m: s.totalElevationGainM,
+            total_elevation_loss_m: s.totalElevationLossM,
+            calories: s.calories,
+            trimp: s.trimp,
+            tss: s.tss,
+            hr_zones_sec: s.hrZonesSec ? Array.from(s.hrZonesSec) : null,
+          }),
+        }).catch(() => {});
       }
       return merged;
     });
@@ -173,13 +172,8 @@ export default function AtletaDashboard() {
   }, [user, maxHR]);
 
   const handleDelete = (id: string) => {
-    setSessions(prev => {
-      const updated = prev.filter(s => s.id !== id);
-      if (isSupabaseConfigured && supabase) {
-        supabase.from("coach_sessions").delete().eq("id", id).then(() => {});
-      }
-      return updated;
-    });
+    setSessions(prev => prev.filter(s => s.id !== id));
+    apiFetch(`/api/coach-sessions?id=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => {});
   };
 
   const handleSaveProfile = async () => {
