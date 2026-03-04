@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Heart, ChevronDown, LogIn, Footprints, Dumbbell, User } from "lucide-react";
+import { Menu, X, Heart, ChevronDown, LogIn, Footprints } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
@@ -20,16 +20,9 @@ const navLinks = [
   { label: "Contatti", to: "/contatti" },
 ];
 
-const loginItems = [
-  { label: "Area Atleta", to: "/atleta/accedi", icon: <User className="w-4 h-4" />, desc: "Accedi o registrati come atleta" },
-  { label: "Area Coach", to: "/coach-login", icon: <Dumbbell className="w-4 h-4" />, desc: "Accedi o registrati come coach" },
-  { label: "Admin", to: "/admin-login", icon: <LogIn className="w-4 h-4" />, desc: "Pannello amministratore" },
-];
-
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [santuariOpen, setSantuariOpen] = useState(false);
-  const [loginOpen, setLoginOpen] = useState(false);
   const location = useLocation();
 
   return (
@@ -77,28 +70,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
               )
             )}
-            {/* Login dropdown */}
-            <div className="relative group">
-              <button className="whitespace-nowrap flex items-center gap-1.5 text-sm font-body font-medium tracking-wide border border-primary-foreground/40 rounded-md px-3 py-1.5 text-primary-foreground/80 hover:text-primary-foreground hover:border-primary-foreground transition-colors">
-                <LogIn className="w-3.5 h-3.5" />
-                Login
-                <ChevronDown className="w-3 h-3 opacity-60" />
-              </button>
-              <div className="absolute top-full right-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                <div className="bg-card rounded-xl shadow-2xl border border-border min-w-[220px] overflow-hidden">
-                  {loginItems.map((item) => (
-                    <Link key={item.to} to={item.to}
-                      className="flex items-start gap-3 px-4 py-3 hover:bg-muted transition-colors">
-                      <span className="mt-0.5 text-primary">{item.icon}</span>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                        <p className="text-xs text-muted-foreground">{item.desc}</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </div>
+            {/* Accedi */}
+            <Link
+              to="/accedi"
+              className={`whitespace-nowrap flex items-center gap-1.5 text-sm font-body font-medium tracking-wide border rounded-md px-3 py-1.5 transition-colors ${
+                location.pathname === "/accedi"
+                  ? "border-primary-foreground text-primary-foreground"
+                  : "border-primary-foreground/40 text-primary-foreground/80 hover:text-primary-foreground hover:border-primary-foreground"
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              Accedi
+            </Link>
             <Link
               to="/partecipa"
               className={`whitespace-nowrap flex items-center gap-1.5 text-sm font-body font-semibold tracking-wide border-2 rounded-md px-3 py-1.5 transition-colors ${
@@ -192,36 +175,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </Link>
                   )
                 )}
-                {/* Login accordion mobile */}
-                <div>
-                  <button
-                    onClick={() => setLoginOpen(!loginOpen)}
-                    className="w-full text-left py-3 mt-1 text-primary-foreground font-body text-sm font-semibold flex items-center justify-between border border-primary-foreground/40 rounded-md px-3"
-                  >
-                    <span className="flex items-center gap-2"><LogIn className="w-4 h-4" />Login</span>
-                    <ChevronDown className={`w-4 h-4 transition-transform ${loginOpen ? "rotate-180" : ""}`} />
-                  </button>
-                  <AnimatePresence>
-                    {loginOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        {loginItems.map((item) => (
-                          <Link key={item.to} to={item.to}
-                            onClick={() => setMobileOpen(false)}
-                            className="flex items-center gap-3 py-2.5 pl-4 text-primary-foreground/80 text-sm font-body">
-                            <span className="text-accent">{item.icon}</span>
-                            {item.label}
-                          </Link>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                {/* Accedi mobile */}
+                <Link
+                  to="/accedi"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 py-3 mt-1 text-primary-foreground font-body text-sm font-semibold border border-primary-foreground/40 rounded-md px-3"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Accedi
+                </Link>
               </div>
             </motion.nav>
           )}
