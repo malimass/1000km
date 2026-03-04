@@ -4,11 +4,13 @@
  * Tool admin per pianificare un percorso pedonale/di corsa tra due indirizzi,
  * suddividerlo in tappe di N km e visualizzarle su mappa Leaflet.
  *
- * APIs Google Maps:
- *  - Geocoding API   → converte indirizzo in coordinate
- *  - Directions API  → calcola percorso a piedi (evita strade veloci)
+ * APIs Google Maps (JS SDK — niente CORS):
+ *  - AutocompleteService → suggerimenti mentre si digita
+ *  - Geocoder            → converte indirizzo in coordinate
+ *  - DirectionsService   → calcola percorso a piedi
  *
  * Richiede: VITE_GOOGLE_MAPS_API_KEY nel file .env
+ * Abilita su Cloud Console: Directions API, Geocoding API, Places API
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -22,7 +24,7 @@ import {
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
-// ─── Carica Google Maps JS API (con Places) una sola volta ───────────────────
+// ─── Carica Google Maps JS API una sola volta ─────────────────────────────────
 
 let _gmapsPromise: Promise<void> | null = null;
 
@@ -30,9 +32,9 @@ function loadGoogleMapsScript(key: string): Promise<void> {
   if (_gmapsPromise) return _gmapsPromise;
   _gmapsPromise = new Promise((resolve, reject) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((window as any).google?.maps?.places) { resolve(); return; }
+    if ((window as any).google?.maps) { resolve(); return; }
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=it`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=it&loading=async`;
     script.async = true;
     script.onload  = () => resolve();
     script.onerror = () => { _gmapsPromise = null; reject(new Error("Impossibile caricare Google Maps")); };
@@ -56,6 +58,11 @@ interface TappaPoint {
   lng:       number;
   kmProgr:   number;
   label:     string;
+}
+
+interface Suggestion {
+  description: string;
+  place_id:    string;
 }
 
 // ─── Decode Google Encoded Polyline ──────────────────────────────────────────
@@ -95,8 +102,8 @@ function splitByKm(coords: [number, number][], kmPerTappa: number): TappaPoint[]
 
   let cumM = 0, next = stepM, tappaNum = 1;
   for (let i = 1; i < coords.length; i++) {
-    const segM    = haversineM(coords[i - 1], coords[i]);
-    const segEnd  = cumM + segM;
+    const segM   = haversineM(coords[i - 1], coords[i]);
+    const segEnd = cumM + segM;
     while (next < segEnd) {
       const t   = segM > 0 ? (next - cumM) / segM : 0;
       const lat = coords[i - 1][0] + t * (coords[i][0] - coords[i - 1][0]);
@@ -112,40 +119,44 @@ function splitByKm(coords: [number, number][], kmPerTappa: number): TappaPoint[]
   return pts;
 }
 
-// ─── Google Geocoding API ─────────────────────────────────────────────────────
+// ─── Google Geocoder JS SDK (niente CORS) ────────────────────────────────────
 
-async function googleGeocode(address: string, key: string): Promise<[number, number] | null> {
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${key}&language=it`;
-  try {
-    const res  = await fetch(url);
-    const data = await res.json();
-    if (data.status !== "OK" || !data.results?.length) return null;
-    const { lat, lng } = data.results[0].geometry.location;
-    return [lat, lng];
-  } catch { return null; }
+function googleGeocode(address: string): Promise<[number, number] | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const G = (window as any).google.maps;
+  return new Promise((resolve) => {
+    new G.Geocoder().geocode({ address, language: "it" }, (results: any[], status: string) => {
+      if (status === "OK" && results?.length) {
+        const loc = results[0].geometry.location;
+        resolve([loc.lat(), loc.lng()]);
+      } else {
+        resolve(null);
+      }
+    });
+  });
 }
 
-// ─── Google Directions API (walking) ─────────────────────────────────────────
+// ─── Google DirectionsService JS SDK (niente CORS) ───────────────────────────
 
-async function googleDirections(
-  start: [number, number],
-  end:   [number, number],
-  key:   string,
-): Promise<RouteResult | null> {
-  const origin      = `${start[0]},${start[1]}`;
-  const destination = `${end[0]},${end[1]}`;
-  // mode=walking: Google evita automaticamente autostrade e strade a scorrimento veloce
-  const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=walking&key=${key}&language=it`;
-  try {
-    const res  = await fetch(url);
-    const data = await res.json();
-    if (data.status !== "OK" || !data.routes?.length) return null;
-    const route = data.routes[0];
-    // Decode la polyline dell'intera rotta (overview_polyline)
-    const coords = decodePolyline(route.overview_polyline.points);
-    const distanceM = route.legs.reduce((sum: number, leg: { distance: { value: number } }) => sum + leg.distance.value, 0);
-    return { coords, distanceM };
-  } catch { return null; }
+function googleDirections(start: [number, number], end: [number, number]): Promise<RouteResult | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const G = (window as any).google.maps;
+  return new Promise((resolve) => {
+    new G.DirectionsService().route({
+      origin:      { lat: start[0], lng: start[1] },
+      destination: { lat: end[0],   lng: end[1]   },
+      travelMode:  "WALKING",
+    }, (result: any, status: string) => {
+      if (status === "OK" && result.routes?.length) {
+        const route     = result.routes[0];
+        const coords    = decodePolyline(route.overview_polyline.points);
+        const distanceM = route.legs.reduce((sum: number, leg: any) => sum + leg.distance.value, 0);
+        resolve({ coords, distanceM });
+      } else {
+        resolve(null);
+      }
+    });
+  });
 }
 
 // ─── MapFit — adatta bounds dopo il calcolo ───────────────────────────────────
@@ -180,64 +191,65 @@ export default function PercorsoBuilder() {
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
 
-  const [route,   setRoute]   = useState<RouteResult | null>(null);
-  const [tappe,   setTappe]   = useState<TappaPoint[]>([]);
-  const [copied,  setCopied]  = useState(false);
+  const [route,  setRoute]  = useState<RouteResult | null>(null);
+  const [tappe,  setTappe]  = useState<TappaPoint[]>([]);
+  const [copied, setCopied] = useState(false);
 
-  const noKey = !GOOGLE_KEY;
+  const [mapsReady,    setMapsReady]    = useState(false);
+  const [partenzaSugg, setPartenzaSugg] = useState<Suggestion[]>([]);
+  const [arrivoSugg,   setArrivoSugg]   = useState<Suggestion[]>([]);
 
-  const partenzaRef = useRef<HTMLInputElement>(null);
-  const arrivoRef   = useRef<HTMLInputElement>(null);
+  const noKey         = !GOOGLE_KEY;
+  const partenzaTimer = useRef<ReturnType<typeof setTimeout>>();
+  const arrivoTimer   = useRef<ReturnType<typeof setTimeout>>();
 
-  // ── Inizializza Google Places Autocomplete sugli input ──────────────────
+  // ── Carica Google Maps JS SDK ─────────────────────────────────────────────
   useEffect(() => {
     if (!GOOGLE_KEY) return;
-    loadGoogleMapsScript(GOOGLE_KEY).then(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const G = (window as any).google.maps.places;
-
-      if (partenzaRef.current) {
-        const ac = new G.Autocomplete(partenzaRef.current, { language: "it" });
-        ac.addListener("place_changed", () => {
-          const place = ac.getPlace();
-          const addr  = place.formatted_address || place.name || "";
-          if (addr) setPartenza(addr);
-        });
-      }
-
-      if (arrivoRef.current) {
-        const ac = new G.Autocomplete(arrivoRef.current, { language: "it" });
-        ac.addListener("place_changed", () => {
-          const place = ac.getPlace();
-          const addr  = place.formatted_address || place.name || "";
-          if (addr) setArrivo(addr);
-        });
-      }
-    }).catch(() => {/* errore già gestito nel banner noKey */});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadGoogleMapsScript(GOOGLE_KEY).then(() => setMapsReady(true)).catch(() => {});
   }, []);
+
+  // ── Autocomplete via AutocompleteService (niente widget, niente deprecation) ─
+  function fetchSugg(
+    input: string,
+    setter: (s: Suggestion[]) => void,
+    timerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | undefined>,
+  ) {
+    clearTimeout(timerRef.current);
+    if (!mapsReady || input.length < 3) { setter([]); return; }
+    timerRef.current = setTimeout(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const svc = new (window as any).google.maps.places.AutocompleteService();
+      svc.getPlacePredictions({ input, language: "it" }, (preds: any[], status: string) => {
+        setter(status === "OK"
+          ? preds.map((p: any) => ({ description: p.description, place_id: p.place_id }))
+          : []);
+      });
+    }, 300);
+  }
 
   // ── Calcola percorso ──────────────────────────────────────────────────────
   const handleCalcola = useCallback(async () => {
-    if (noKey) { setError("Imposta VITE_GOOGLE_MAPS_API_KEY nel file .env"); return; }
+    if (noKey)      { setError("Imposta VITE_GOOGLE_MAPS_API_KEY nel file .env"); return; }
+    if (!mapsReady) { setError("Google Maps non ancora caricato, attendi un momento."); return; }
     if (!partenza.trim() || !arrivo.trim()) { setError("Inserisci partenza e arrivo."); return; }
 
     setLoading(true); setError(null); setRoute(null); setTappe([]);
 
     const [startC, endC] = await Promise.all([
-      googleGeocode(partenza, GOOGLE_KEY!),
-      googleGeocode(arrivo,   GOOGLE_KEY!),
+      googleGeocode(partenza),
+      googleGeocode(arrivo),
     ]);
     if (!startC) { setError(`Indirizzo non trovato: "${partenza}"`); setLoading(false); return; }
     if (!endC)   { setError(`Indirizzo non trovato: "${arrivo}"`);   setLoading(false); return; }
 
-    const result = await googleDirections(startC, endC, GOOGLE_KEY!);
+    const result = await googleDirections(startC, endC);
     if (!result) { setError("Google non ha trovato un percorso. Prova indirizzi più precisi."); setLoading(false); return; }
 
     setRoute(result);
     setTappe(splitByKm(result.coords, kmPerTappa));
     setLoading(false);
-  }, [partenza, arrivo, kmPerTappa, noKey]);
+  }, [partenza, arrivo, kmPerTappa, noKey, mapsReady]);
 
   // ── Ricalcola tappe al cambio di kmPerTappa ───────────────────────────────
   useEffect(() => {
@@ -257,6 +269,23 @@ export default function PercorsoBuilder() {
 
   const totalKm = route ? Math.round(route.distanceM / 100) / 10 : null;
   const nTappe  = totalKm && kmPerTappa ? Math.ceil(totalKm / kmPerTappa) : null;
+
+  // ── Dropdown suggerimenti ─────────────────────────────────────────────────
+  function SuggDropdown({ suggestions, onSelect }: { suggestions: Suggestion[]; onSelect: (d: string) => void }) {
+    if (!suggestions.length) return null;
+    return (
+      <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-52 overflow-y-auto">
+        {suggestions.map((s) => (
+          <li key={s.place_id}
+            onMouseDown={() => onSelect(s.description)}
+            className="px-3 py-2 text-xs cursor-pointer hover:bg-muted flex items-center gap-2">
+            <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
+            {s.description}
+          </li>
+        ))}
+      </ul>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -311,11 +340,14 @@ export default function PercorsoBuilder() {
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">Partenza</label>
           <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-green-500" />
-            <input ref={partenzaRef} type="text" value={partenza} onChange={e => setPartenza(e.target.value)}
-              placeholder="Es. Bologna, Piazza Maggiore"
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-green-500 z-10 pointer-events-none" />
+            <input type="text" value={partenza}
+              onChange={e => { setPartenza(e.target.value); fetchSugg(e.target.value, setPartenzaSugg, partenzaTimer); }}
+              onBlur={() => setTimeout(() => setPartenzaSugg([]), 150)}
               onKeyDown={e => e.key === "Enter" && handleCalcola()}
+              placeholder="Es. Bologna, Piazza Maggiore"
               className="w-full pl-8 pr-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-dona/40" />
+            <SuggDropdown suggestions={partenzaSugg} onSelect={v => { setPartenza(v); setPartenzaSugg([]); }} />
           </div>
         </div>
 
@@ -323,11 +355,14 @@ export default function PercorsoBuilder() {
         <div>
           <label className="block text-xs font-semibold text-foreground mb-1">Arrivo</label>
           <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-red-500" />
-            <input ref={arrivoRef} type="text" value={arrivo} onChange={e => setArrivo(e.target.value)}
-              placeholder="Es. Terranova Sappo Minulio, Reggio Calabria"
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-red-500 z-10 pointer-events-none" />
+            <input type="text" value={arrivo}
+              onChange={e => { setArrivo(e.target.value); fetchSugg(e.target.value, setArrivoSugg, arrivoTimer); }}
+              onBlur={() => setTimeout(() => setArrivoSugg([]), 150)}
               onKeyDown={e => e.key === "Enter" && handleCalcola()}
+              placeholder="Es. Terranova Sappo Minulio, Reggio Calabria"
               className="w-full pl-8 pr-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-dona/40" />
+            <SuggDropdown suggestions={arrivoSugg} onSelect={v => { setArrivo(v); setArrivoSugg([]); }} />
           </div>
         </div>
 
