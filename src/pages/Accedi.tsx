@@ -18,8 +18,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { signInUser } from "@/lib/auth";
+import { signInUser, getCurrentUser } from "@/lib/auth";
 
 // ─── Icone provider OAuth ─────────────────────────────────────────────────────
 
@@ -66,20 +65,11 @@ export default function Accedi() {
   const [password, setPassword] = useState("");
   const [error, setError]       = useState<string | null>(null);
   const [loading, setLoading]   = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
 
   // ── Se già loggato, redirige subito ──
   useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(async ({ data }) => {
-      const user = data.session?.user;
-      if (!user) return;
-      const { data: profile } = await supabase!
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      navigate(redirectForRole(profile?.role), { replace: true });
+    getCurrentUser().then(user => {
+      if (user) navigate(redirectForRole(user.role), { replace: true });
     });
   }, [navigate]);
 
@@ -106,29 +96,6 @@ export default function Accedi() {
     navigate(redirectForRole(user.role), { replace: true });
   }
 
-  // ── Login OAuth (Google / Facebook / Apple) ──
-  async function handleOAuth(provider: "google" | "facebook" | "apple") {
-    if (!supabase) return;
-    setOauthLoading(provider);
-    setError(null);
-    // Dopo l'autenticazione OAuth il provider redirige a /accedi
-    // e l'useEffect sopra legge il ruolo e fa il redirect corretto
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}/accedi` },
-    });
-  }
-
-  if (!isSupabaseConfigured) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-muted-foreground text-sm">
-          Supabase non configurato. Aggiungi VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12 pt-safe">
       <motion.div
@@ -146,41 +113,6 @@ export default function Accedi() {
           <p className="font-body text-muted-foreground text-sm">
             1000km di Gratitudine — entra con il tuo account
           </p>
-        </div>
-
-        {/* OAuth */}
-        <div className="space-y-3 mb-6">
-          {(["google", "facebook", "apple"] as const).map((provider) => {
-            const labels = { google: "Google", facebook: "Facebook", apple: "Apple" };
-            const icons  = { google: <GoogleIcon />, facebook: <FacebookIcon />, apple: <AppleIcon /> };
-            return (
-              <button
-                key={provider}
-                type="button"
-                onClick={() => handleOAuth(provider)}
-                disabled={!!oauthLoading}
-                className="w-full flex items-center justify-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm font-body font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-60"
-              >
-                {oauthLoading === provider
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : icons[provider]
-                }
-                Continua con {labels[provider]}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Divisore */}
-        <div className="relative mb-6">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center">
-            <span className="bg-background px-3 text-xs text-muted-foreground font-body">
-              oppure con email
-            </span>
-          </div>
         </div>
 
         {/* Form login */}
