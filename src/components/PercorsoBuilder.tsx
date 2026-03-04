@@ -145,7 +145,6 @@ async function googleDirections(start: [number, number], end: [number, number]):
       origin:      { location: { latLng: { latitude: start[0], longitude: start[1] } } },
       destination: { location: { latLng: { latitude: end[0], longitude: end[1] } } },
       travelMode:  "WALK",
-      languageCode: "it",
       routeModifiers: { avoidHighways: true, avoidTolls: false, avoidFerries: false },
     });
     if (!response?.routes?.length) return null;
