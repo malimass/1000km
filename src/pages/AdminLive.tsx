@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 
 const RouteMap = lazy(() => import("@/components/RouteMap"));
+const PercorsoBuilder = lazy(() => import("@/components/PercorsoBuilder"));
 
 // ─── Costanti ────────────────────────────────────────────────────────────────
 const CAMMINO_START = new Date("2026-04-18T06:00:00");
@@ -206,7 +207,7 @@ async function shareToTikTok(file: File, caption: string): Promise<{ ok: boolean
 }
 
 // ─── Tipi sezione ─────────────────────────────────────────────────────────────
-type Section = "live" | "social" | "notizie" | "raccolta" | "video" | "sostenitori" | "share" | "settings";
+type Section = "live" | "social" | "notizie" | "raccolta" | "video" | "sostenitori" | "share" | "settings" | "percorso";
 
 const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
   { key: "live",        label: "Live Tracking", icon: <MapPin className="w-4 h-4" /> },
@@ -217,6 +218,7 @@ const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
   { key: "sostenitori", label: "Sostenitori",   icon: <Users className="w-4 h-4" /> },
   { key: "share",       label: "Condivisione",  icon: <Share2 className="w-4 h-4" /> },
   { key: "settings",    label: "Impostazioni",  icon: <Settings className="w-4 h-4" /> },
+  { key: "percorso",    label: "Crea Percorso", icon: <Map className="w-4 h-4" /> },
 ];
 
 // ─── Componente principale ────────────────────────────────────────────────────
@@ -2080,6 +2082,17 @@ export default function AdminLive() {
                   {isSupabaseConfigured ? "Salva e sincronizza" : "Salva impostazioni"}
                 </button>
               </div>
+            )}
+
+            {/* ══ CREA PERCORSO ═════════════════════════════════════════════ */}
+            {activeSection === "percorso" && (
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              }>
+                <PercorsoBuilder />
+              </Suspense>
             )}
 
           </div>
