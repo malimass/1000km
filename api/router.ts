@@ -32,6 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/community/live-position") return await communityLivePosition(req, res);
     if (path === "/community/route-positions") return await communityRoutePositions(req, res);
     if (path === "/percorso-config") return await percorsoConfig(req, res);
+    if (path === "/saved-percorsi") return await savedPercorsi(req, res);
     return res.status(404).json({ error: "Not found" });
   } catch (err: any) {
     console.error(err);
@@ -712,5 +713,49 @@ async function percorsoConfig(req: VercelRequest, res: VercelResponse) {
     `;
     return res.json({ ok: true });
   }
+  return res.status(405).end();
+}
+
+// ─── SAVED PERCORSI ──────────────────────────────────────────────────────────
+
+async function savedPercorsi(req: VercelRequest, res: VercelResponse) {
+  const user = await requireAuth(req);
+  if (!user) return res.status(401).json({ error: "Non autenticato" });
+
+  // GET — lista percorsi dell'utente
+  if (req.method === "GET") {
+    const rows = await sql`
+      SELECT id, name, partenza, arrivo, distance_m, km_per_tappa, coords, tappe, created_at
+      FROM saved_percorsi
+      WHERE user_id = ${user.sub}
+      ORDER BY created_at DESC
+    `;
+    return res.json(rows);
+  }
+
+  // POST — salva nuovo percorso
+  if (req.method === "POST") {
+    const { name, partenza, arrivo, distanceM, kmPerTappa, coords, tappe } = req.body ?? {};
+    if (!partenza || !arrivo || !coords?.length || !tappe?.length)
+      return res.status(400).json({ error: "Dati percorso incompleti" });
+
+    const label = (name as string)?.trim() || `${partenza} → ${arrivo}`;
+    const rows = await sql`
+      INSERT INTO saved_percorsi (user_id, name, partenza, arrivo, distance_m, km_per_tappa, coords, tappe)
+      VALUES (${user.sub}, ${label}, ${partenza}, ${arrivo}, ${distanceM ?? 0}, ${kmPerTappa ?? 70},
+              ${JSON.stringify(coords)}, ${JSON.stringify(tappe)})
+      RETURNING id, name, partenza, arrivo, distance_m, km_per_tappa, coords, tappe, created_at
+    `;
+    return res.status(201).json(rows[0]);
+  }
+
+  // DELETE — elimina un percorso
+  if (req.method === "DELETE") {
+    const id = (req.query.id as string) ?? req.body?.id;
+    if (!id) return res.status(400).json({ error: "id richiesto" });
+    await sql`DELETE FROM saved_percorsi WHERE id = ${id} AND user_id = ${user.sub}`;
+    return res.json({ ok: true });
+  }
+
   return res.status(405).end();
 }

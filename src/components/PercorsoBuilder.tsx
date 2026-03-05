@@ -26,6 +26,7 @@ import {
   Search, Navigation, Loader2, MapPin, Route, RotateCcw, Copy, CheckCircle2,
   AlertCircle, Save, Trash2, FolderOpen, Map as MapIcon,
 } from "lucide-react";
+import { apiFetch } from "@/lib/supabase";
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
@@ -96,27 +97,15 @@ interface Suggestion {
 }
 
 interface SavedPercorso {
-  id:         string;
-  name:       string;
-  partenza:   string;
-  arrivo:     string;
-  distanceM:  number;
-  kmPerTappa: number;
-  coords:     [number, number][];
-  tappe:      TappaPoint[];
-  createdAt:  string;
-}
-
-const STORAGE_KEY = "gp_saved_percorsi";
-
-function loadSavedPercorsi(): SavedPercorso[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch { return []; }
-}
-
-function saveToDisk(list: SavedPercorso[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  id:            string;
+  name:          string;
+  partenza:      string;
+  arrivo:        string;
+  distance_m:    number;
+  km_per_tappa:  number;
+  coords:        [number, number][];
+  tappe:         TappaPoint[];
+  created_at:    string;
 }
 
 // ─── Haversine (m) ────────────────────────────────────────────────────────────
@@ -200,16 +189,22 @@ async function googleDirections(start: [number, number], end: [number, number]):
     if (!result?.routes?.length) return null;
     const route = result.routes[0];
 
-    // Estrai coordinate dalla overview_path
+    // Estrai coordinate dettagliate da ogni step di ogni leg
+    // (overview_path è troppo semplificato e taglia dritto)
+    const coords: [number, number][] = [];
+    let distanceM = 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const coords: [number, number][] = route.overview_path.map((p: any) => [p.lat(), p.lng()]);
-    if (!coords.length) return null;
-
-    // Distanza totale in metri
-    const distanceM = route.legs.reduce(
+    for (const leg of route.legs as any[]) {
+      distanceM += leg.distance?.value ?? 0;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (s: number, leg: any) => s + (leg.distance?.value ?? 0), 0
-    );
+      for (const step of leg.steps as any[]) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const pt of step.path as any[]) {
+          coords.push([pt.lat(), pt.lng()]);
+        }
+      }
+    }
+    if (!coords.length) return null;
 
     return { coords, distanceM };
   } catch (err) {
@@ -261,10 +256,11 @@ export default function PercorsoBuilder() {
   const [partenzaSugg, setPartenzaSugg] = useState<Suggestion[]>([]);
   const [arrivoSugg,   setArrivoSugg]   = useState<Suggestion[]>([]);
 
-  // Saved percorsi
-  const [savedList, setSavedList] = useState<SavedPercorso[]>(() => loadSavedPercorsi());
-  const [showSaved, setShowSaved] = useState(false);
-  const [saveName,  setSaveName]  = useState("");
+  // Saved percorsi (DB)
+  const [savedList,    setSavedList]    = useState<SavedPercorso[]>([]);
+  const [showSaved,    setShowSaved]    = useState(false);
+  const [saveName,     setSaveName]     = useState("");
+  const [loadingSaved, setLoadingSaved] = useState(false);
 
   const noKey         = !GOOGLE_KEY;
   const partenzaTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -274,6 +270,16 @@ export default function PercorsoBuilder() {
   useEffect(() => {
     if (!GOOGLE_KEY) return;
     loadGoogleMapsScript(GOOGLE_KEY).then(() => setMapsReady(true)).catch(() => {});
+  }, []);
+
+  // ── Carica percorsi salvati dal DB ──────────────────────────────────────
+  useEffect(() => {
+    setLoadingSaved(true);
+    apiFetch("/api/saved-percorsi")
+      .then(r => r.ok ? r.json() : [])
+      .then((rows: SavedPercorso[]) => setSavedList(rows))
+      .catch(() => {})
+      .finally(() => setLoadingSaved(false));
   }, []);
 
   // ── Autocomplete via AutocompleteSuggestion (nuova API, niente deprecation) ─
@@ -346,40 +352,50 @@ export default function PercorsoBuilder() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // ── Salva percorso in locale ──────────────────────────────────────────────
-  function savePercorsoLocal() {
+  // ── Salva percorso nel DB ─────────────────────────────────────────────────
+  async function savePercorsoLocal() {
     if (!route || !tappe.length) return;
-    const name = saveName.trim() || `${partenza} → ${arrivo}`;
-    const entry: SavedPercorso = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      name,
-      partenza,
-      arrivo,
-      distanceM: route.distanceM,
-      kmPerTappa,
-      coords: route.coords,
-      tappe,
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [entry, ...savedList];
-    setSavedList(updated);
-    saveToDisk(updated);
-    setSaveName("");
-    setSaveMsg({ ok: true, text: `"${name}" salvato localmente.` });
-    setTimeout(() => setSaveMsg(null), 3000);
+    setSaving(true);
+    try {
+      const res = await apiFetch("/api/saved-percorsi", {
+        method: "POST",
+        body: JSON.stringify({
+          name: saveName.trim() || undefined,
+          partenza,
+          arrivo,
+          distanceM: route.distanceM,
+          kmPerTappa,
+          coords: route.coords,
+          tappe,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSaveMsg({ ok: false, text: data.error ?? "Errore nel salvataggio." });
+        setSaving(false);
+        return;
+      }
+      const entry: SavedPercorso = await res.json();
+      setSavedList(prev => [entry, ...prev]);
+      setSaveName("");
+      setSaveMsg({ ok: true, text: `"${entry.name}" salvato.` });
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch {
+      setSaveMsg({ ok: false, text: "Errore di rete." });
+    }
+    setSaving(false);
   }
 
-  function deleteSavedPercorso(id: string) {
-    const updated = savedList.filter(p => p.id !== id);
-    setSavedList(updated);
-    saveToDisk(updated);
+  async function deleteSavedPercorso(id: string) {
+    setSavedList(prev => prev.filter(p => p.id !== id));
+    await apiFetch(`/api/saved-percorsi?id=${id}`, { method: "DELETE" }).catch(() => {});
   }
 
   function loadPercorso(p: SavedPercorso) {
     setPartenza(p.partenza);
     setArrivo(p.arrivo);
-    setKmPerTappa(p.kmPerTappa);
-    setRoute({ coords: p.coords, distanceM: p.distanceM });
+    setKmPerTappa(p.km_per_tappa);
+    setRoute({ coords: p.coords, distanceM: p.distance_m });
     setTappe(p.tappe);
     setShowSaved(false);
     setError(null);
@@ -442,13 +458,13 @@ export default function PercorsoBuilder() {
             Percorso a piedi / di corsa calcolato da Google Maps.
           </p>
         </div>
-        {savedList.length > 0 && (
+        {(savedList.length > 0 || loadingSaved) && (
           <button
             onClick={() => setShowSaved(!showSaved)}
             className="flex items-center gap-1.5 text-xs font-semibold text-dona hover:opacity-80 transition-opacity"
           >
-            <FolderOpen className="w-4 h-4" />
-            Salvati ({savedList.length})
+            {loadingSaved ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />}
+            {loadingSaved ? "Caricamento…" : `Salvati (${savedList.length})`}
           </button>
         )}
       </div>
@@ -468,7 +484,7 @@ export default function PercorsoBuilder() {
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => loadPercorso(p)}>
                   <p className="text-xs font-semibold text-foreground truncate">{p.name}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    {(p.distanceM / 1000).toFixed(1)} km · {p.tappe.length} tappe · {new Date(p.createdAt).toLocaleDateString("it-IT")}
+                    {(Number(p.distance_m) / 1000).toFixed(1)} km · {p.tappe.length} tappe · {new Date(p.created_at).toLocaleDateString("it-IT")}
                   </p>
                 </div>
                 <button
