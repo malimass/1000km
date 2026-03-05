@@ -33,7 +33,7 @@ import {
   SessionAnalysis, WeeklyStats, CoachProfile,
 } from "@/lib/coachAnalysis";
 import { getCurrentUser, loadCoachAthletes, CoachAthlete, saveAthleteProfile, loadAthleteProfile } from "@/lib/auth";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured, clearAuthToken } from "@/lib/supabase";
 
 // ─── COSTANTI COLORI ─────────────────────────────────────────────────────────
 
@@ -288,6 +288,7 @@ export default function Coach() {
   };
 
   const handleLogout = () => {
+    clearAuthToken();
     localStorage.removeItem("gp_coach_auth");
     navigate("/coach-login");
   };

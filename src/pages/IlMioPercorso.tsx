@@ -16,7 +16,7 @@ import NativeLayout from "@/components/NativeLayout";
 import ShareCard from "@/components/ShareCard";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured, clearAuthToken } from "@/lib/supabase";
 import { startGeoTracking, stopGeoTracking } from "@/lib/capacitorGeo";
 import { todaySessionId, distanceMeters } from "@/lib/liveTracking";
 import {
@@ -188,7 +188,7 @@ export default function IlMioPercorso() {
   // ── Logout ──
   async function handleLogout() {
     if (tracking) await stopTracking();
-    await supabase?.auth.signOut();
+    clearAuthToken();
     navigate("/partecipa");
   }
 
