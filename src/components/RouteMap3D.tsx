@@ -16,15 +16,13 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
   // Stabilize props to prevent continuous re-renders
   const coordsKey = useMemo(() => JSON.stringify(coords), [coords]);
   const waypointsKey = useMemo(() => JSON.stringify(waypoints), [waypoints]);
-  const elevKey = useMemo(() => elevationPoints?.length ?? 0, [elevationPoints]);
   const stableCoords = useMemo(() => coords, [coordsKey]);
   const stableWaypoints = useMemo(() => waypoints, [waypointsKey]);
-  const stableElevation = useMemo(() => elevationPoints, [elevKey]);
 
   useEffect(() => {
     if (!containerRef.current || stableCoords.length < 2) return;
 
-    // Calculate center and bounds
+    // Calculate center
     let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
     for (const [lat, lng] of stableCoords) {
       if (lat < minLat) minLat = lat;
@@ -35,7 +33,6 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
     const centerLat = (minLat + maxLat) / 2;
     const centerLng = (minLng + maxLng) / 2;
 
-    // Start WITHOUT terrain in the style — add it later as progressive enhancement
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: {
@@ -68,7 +65,24 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
     map.addControl(new maplibregl.NavigationControl(), "top-left");
 
     map.on("load", () => {
-      // ── 1. Add route line FIRST (always works, no terrain dependency) ──
+      // ── 1. Try to enable 3D terrain first ──
+      let terrainActive = false;
+      try {
+        map.addSource("terrain-dem", {
+          type: "raster-dem",
+          tiles: [
+            "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+          ],
+          tileSize: 256,
+          encoding: "terrarium",
+        });
+        map.setTerrain({ source: "terrain-dem", exaggeration: 1.5 });
+        terrainActive = true;
+      } catch (err) {
+        console.warn("[RouteMap3D] Terrain not available:", err);
+      }
+
+      // ── 2. Add route line with z-offset to render above terrain ──
       const routeCoords = stableCoords.map(([lat, lng]) => [lng, lat]);
 
       map.addSource("route", {
@@ -93,7 +107,8 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
           "line-width": 8,
           "line-opacity": 0.4,
           "line-blur": 4,
-        },
+          ...(terrainActive ? { "line-z-offset": 150 } : {}),
+        } as any,
       });
 
       // Route line (inner)
@@ -109,10 +124,11 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
           "line-color": "#e11d48",
           "line-width": 4,
           "line-opacity": 1,
-        },
+          ...(terrainActive ? { "line-z-offset": 150 } : {}),
+        } as any,
       });
 
-      // ── 2. Waypoint markers ──
+      // ── 3. Waypoint markers (HTML overlays — always above terrain) ──
       if (stableWaypoints?.length) {
         for (const wp of stableWaypoints) {
           const el = document.createElement("div");
@@ -138,21 +154,12 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
         bounds.extend([lng, lat]);
       }
       map.fitBounds(bounds, { padding: 60, pitch: 60, bearing: -20 });
+    });
 
-      // ── 3. Enable 3D terrain as progressive enhancement ──
-      try {
-        map.addSource("terrain-dem", {
-          type: "raster-dem",
-          tiles: [
-            "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
-          ],
-          tileSize: 256,
-          encoding: "terrarium",
-        });
-        map.setTerrain({ source: "terrain-dem", exaggeration: 1.5 });
-      } catch (err) {
-        console.warn("[RouteMap3D] Terrain not available:", err);
-      }
+    // Suppress terrain DEM errors (Ne is not defined) to prevent console spam
+    map.on("error", (e) => {
+      if (e?.error?.message?.includes("Ne is not defined")) return;
+      console.error("[RouteMap3D]", e);
     });
 
     mapRef.current = map;
@@ -161,7 +168,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
       map.remove();
       mapRef.current = null;
     };
-  }, [coordsKey, waypointsKey, elevKey]);
+  }, [coordsKey, waypointsKey]);
 
   // Resize map on fullscreen toggle
   useEffect(() => {
