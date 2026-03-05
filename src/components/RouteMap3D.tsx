@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -13,12 +13,18 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Stabilize props to prevent continuous re-renders
+  const coordsKey = useMemo(() => JSON.stringify(coords), [coords]);
+  const waypointsKey = useMemo(() => JSON.stringify(waypoints), [waypoints]);
+  const stableCoords = useMemo(() => coords, [coordsKey]);
+  const stableWaypoints = useMemo(() => waypoints, [waypointsKey]);
+
   useEffect(() => {
-    if (!containerRef.current || coords.length < 2) return;
+    if (!containerRef.current || stableCoords.length < 2) return;
 
     // Calculate center and bounds
     let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
-    for (const [lat, lng] of coords) {
+    for (const [lat, lng] of stableCoords) {
       if (lat < minLat) minLat = lat;
       if (lat > maxLat) maxLat = lat;
       if (lng < minLng) minLng = lng;
@@ -82,7 +88,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
           properties: {},
           geometry: {
             type: "LineString",
-            coordinates: coords.map(([lat, lng]) => [lng, lat]),
+            coordinates: stableCoords.map(([lat, lng]) => [lng, lat]),
           },
         },
       });
@@ -113,8 +119,8 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
       });
 
       // Waypoint markers
-      if (waypoints?.length) {
-        for (const wp of waypoints) {
+      if (stableWaypoints?.length) {
+        for (const wp of stableWaypoints) {
           const el = document.createElement("div");
           el.style.cssText = `
             width: 12px; height: 12px;
@@ -134,7 +140,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
 
       // Fit bounds
       const bounds = new maplibregl.LngLatBounds();
-      for (const [lat, lng] of coords) {
+      for (const [lat, lng] of stableCoords) {
         bounds.extend([lng, lat]);
       }
       map.fitBounds(bounds, { padding: 60, pitch: 60, bearing: -20 });
@@ -146,7 +152,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
       map.remove();
       mapRef.current = null;
     };
-  }, [coords, waypoints, elevationPoints]);
+  }, [coordsKey, waypointsKey]);
 
   // Resize map on fullscreen toggle
   useEffect(() => {
