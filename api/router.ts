@@ -67,18 +67,25 @@ async function authPinLogin(req: VercelRequest, res: VercelResponse) {
   const adminPin = process.env.VITE_ADMIN_PIN || process.env.ADMIN_PIN || "gratitude2026";
   if (!pin || pin !== adminPin)
     return res.status(401).json({ error: "PIN non valido" });
-  // Ensure users table exists
+  // Ensure users table exists with admin role allowed
   await sql`
     CREATE TABLE IF NOT EXISTS users (
       id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
       email         text        NOT NULL UNIQUE,
       password_hash text        NOT NULL,
       display_name  text        NOT NULL,
-      role          text        NOT NULL DEFAULT 'athlete'
-                                CHECK (role IN ('athlete', 'coach', 'admin')),
+      role          text        NOT NULL DEFAULT 'athlete',
       created_at    timestamptz NOT NULL DEFAULT now(),
       updated_at    timestamptz NOT NULL DEFAULT now()
     )
+  `;
+  // Update role constraint to allow 'admin'
+  await sql`
+    ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check
+  `;
+  await sql`
+    ALTER TABLE users ADD CONSTRAINT users_role_check
+      CHECK (role = ANY (ARRAY['athlete','coach','admin']))
   `;
   // Find or create admin user
   const rows = await sql`
