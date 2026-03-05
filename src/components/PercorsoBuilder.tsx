@@ -149,7 +149,7 @@ async function googleDirections(start: [number, number], end: [number, number]):
         travelMode:  "WALK",
         routeModifiers: { avoidHighways: true, avoidTolls: false, avoidFerries: false },
       },
-      { fields: ["routes.polyline.encodedPolyline", "routes.legs.distanceMeters"] },
+      ["routes.polyline.encodedPolyline", "routes.legs.distanceMeters"],
     );
     if (!response?.routes?.length) return null;
     const route = response.routes[0];
