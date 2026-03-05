@@ -189,16 +189,22 @@ async function googleDirections(start: [number, number], end: [number, number]):
     if (!result?.routes?.length) return null;
     const route = result.routes[0];
 
-    // Estrai coordinate dalla overview_path
+    // Estrai coordinate dettagliate da ogni step di ogni leg
+    // (overview_path è troppo semplificato e taglia dritto)
+    const coords: [number, number][] = [];
+    let distanceM = 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const coords: [number, number][] = route.overview_path.map((p: any) => [p.lat(), p.lng()]);
-    if (!coords.length) return null;
-
-    // Distanza totale in metri
-    const distanceM = route.legs.reduce(
+    for (const leg of route.legs as any[]) {
+      distanceM += leg.distance?.value ?? 0;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (s: number, leg: any) => s + (leg.distance?.value ?? 0), 0
-    );
+      for (const step of leg.steps as any[]) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const pt of step.path as any[]) {
+          coords.push([pt.lat(), pt.lng()]);
+        }
+      }
+    }
+    if (!coords.length) return null;
 
     return { coords, distanceM };
   } catch (err) {
