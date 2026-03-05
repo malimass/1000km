@@ -238,7 +238,6 @@ async function walkSegmentNew(
       travelMode:  "WALKING",
       routeModifiers: {
         avoidHighways: true,
-        avoidTolls:    true,
         avoidFerries:  true,
       },
       fields: ["legs", "distanceMeters"],
@@ -296,14 +295,54 @@ async function walkSegmentNew(
 
 /**
  * Ottieni una rotta DRIVING come "scheletro" per sapere dove passano le strade.
- * Restituisce le coordinate della rotta oppure null.
+ * Usa computeRoutes (nuova API), con fallback a DirectionsService legacy.
  */
-function getDrivingSkeleton(
+async function getDrivingSkeleton(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   G: any,
   origin: [number, number],
   destination: [number, number],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  RouteClass?: any,
 ): Promise<RouteResult | null> {
+  // 1. Prova computeRoutes (nuova API)
+  if (RouteClass) {
+    try {
+      const { routes } = await RouteClass.computeRoutes({
+        origin:      { lat: origin[0], lng: origin[1] },
+        destination: { lat: destination[0], lng: destination[1] },
+        travelMode:  "DRIVE",
+        fields:      ["legs", "distanceMeters"],
+      });
+      if (routes?.length) {
+        const route = routes[0];
+        const coords: [number, number][] = [];
+        let distanceM = route.distanceMeters ?? 0;
+        if (route.legs) {
+          distanceM = 0;
+          for (const leg of route.legs) {
+            distanceM += leg.distanceMeters ?? 0;
+            if (leg.steps) {
+              for (const step of leg.steps) {
+                if (step.path) {
+                  for (const pt of step.path) {
+                    const lat = typeof pt.lat === "function" ? pt.lat() : pt.lat;
+                    const lng = typeof pt.lng === "function" ? pt.lng() : pt.lng;
+                    coords.push([lat, lng]);
+                  }
+                }
+              }
+            }
+          }
+        }
+        if (coords.length) return { coords, distanceM };
+      }
+    } catch (err) {
+      console.warn("[PercorsoBuilder] computeRoutes DRIVE skeleton error:", err);
+    }
+  }
+
+  // 2. Fallback: DirectionsService legacy
   return new Promise((resolve) => {
     const service = new G.DirectionsService();
     service.route(
@@ -542,7 +581,7 @@ async function googleDirections(
       onProgress?.(0);
 
       // 1. Ottieni "scheletro" DRIVING per avere punti su strade reali
-      const skeleton = await getDrivingSkeleton(G, start, end);
+      const skeleton = await getDrivingSkeleton(G, start, end, RouteClass);
 
       if (skeleton && skeleton.coords.length > 2) {
         // Estrai waypoint equidistanti lungo la rotta DRIVING reale
