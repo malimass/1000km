@@ -7,7 +7,8 @@
  * APIs Google Maps (JS SDK — niente CORS):
  *  - AutocompleteSuggestion → suggerimenti mentre si digita
  *  - Geocoder               → converte indirizzo in coordinate
- *  - DirectionsService      → calcola percorso a piedi
+ *  - Route.computeRoutes    → calcola percorso a piedi (nuova API)
+ *  - DirectionsService      → fallback legacy
  *
  * Mappe:
  *  - Stradale (OpenStreetMap)
@@ -162,10 +163,10 @@ function googleGeocode(address: string): Promise<[number, number] | null> {
   });
 }
 
-// ─── Google DirectionsService (classica, stabile) ────────────────────────────
+// ─── Google Routes API (computeRoutes — nuova, sostituisce DirectionsService) ─
 
-// Max distanza in linea d'aria per un singolo segmento (~100 km)
-const MAX_SEGMENT_KM = 100;
+// Max distanza in linea d'aria per un singolo segmento (~150 km)
+const MAX_SEGMENT_KM = 150;
 
 /**
  * Interpola N punti intermedi equidistanti tra start e end.
@@ -183,16 +184,113 @@ function interpolatePoints(start: [number, number], end: [number, number], n: nu
 }
 
 /**
- * Chiama DirectionsService per un singolo segmento.
- * Usa WALKING con avoidHighways e avoidTolls per strade sicure.
+ * Snap un punto interpolato alla città più vicina tramite reverse geocoding.
+ * Evita che i waypoint cadano in mare/montagna.
  */
-function walkSegment(
+async function snapToCity(pt: [number, number]): Promise<[number, number]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G = (window as any).google.maps;
+    return new Promise((resolve) => {
+      new G.Geocoder().geocode(
+        { location: new G.LatLng(pt[0], pt[1]), language: "it" },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (results: any[], status: string) => {
+          if (status === "OK" && results?.length) {
+            // Cerca il risultato più "navigabile" — preferisci locality > route > il primo
+            const best =
+              results.find((r: any) => r.types?.includes("locality")) ??
+              results.find((r: any) => r.types?.includes("route")) ??
+              results[0];
+            const loc = best.geometry.location;
+            resolve([loc.lat(), loc.lng()]);
+          } else {
+            resolve(pt); // fallback: punto originale
+          }
+        },
+      );
+    });
+  } catch {
+    return pt;
+  }
+}
+
+/**
+ * Chiama Route.computeRoutes per un singolo segmento.
+ * Usa WALK con avoidHighways/avoidTolls/avoidFerries per strade sicure.
+ */
+async function walkSegmentNew(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  service: any, G: any,
+  RouteClass: any,
+  origin: [number, number],
+  destination: [number, number],
+): Promise<RouteResult | null> {
+  try {
+    const request = {
+      origin:      { lat: origin[0], lng: origin[1] },
+      destination: { lat: destination[0], lng: destination[1] },
+      travelMode:  "WALK",
+      routeModifiers: {
+        avoidHighways: true,
+        avoidTolls:    true,
+        avoidFerries:  true,
+      },
+      fields: ["legs", "distanceMeters"],
+    };
+
+    const { routes } = await RouteClass.computeRoutes(request);
+    if (!routes?.length) return null;
+
+    const route = routes[0];
+    const coords: [number, number][] = [];
+    let distanceM = route.distanceMeters ?? 0;
+
+    // Estrai coordinate dai legs → steps → path
+    if (route.legs) {
+      distanceM = 0;
+      for (const leg of route.legs) {
+        distanceM += leg.distanceMeters ?? 0;
+        if (leg.steps) {
+          for (const step of leg.steps) {
+            if (step.path) {
+              for (const pt of step.path) {
+                const lat = typeof pt.lat === "function" ? pt.lat() : pt.lat;
+                const lng = typeof pt.lng === "function" ? pt.lng() : pt.lng;
+                coords.push([lat, lng]);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Fallback: usa route.path se legs non ha dato coordinate
+    if (!coords.length && route.path) {
+      for (const pt of route.path) {
+        const lat = typeof pt.lat === "function" ? pt.lat() : pt.lat;
+        const lng = typeof pt.lng === "function" ? pt.lng() : pt.lng;
+        coords.push([lat, lng]);
+      }
+    }
+
+    return coords.length ? { coords, distanceM } : null;
+  } catch (err) {
+    console.warn("[PercorsoBuilder] computeRoutes segment error:", err);
+    return null;
+  }
+}
+
+/**
+ * Fallback: DirectionsService (legacy) per segmenti che falliscono con la nuova API.
+ */
+function walkSegmentLegacy(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  G: any,
   origin: [number, number],
   destination: [number, number],
 ): Promise<RouteResult | null> {
   return new Promise((resolve) => {
+    const service = new G.DirectionsService();
     service.route(
       {
         origin:      new G.LatLng(origin[0], origin[1]),
@@ -205,7 +303,6 @@ function walkSegment(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (response: any, status: string) => {
         if (status !== "OK" || !response?.routes?.length) {
-          console.warn(`[PercorsoBuilder] segment failed: ${status}`);
           resolve(null);
           return;
         }
@@ -231,8 +328,10 @@ function walkSegment(
 
 /**
  * Calcola percorso pedonale sicuro.
- * Per distanze > MAX_SEGMENT_KM spezza in segmenti più corti
- * così Google restituisce vere strade pedonali, non scorciatoie.
+ * 1. Usa la nuova Route.computeRoutes (travelMode WALK)
+ * 2. Per distanze > MAX_SEGMENT_KM spezza in segmenti
+ * 3. Waypoint intermedi snappati a città reali (reverse geocoding)
+ * 4. Fallback a DirectionsService (legacy) per segmenti falliti
  */
 async function googleDirections(
   start: [number, number],
@@ -242,16 +341,31 @@ async function googleDirections(
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G = (window as any).google.maps;
-    const service = new G.DirectionsService();
+
+    // Tenta di caricare la nuova Routes library
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let RouteClass: any = null;
+    try {
+      const lib = await G.importLibrary("routes");
+      RouteClass = lib.Route;
+    } catch {
+      console.warn("[PercorsoBuilder] Routes library non disponibile, uso DirectionsService legacy");
+    }
 
     // Calcola distanza in linea d'aria
     const straightKm = haversineM(start, end) / 1000;
 
     // Determina quanti segmenti servono
     const nSegments = Math.max(1, Math.ceil(straightKm / MAX_SEGMENT_KM));
-    const waypoints = nSegments > 1
-      ? interpolatePoints(start, end, nSegments - 1)
-      : [];
+
+    // Genera waypoint intermedi e snappali a città reali
+    let waypoints: [number, number][] = [];
+    if (nSegments > 1) {
+      const rawWaypoints = interpolatePoints(start, end, nSegments - 1);
+      onProgress?.(0);
+      // Snap a città in parallelo per velocità
+      waypoints = await Promise.all(rawWaypoints.map(snapToCity));
+    }
 
     // Costruisci la lista di coppie [origin, destination]
     const allPoints = [start, ...waypoints, end];
@@ -260,22 +374,36 @@ async function googleDirections(
       segments.push([allPoints[i], allPoints[i + 1]]);
     }
 
-    // Esegui le richieste in sequenza (evita rate limit Google)
+    // Esegui le richieste in sequenza
     const allCoords: [number, number][] = [];
     let totalDistanceM = 0;
 
     for (let i = 0; i < segments.length; i++) {
       onProgress?.(Math.round(((i) / segments.length) * 100));
 
-      const seg = await walkSegment(service, G, segments[i][0], segments[i][1]);
+      // Prova nuova API, poi fallback a legacy
+      let seg: RouteResult | null = null;
+      if (RouteClass) {
+        seg = await walkSegmentNew(RouteClass, segments[i][0], segments[i][1]);
+      }
       if (!seg) {
-        console.error(`[PercorsoBuilder] segmento ${i + 1}/${segments.length} fallito`);
+        seg = await walkSegmentLegacy(G, segments[i][0], segments[i][1]);
+      }
+
+      if (!seg) {
+        console.error(`[PercorsoBuilder] segmento ${i + 1}/${segments.length} fallito (entrambe le API)`);
+        // Ultimo tentativo: salta il waypoint e unisci con il segmento successivo
+        if (i < segments.length - 1) {
+          console.warn(`[PercorsoBuilder] unisco segmento ${i + 1} con ${i + 2}`);
+          segments[i + 1] = [segments[i][0], segments[i + 1][1]];
+          continue;
+        }
         return null;
       }
       allCoords.push(...seg.coords);
       totalDistanceM += seg.distanceM;
 
-      // Piccola pausa tra richieste per evitare OVER_QUERY_LIMIT
+      // Pausa tra richieste per evitare rate limit
       if (i < segments.length - 1) {
         await new Promise(r => setTimeout(r, 300));
       }
