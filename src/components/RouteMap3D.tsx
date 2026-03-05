@@ -16,8 +16,60 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
   // Stabilize props to prevent continuous re-renders
   const coordsKey = useMemo(() => JSON.stringify(coords), [coords]);
   const waypointsKey = useMemo(() => JSON.stringify(waypoints), [waypoints]);
+  const elevKey = useMemo(() => elevationPoints?.length ?? 0, [elevationPoints]);
   const stableCoords = useMemo(() => coords, [coordsKey]);
   const stableWaypoints = useMemo(() => waypoints, [waypointsKey]);
+  const stableElevation = useMemo(() => elevationPoints, [elevKey]);
+
+  // Build 3D coordinates [lng, lat, elevation] by interpolating elevation data
+  const coords3D = useMemo(() => {
+    if (!stableElevation?.length || stableCoords.length < 2) {
+      return stableCoords.map(([lat, lng]) => [lng, lat, 0] as [number, number, number]);
+    }
+
+    // Build a lookup: for each elevation point, find the nearest coord index
+    const elevMap = new Map<number, number>(); // coordIndex → elevation
+    for (const ep of stableElevation) {
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < stableCoords.length; i++) {
+        const dlat = stableCoords[i][0] - ep.lat;
+        const dlng = stableCoords[i][1] - ep.lng;
+        const d = dlat * dlat + dlng * dlng;
+        if (d < bestDist) {
+          bestDist = d;
+          bestIdx = i;
+        }
+      }
+      elevMap.set(bestIdx, ep.elevation);
+    }
+
+    // Sorted indices that have elevation
+    const knownIndices = [...elevMap.keys()].sort((a, b) => a - b);
+    if (knownIndices.length < 2) {
+      const fallbackElev = stableElevation[0]?.elevation ?? 100;
+      return stableCoords.map(([lat, lng]) => [lng, lat, fallbackElev + 50] as [number, number, number]);
+    }
+
+    // Interpolate elevation for all coords
+    return stableCoords.map(([lat, lng], i) => {
+      if (elevMap.has(i)) return [lng, lat, elevMap.get(i)! + 50] as [number, number, number];
+
+      // Find surrounding known indices and lerp
+      let lo = knownIndices[0], hi = knownIndices[knownIndices.length - 1];
+      for (let k = 0; k < knownIndices.length - 1; k++) {
+        if (knownIndices[k] <= i && knownIndices[k + 1] >= i) {
+          lo = knownIndices[k];
+          hi = knownIndices[k + 1];
+          break;
+        }
+      }
+      if (lo === hi) return [lng, lat, elevMap.get(lo)! + 50] as [number, number, number];
+      const t = (i - lo) / (hi - lo);
+      const elev = elevMap.get(lo)! * (1 - t) + elevMap.get(hi)! * t;
+      return [lng, lat, elev + 50] as [number, number, number];
+    });
+  }, [stableCoords, stableElevation]);
 
   useEffect(() => {
     if (!containerRef.current || stableCoords.length < 2) return;
@@ -80,7 +132,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
     map.addControl(new maplibregl.NavigationControl(), "top-left");
 
     map.on("load", () => {
-      // Route line
+      // Route line (3D coordinates so line drapes above terrain)
       map.addSource("route", {
         type: "geojson",
         data: {
@@ -88,7 +140,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
           properties: {},
           geometry: {
             type: "LineString",
-            coordinates: stableCoords.map(([lat, lng]) => [lng, lat]),
+            coordinates: coords3D,
           },
         },
       });
@@ -100,8 +152,8 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
         source: "route",
         paint: {
           "line-color": "#e11d48",
-          "line-width": 6,
-          "line-opacity": 0.3,
+          "line-width": 8,
+          "line-opacity": 0.4,
           "line-blur": 4,
         },
       });
@@ -111,10 +163,14 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
         id: "route-line",
         type: "line",
         source: "route",
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
         paint: {
           "line-color": "#e11d48",
-          "line-width": 3,
-          "line-opacity": 0.9,
+          "line-width": 4,
+          "line-opacity": 1,
         },
       });
 
@@ -152,7 +208,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
       map.remove();
       mapRef.current = null;
     };
-  }, [coordsKey, waypointsKey]);
+  }, [coordsKey, waypointsKey, elevKey]);
 
   // Resize map on fullscreen toggle
   useEffect(() => {
