@@ -164,49 +164,125 @@ function googleGeocode(address: string): Promise<[number, number] | null> {
 
 // ─── Google DirectionsService (classica, stabile) ────────────────────────────
 
-async function googleDirections(start: [number, number], end: [number, number]): Promise<RouteResult | null> {
+// Max distanza in linea d'aria per un singolo segmento (~100 km)
+const MAX_SEGMENT_KM = 100;
+
+/**
+ * Interpola N punti intermedi equidistanti tra start e end.
+ */
+function interpolatePoints(start: [number, number], end: [number, number], n: number): [number, number][] {
+  const pts: [number, number][] = [];
+  for (let i = 1; i <= n; i++) {
+    const t = i / (n + 1);
+    pts.push([
+      start[0] + t * (end[0] - start[0]),
+      start[1] + t * (end[1] - start[1]),
+    ]);
+  }
+  return pts;
+}
+
+/**
+ * Chiama DirectionsService per un singolo segmento.
+ * Usa WALKING con avoidHighways e avoidTolls per strade sicure.
+ */
+function walkSegment(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  service: any, G: any,
+  origin: [number, number],
+  destination: [number, number],
+): Promise<RouteResult | null> {
+  return new Promise((resolve) => {
+    service.route(
+      {
+        origin:      new G.LatLng(origin[0], origin[1]),
+        destination: new G.LatLng(destination[0], destination[1]),
+        travelMode:  G.TravelMode.WALKING,
+        avoidHighways: true,
+        avoidTolls:    true,
+        avoidFerries:  true,
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (response: any, status: string) => {
+        if (status !== "OK" || !response?.routes?.length) {
+          console.warn(`[PercorsoBuilder] segment failed: ${status}`);
+          resolve(null);
+          return;
+        }
+        const route = response.routes[0];
+        const coords: [number, number][] = [];
+        let distanceM = 0;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const leg of route.legs as any[]) {
+          distanceM += leg.distance?.value ?? 0;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          for (const step of leg.steps as any[]) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            for (const pt of step.path as any[]) {
+              coords.push([pt.lat(), pt.lng()]);
+            }
+          }
+        }
+        resolve(coords.length ? { coords, distanceM } : null);
+      },
+    );
+  });
+}
+
+/**
+ * Calcola percorso pedonale sicuro.
+ * Per distanze > MAX_SEGMENT_KM spezza in segmenti più corti
+ * così Google restituisce vere strade pedonali, non scorciatoie.
+ */
+async function googleDirections(
+  start: [number, number],
+  end: [number, number],
+  onProgress?: (pct: number) => void,
+): Promise<RouteResult | null> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G = (window as any).google.maps;
     const service = new G.DirectionsService();
 
-    const result = await new Promise<any>((resolve, reject) => {
-      service.route(
-        {
-          origin:      new G.LatLng(start[0], start[1]),
-          destination: new G.LatLng(end[0], end[1]),
-          travelMode:  G.TravelMode.WALKING,
-          avoidHighways: true,
-        },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (response: any, status: string) => {
-          if (status === "OK") resolve(response);
-          else reject(new Error(`DirectionsService: ${status}`));
-        },
-      );
-    });
+    // Calcola distanza in linea d'aria
+    const straightKm = haversineM(start, end) / 1000;
 
-    if (!result?.routes?.length) return null;
-    const route = result.routes[0];
+    // Determina quanti segmenti servono
+    const nSegments = Math.max(1, Math.ceil(straightKm / MAX_SEGMENT_KM));
+    const waypoints = nSegments > 1
+      ? interpolatePoints(start, end, nSegments - 1)
+      : [];
 
-    // Estrai coordinate dettagliate da ogni step di ogni leg
-    // (overview_path è troppo semplificato e taglia dritto)
-    const coords: [number, number][] = [];
-    let distanceM = 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const leg of route.legs as any[]) {
-      distanceM += leg.distance?.value ?? 0;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const step of leg.steps as any[]) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for (const pt of step.path as any[]) {
-          coords.push([pt.lat(), pt.lng()]);
-        }
+    // Costruisci la lista di coppie [origin, destination]
+    const allPoints = [start, ...waypoints, end];
+    const segments: [number, number][][] = [];
+    for (let i = 0; i < allPoints.length - 1; i++) {
+      segments.push([allPoints[i], allPoints[i + 1]]);
+    }
+
+    // Esegui le richieste in sequenza (evita rate limit Google)
+    const allCoords: [number, number][] = [];
+    let totalDistanceM = 0;
+
+    for (let i = 0; i < segments.length; i++) {
+      onProgress?.(Math.round(((i) / segments.length) * 100));
+
+      const seg = await walkSegment(service, G, segments[i][0], segments[i][1]);
+      if (!seg) {
+        console.error(`[PercorsoBuilder] segmento ${i + 1}/${segments.length} fallito`);
+        return null;
+      }
+      allCoords.push(...seg.coords);
+      totalDistanceM += seg.distanceM;
+
+      // Piccola pausa tra richieste per evitare OVER_QUERY_LIMIT
+      if (i < segments.length - 1) {
+        await new Promise(r => setTimeout(r, 300));
       }
     }
-    if (!coords.length) return null;
 
-    return { coords, distanceM };
+    onProgress?.(100);
+    return allCoords.length ? { coords: allCoords, distanceM: totalDistanceM } : null;
   } catch (err) {
     console.error("[PercorsoBuilder] directions error:", err);
     return null;
@@ -242,8 +318,9 @@ export default function PercorsoBuilder() {
   const [mode,       setMode]       = useState<TravelMode>("walking");
   const [kmPerTappa, setKmPerTappa] = useState(70);
 
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
+  const [loading,  setLoading]  = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error,    setError]    = useState<string | null>(null);
 
   const [route,  setRoute]  = useState<RouteResult | null>(null);
   const [tappe,  setTappe]  = useState<TappaPoint[]>([]);
@@ -319,7 +396,7 @@ export default function PercorsoBuilder() {
     if (!mapsReady) { setError("Google Maps non ancora caricato, attendi un momento."); return; }
     if (!partenza.trim() || !arrivo.trim()) { setError("Inserisci partenza e arrivo."); return; }
 
-    setLoading(true); setError(null); setRoute(null); setTappe([]);
+    setLoading(true); setProgress(0); setError(null); setRoute(null); setTappe([]);
 
     const [startC, endC] = await Promise.all([
       googleGeocode(partenza),
@@ -328,8 +405,8 @@ export default function PercorsoBuilder() {
     if (!startC) { setError(`Indirizzo non trovato: "${partenza}"`); setLoading(false); return; }
     if (!endC)   { setError(`Indirizzo non trovato: "${arrivo}"`);   setLoading(false); return; }
 
-    const result = await googleDirections(startC, endC);
-    if (!result) { setError("Google non ha trovato un percorso. Prova indirizzi più precisi."); setLoading(false); return; }
+    const result = await googleDirections(startC, endC, setProgress);
+    if (!result) { setError("Google non ha trovato un percorso pedonale. Prova indirizzi più precisi."); setLoading(false); return; }
 
     setRoute(result);
     setTappe(splitByKm(result.coords, kmPerTappa));
@@ -594,7 +671,7 @@ export default function PercorsoBuilder() {
         <button onClick={handleCalcola} disabled={loading || noKey}
           className="w-full flex items-center justify-center gap-2 bg-dona text-white rounded-lg py-2.5 text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-50">
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-          {loading ? "Calcolo in corso…" : "Calcola percorso"}
+          {loading ? (progress > 0 ? `Calcolo… ${progress}%` : "Geocodifica…") : "Calcola percorso"}
         </button>
       </div>
 
