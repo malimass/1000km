@@ -2,7 +2,7 @@
  * auth.ts — Autenticazione JWT via Neon API Routes
  */
 
-import { apiFetch, setAuthToken, clearAuthToken, getAuthToken } from "./supabase";
+import { apiFetch, setAuthToken, clearAuthToken, getAuthToken } from "./api";
 
 export type UserRole = "athlete" | "coach";
 

@@ -1,8 +1,5 @@
 /**
- * supabase.ts — MIGRATO A NEON
- * ─────────────────────────────
- * Questo file non usa più Supabase. Esporta le utility per
- * chiamare le API routes Vercel che si connettono a Neon PostgreSQL.
+ * api.ts — Client per le API routes Vercel (Neon PostgreSQL)
  */
 
 /** URL base delle API (stringa vuota = same-origin su Vercel). */
@@ -36,7 +33,3 @@ export async function apiFetch(
   if (token) headers["Authorization"] = `Bearer ${token}`;
   return fetch(`${API_BASE}${path}`, { ...init, headers });
 }
-
-// Manteniamo exports compatibili con il codice legacy che importa supabase
-export const supabase = null;
-export const isSupabaseConfigured = false;

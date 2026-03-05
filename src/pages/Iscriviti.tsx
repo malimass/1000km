@@ -4,7 +4,7 @@ import { ArrowLeft, Shirt, Heart, Users, Loader2, AlertCircle, CheckCircle2 } fr
 import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { apiFetch } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 import { tappe } from "@/lib/tappe";
 
 const TAGLIE = ["XS", "S", "M", "L", "XL", "XXL"] as const;

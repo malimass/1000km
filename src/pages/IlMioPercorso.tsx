@@ -16,7 +16,7 @@ import NativeLayout from "@/components/NativeLayout";
 import ShareCard from "@/components/ShareCard";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { supabase, isSupabaseConfigured, clearAuthToken } from "@/lib/supabase";
+import { clearAuthToken, getAuthToken } from "@/lib/api";
 import { startGeoTracking, stopGeoTracking } from "@/lib/capacitorGeo";
 import { todaySessionId, distanceMeters } from "@/lib/liveTracking";
 import {
@@ -60,21 +60,24 @@ export default function IlMioPercorso() {
 
   // ── Verifica autenticazione ──
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) {
+    const token = getAuthToken();
+    if (!token) {
+      navigate("/partecipa");
       setAuthLoading(false);
       return;
     }
-    supabase.auth.getSession().then(async ({ data }) => {
-      const user = data.session?.user ?? null;
-      if (!user) {
-        navigate("/partecipa");
-        return;
-      }
-      userRef.current = { id: user.id };
-      const prof = await loadProfile(user.id);
-      setProfile(prof);
+    // Decodifica user id dal JWT (payload è il secondo segmento base64)
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      userRef.current = { id: payload.sub };
+      loadProfile(payload.sub).then((prof) => {
+        setProfile(prof);
+        setAuthLoading(false);
+      });
+    } catch {
+      navigate("/partecipa");
       setAuthLoading(false);
-    });
+    }
   }, [navigate]);
 
   // ── Cleanup al dismount ──

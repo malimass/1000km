@@ -5,7 +5,7 @@
  * Fallback su localStorage.
  */
 
-import { apiFetch, getAuthToken } from "./supabase";
+import { apiFetch, getAuthToken } from "./api";
 
 export type Sostenitore = {
   id:      string;

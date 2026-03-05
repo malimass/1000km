@@ -1,7 +1,7 @@
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- 1000km di Gratitudine — Schema Neon PostgreSQL
 -- ───────────────────────────────────────────────
--- Sostituisce Supabase con Neon come database.
+-- Schema principale Neon PostgreSQL come database.
 -- Auth, realtime e API sono gestiti da Vercel API Routes + JWT.
 --
 -- Esegui in Neon Console → SQL Editor (una sola volta).
@@ -13,7 +13,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 1. USERS  (rimpiazza auth.users di Supabase)
+-- 1. USERS  (tabella utenti gestita internamente)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS users (

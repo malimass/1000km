@@ -27,7 +27,7 @@ import {
   Search, Navigation, Loader2, MapPin, Route, RotateCcw, Copy, CheckCircle2,
   AlertCircle, Save, Trash2, FolderOpen, Map as MapIcon,
 } from "lucide-react";
-import { apiFetch } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 

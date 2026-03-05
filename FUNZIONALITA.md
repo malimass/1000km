@@ -69,7 +69,7 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 - Animazione **fly-to** sul waypoint selezionato (durata 1.2s)
 - Auto-pan sul corridore attivo quando arriva nuova posizione GPS
 - Controllo zoom bottom-right; scroll-wheel disabilitato
-- Aggiornamento in tempo reale via **Supabase Realtime** (postgres_changes)
+- Aggiornamento in tempo reale via **polling API** (postgres_changes)
 
 ---
 
@@ -80,7 +80,7 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 - **Web**: `navigator.geolocation.watchPosition()` (richiede HTTPS)
 - **Nativo iOS/Android**: `@capacitor/geolocation` con permesso "always"
 - Background tracking su iOS/Android (continua con app in background)
-- Persistenza su Supabase:
+- Persistenza su Neon:
   - `live_position` — posizione corrente (upsert su riga id=1 o id=2)
   - `route_positions` — storico trail (append-only, filtrato: ogni 30m o 60s)
 - `session_id` = data corrente formattata (`todaySessionId()`) — permette caricamento per giornata
@@ -92,17 +92,17 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 ### 4. Community Tracking (`/partecipa` + `/il-mio-percorso`)
 
 #### Registrazione / Login
-- **OAuth social**: Google, Facebook, Apple — tramite `supabase.auth.signInWithOAuth()`
+- **OAuth social**: Google, Facebook, Apple — tramite `API OAuth`
   - Redirect a `/partecipa` dopo il provider
   - Se utente nuovo senza profilo → form di completamento (nome, attività, città)
   - Se profilo esistente → redirect diretto a `/il-mio-percorso`
-- **Email + password**: signup e login via Supabase Auth
+- **Email + password**: signup e login via JWT auth
 - Dati profilo: nome visualizzato, tipo attività, città
 - Creazione record `profiles` al signup con `upsertProfile()`
 - Redirect a `/il-mio-percorso` dopo login
 - Messaggio di errore dedicato se email già registrata (guida l'utente al login)
 
-> **Nota Supabase**: disabilitare "Enable email confirmations" in Auth Settings per permettere login immediato senza verifica email.
+> **Nota Neon**: disabilitare "Enable email confirmations" in Auth Settings per permettere login immediato senza verifica email.
 
 #### Tipi di attività (enum: `ActivityType`)
 | Valore | Emoji | Colore marker |
@@ -134,7 +134,7 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 - Card visiva con: tipo attività, km percorsi, tempo, logo campagna
 - **Testi completamente configurabili da admin** (titolo, corpo, tag social, hashtag, URL)
 - Valori di default integrati nel codice (`SHARE_DEFAULTS`) se admin non ha configurato nulla
-- Testi letti da Supabase `site_settings` (id=2, lettura pubblica senza auth)
+- Testi letti da Neon `site_settings` (id=2, lettura pubblica senza auth)
 - **Condivisione nativa** su iOS/Android tramite `@capacitor/share`
 - Fallback: **Web Share API** su browser moderni
 - Fallback finale: copia negli appunti (`navigator.clipboard`)
@@ -148,7 +148,7 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 - Opzione t-shirt con scelta taglia (XS → XXL)
 - Integrazione **Stripe** per pagamento maglietta
 - Stati pagamento: `gratuito` / `in_attesa` / `completato` / `fallito` / `in_attesa_bonifico`
-- Funzione RPC Supabase `get_iscritti_per_tappa()` per contatori per tappa
+- Funzione RPC Neon `get_iscritti_per_tappa()` per contatori per tappa
 
 ---
 
@@ -176,7 +176,7 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 - Struttura: `{ title, intro, items: Sostenitore[] }`
 - Contenuto leggibile pubblicamente
 - **Modificabile solo da admin** autenticati (RLS protetta)
-- Persistenza: Supabase `sostenitori_page` + fallback localStorage
+- Persistenza: Neon `sostenitori_page` + fallback localStorage
 
 ---
 
@@ -189,7 +189,7 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 - Instagram: User ID, Access Token
 - Cloudinary: Cloud Name, Upload Preset
 - YouTube: 3 video per la pagina Crocifisso Nero (id, titolo, descrizione)
-- Persistenza: Supabase `admin_settings` (per user_id) + cache localStorage
+- Persistenza: Neon `admin_settings` (per user_id) + cache localStorage
 
 #### Condivisione Social (tab "Condivisione")
 - Campi configurabili: titolo, corpo messaggio, tag social, hashtag, URL link
@@ -232,10 +232,10 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 ### 11. Sistema Atleta / Coach
 
 #### Area Atleta (`/atleta/accedi`)
-- Login e registrazione con email + password (via Supabase Auth)
+- Login e registrazione con email + password (via JWT auth)
 - Profilo atleta: dati personali, storico sessioni, rischio infortuni
 - Valutazione per sessione (wellness check-in)
-- Sincronizzazione profilo cross-device tramite Supabase `athlete_profiles`
+- Sincronizzazione profilo cross-device tramite Neon `athlete_profiles`
 
 #### Area Coach (`/coach-login`)
 - Login dedicato per coach
@@ -243,8 +243,8 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 - Visualizzazione dati sessioni: km, dislivello, frequenza cardiaca
 - Ring SVG per metriche chiave + KPI cards
 - Sezione valutazione atleti in carico
-- Persistenza sessioni su Supabase (sync cross-device)
-- Gestione profilo coach con upsert su Supabase
+- Persistenza sessioni su Neon (sync cross-device)
+- Gestione profilo coach con upsert su Neon
 
 #### Login dropdown in navbar
 - Il bottone **Login** in header è ora un menu a tendina con tre voci:
@@ -280,7 +280,7 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 
 ---
 
-## Database Supabase
+## Database Neon
 
 | Tabella | Scopo | RLS |
 |---------|-------|-----|
@@ -296,12 +296,12 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 
 ### Strategia di persistenza dati
 
-- **Supabase** è la fonte di verità per tutti i dati
-- **localStorage** è usato come cache/fallback (se Supabase non configurato o offline)
-- I dati su Supabase **non vengono toccati** durante deploy/aggiornamenti dell'app
-- Script di setup: `supabase-schema.sql` · `live_position.sql` · `community-schema.sql` · `site-settings.sql`
+- **Neon** è la fonte di verità per tutti i dati
+- **localStorage** è usato come cache/fallback (se Neon non configurato o offline)
+- I dati su Neon **non vengono toccati** durante deploy/aggiornamenti dell'app
+- Script di setup: `Neon-schema.sql` · `live_position.sql` · `community-schema.sql` · `site-settings.sql`
 
-### Realtime (Supabase postgres_changes)
+### Realtime (Neon postgres_changes)
 
 | Canale | Tabella | Eventi | Uso |
 |--------|---------|--------|-----|
@@ -318,7 +318,7 @@ App web + mobile (PWA + iOS/Android via Capacitor) per il pellegrinaggio spiritu
 
 | Servizio | Utilizzo |
 |----------|----------|
-| **Supabase** | DB PostgreSQL, Auth (email/password), Realtime, RLS |
+| **Neon** | DB PostgreSQL, Auth (email/password), Realtime, RLS |
 | **Stripe** | Pagamento magliette iscritti |
 | **Meta Graph API v20** | Post su Facebook Page e Instagram Business |
 | **Cloudinary** | Upload e hosting media (foto/video) |

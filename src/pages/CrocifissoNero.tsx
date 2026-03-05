@@ -57,7 +57,7 @@ export default function CrocifissoNero() {
   );
 
   useEffect(() => {
-    // Prova prima Supabase (cross-device, aggiornato dall'admin),
+    // Prova prima Neon (cross-device, aggiornato dall'admin),
     // poi fallback su localStorage (stesso dispositivo admin).
     loadSiteYtVideos().then(siteData => {
       const source = siteData ?? loadYtCrocifissoVideos();
