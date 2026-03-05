@@ -140,11 +140,12 @@ function googleGeocode(address: string): Promise<[number, number] | null> {
 
 async function googleDirections(start: [number, number], end: [number, number]): Promise<RouteResult | null> {
   try {
-    const { Route } = await (window as any).google.maps.importLibrary("routes");
+    const G = (window as any).google.maps;
+    const { Route } = await G.importLibrary("routes");
     const response: any = await Route.computeRoutes(
       {
-        origin:      { lat: start[0], lng: start[1] },
-        destination: { lat: end[0], lng: end[1] },
+        origin:      new G.LatLng(start[0], start[1]),
+        destination: new G.LatLng(end[0], end[1]),
         travelMode:  "WALK",
         routeModifiers: { avoidHighways: true, avoidTolls: false, avoidFerries: false },
       },
