@@ -405,7 +405,7 @@ export default function Percorso() {
             </div>
 
             {/* Legenda */}
-            <div className="flex flex-wrap items-center justify-center gap-6 mt-6 text-sm font-body text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 mt-6 text-xs sm:text-sm font-body text-muted-foreground">
               <span className="flex items-center gap-2">
                 <span className="w-4 h-4 rounded-full bg-green-500 border-2 border-white shadow" />
                 Partenza — Bologna
@@ -478,7 +478,7 @@ export default function Percorso() {
                 return (
                   <AnimatedSection key={`${t.tappaNum}-${t.lat}`} delay={i * 0.05}>
                     <div
-                      className={`w-full flex items-center gap-3 bg-card rounded-lg p-4 shadow-sm border transition-all
+                      className={`w-full flex items-center gap-2 sm:gap-3 bg-card rounded-lg p-3 sm:p-4 shadow-sm border transition-all
                         ${isSelected
                           ? "border-dona ring-2 ring-dona/30 shadow-md"
                           : "border-border hover:shadow-md hover:border-dona/50"
@@ -509,11 +509,11 @@ export default function Percorso() {
                         </div>
                       </button>
                       <div className="flex-shrink-0 flex items-center gap-2">
-                        <MapPin className={`w-4 h-4 transition-colors ${isSelected ? "text-dona" : "text-muted-foreground/30"}`} />
+                        <MapPin className={`w-4 h-4 transition-colors hidden sm:block ${isSelected ? "text-dona" : "text-muted-foreground/30"}`} />
                         <Link to={`/iscriviti?tappa=${t.tappaNum}`}>
-                          <Button size="sm" className="text-xs h-8 px-3 bg-dona hover:bg-dona/90 text-white">
-                            <UserPlus className="w-3.5 h-3.5 mr-1" />
-                            Partecipa
+                          <Button size="sm" className="text-xs h-8 px-2 sm:px-3 bg-dona hover:bg-dona/90 text-white">
+                            <UserPlus className="w-3.5 h-3.5 sm:mr-1" />
+                            <span className="hidden sm:inline">Partecipa</span>
                           </Button>
                         </Link>
                       </div>
@@ -530,7 +530,7 @@ export default function Percorso() {
                 return (
                   <AnimatedSection key={t.giorno} delay={i * 0.05}>
                     <div
-                      className={`w-full flex items-center gap-3 bg-card rounded-lg p-4 shadow-sm border transition-all
+                      className={`w-full flex items-center gap-2 sm:gap-3 bg-card rounded-lg p-3 sm:p-4 shadow-sm border transition-all
                         ${isSelected
                           ? "border-dona ring-2 ring-dona/30 shadow-md"
                           : "border-border hover:shadow-md hover:border-dona/50"
@@ -561,11 +561,11 @@ export default function Percorso() {
                         </div>
                       </button>
                       <div className="flex-shrink-0 flex items-center gap-2">
-                        <MapPin className={`w-4 h-4 transition-colors ${isSelected ? "text-dona" : "text-muted-foreground/30"}`} />
+                        <MapPin className={`w-4 h-4 transition-colors hidden sm:block ${isSelected ? "text-dona" : "text-muted-foreground/30"}`} />
                         <Link to={`/iscriviti?tappa=${t.giorno}`}>
-                          <Button size="sm" className="text-xs h-8 px-3 bg-dona hover:bg-dona/90 text-white">
-                            <UserPlus className="w-3.5 h-3.5 mr-1" />
-                            Partecipa
+                          <Button size="sm" className="text-xs h-8 px-2 sm:px-3 bg-dona hover:bg-dona/90 text-white">
+                            <UserPlus className="w-3.5 h-3.5 sm:mr-1" />
+                            <span className="hidden sm:inline">Partecipa</span>
                           </Button>
                         </Link>
                       </div>
