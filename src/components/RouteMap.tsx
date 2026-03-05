@@ -6,8 +6,8 @@ import type { LivePosition } from "@/lib/liveTracking";
 import type { CommunityLivePosition } from "@/lib/communityTracking";
 import { ACTIVITY_EMOJI, ACTIVITY_COLOR, COMMUNITY_STALE_MS, type ActivityType } from "@/lib/communityTracking";
 
-// Coordinate delle 15 tappe (Bologna → Via Emilia → SS16 Adriatica → interno Sud → SS18 Tirrenica → Terranova)
-const waypoints: [number, number][] = [
+// Coordinate default delle 15 tappe (Bologna → Terranova)
+const defaultWaypoints: [number, number][] = [
   [44.4949, 11.3426], // Bologna – Santuario S. Luca
   [44.2887, 11.8826], // Faenza
   [44.0595, 12.5683], // Rimini
@@ -25,31 +25,40 @@ const waypoints: [number, number][] = [
   [38.3397, 16.1152], // Terranova Sappo Minulio
 ];
 
-const labels = [
+const defaultLabels = [
   "Bologna", "Faenza", "Rimini", "Ancona", "Porto San Giorgio",
   "Pescara", "Vasto", "Campobasso", "Avellino", "Sala Consilina",
   "Scalea", "Paola", "Pizzo Calabro", "Rosarno", "Terranova Sappo Minulio",
 ];
 
-const dates = [
+const defaultDates = [
   "18 apr", "18 apr", "19 apr", "20 apr", "21 apr",
   "22 apr", "23 apr", "24 apr", "25 apr", "26 apr",
   "27 apr", "28 apr", "29 apr", "30 apr", "1 mag",
 ];
 
-const km = [
+const defaultKm = [
   0, 55, 125, 215, 280, 365, 440, 530, 620, 690,
   775, 830, 895, 960, 1000,
 ];
 
+/** Tipo tappa pubblicata dal PercorsoBuilder */
+export interface PublishedTappa {
+  tappaNum: number;
+  lat: number;
+  lng: number;
+  kmProgr: number;
+  label: string;
+}
+
 // Vola verso il waypoint selezionato
-function MapController({ selectedIndex }: { selectedIndex: number | null }) {
+function MapController({ selectedIndex, waypoints }: { selectedIndex: number | null; waypoints: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
-    if (selectedIndex !== null) {
+    if (selectedIndex !== null && waypoints[selectedIndex]) {
       map.flyTo(waypoints[selectedIndex], 10, { duration: 1.2 });
     }
-  }, [selectedIndex, map]);
+  }, [selectedIndex, waypoints, map]);
   return null;
 }
 
@@ -159,6 +168,8 @@ export default function RouteMap({
   communityPositions = [],
   communityRoutes = {},
   containerId,
+  publishedTappe = null,
+  publishedCoords = null,
 }: {
   selectedIndex?:      number | null;
   iscritti?:           Record<number, number>;
@@ -169,7 +180,25 @@ export default function RouteMap({
   communityPositions?: CommunityLivePosition[];
   communityRoutes?:    Record<string, { points: [number, number][]; activityType: ActivityType }>;
   containerId?:        string;
+  publishedTappe?:     PublishedTappa[] | null;
+  publishedCoords?:    [number, number][] | null;
 }) {
+  // Se ci sono tappe pubblicate, usale; altrimenti fallback a quelle default
+  const waypoints: [number, number][] = publishedTappe
+    ? publishedTappe.map(t => [t.lat, t.lng])
+    : defaultWaypoints;
+  const labels = publishedTappe
+    ? publishedTappe.map(t => t.label)
+    : defaultLabels;
+  const km = publishedTappe
+    ? publishedTappe.map(t => Math.round(t.kmProgr))
+    : defaultKm;
+  // Per le date: usare default se disponibili, altrimenti stringa vuota
+  const dates = publishedTappe
+    ? publishedTappe.map((_, i) => defaultDates[i] ?? "")
+    : defaultDates;
+  // Per la polyline: se ci sono coords pubblicate usale, altrimenti unisci waypoints
+  const routeLine: [number, number][] = publishedCoords ?? waypoints;
   const liveLatlng1: [number, number] | null =
     livePos?.is_active && livePos.lat != null && livePos.lng != null
       ? [livePos.lat, livePos.lng] : null;
@@ -192,7 +221,7 @@ export default function RouteMap({
         scrollWheelZoom={false}
         style={{ height: "100%", width: "100%" }}
       >
-        <MapController selectedIndex={selectedIndex} />
+        <MapController selectedIndex={selectedIndex} waypoints={waypoints} />
         {liveLatlng && <LiveController pos={liveLatlng} />}
         <ZoomControl position="bottomright" />
         <TileLayer
@@ -200,14 +229,14 @@ export default function RouteMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* Linea del percorso pianificato */}
+        {/* Linea del percorso pianificato (usa polyline reale se pubblicata) */}
         <Polyline
-          positions={waypoints}
+          positions={routeLine}
           pathOptions={{
             color: "#e11d48",
             weight: 3,
             opacity: 0.85,
-            dashArray: "6 4",
+            dashArray: publishedCoords ? undefined : "6 4",
           }}
         />
 

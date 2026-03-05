@@ -722,6 +722,22 @@ async function savedPercorsi(req: VercelRequest, res: VercelResponse) {
   const user = await requireAuth(req);
   if (!user) return res.status(401).json({ error: "Non autenticato" });
 
+  // Auto-create table if missing
+  await sql`
+    CREATE TABLE IF NOT EXISTS saved_percorsi (
+      id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id       uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name          text        NOT NULL,
+      partenza      text        NOT NULL,
+      arrivo        text        NOT NULL,
+      distance_m    numeric     NOT NULL DEFAULT 0,
+      km_per_tappa  numeric     NOT NULL DEFAULT 70,
+      coords        jsonb       NOT NULL DEFAULT '[]',
+      tappe         jsonb       NOT NULL DEFAULT '[]',
+      created_at    timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+
   // GET — lista percorsi dell'utente
   if (req.method === "GET") {
     const rows = await sql`
