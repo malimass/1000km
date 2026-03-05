@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash text        NOT NULL,
   display_name  text        NOT NULL,
   role          text        NOT NULL DEFAULT 'athlete'
-                            CHECK (role IN ('athlete', 'coach')),
+                            CHECK (role IN ('athlete', 'coach', 'admin')),
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()
 );

@@ -67,13 +67,32 @@ async function authPinLogin(req: VercelRequest, res: VercelResponse) {
   const adminPin = process.env.VITE_ADMIN_PIN || process.env.ADMIN_PIN || "gratitude2026";
   if (!pin || pin !== adminPin)
     return res.status(401).json({ error: "PIN non valido" });
-  // Trova il primo utente admin (o il primo utente se nessuno ha role=admin)
+  // Ensure users table exists with admin role allowed
+  await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+      email         text        NOT NULL UNIQUE,
+      password_hash text        NOT NULL,
+      display_name  text        NOT NULL,
+      role          text        NOT NULL DEFAULT 'athlete',
+      created_at    timestamptz NOT NULL DEFAULT now(),
+      updated_at    timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  // Update role constraint to allow 'admin'
+  await sql`
+    ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check
+  `;
+  await sql`
+    ALTER TABLE users ADD CONSTRAINT users_role_check
+      CHECK (role = ANY (ARRAY['athlete','coach','admin']))
+  `;
+  // Find or create admin user
   const rows = await sql`
     SELECT id, email, role FROM users ORDER BY id LIMIT 1
   `;
   let user = rows[0] as any;
   if (!user) {
-    // Auto-create admin user on first pin-login
     const created = await sql`
       INSERT INTO users (email, password_hash, display_name, role)
       VALUES ('admin@1000km.it', 'pin-only', 'Admin', 'admin')
