@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import ScrollToTop from "./components/ScrollToTop";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
@@ -60,9 +60,9 @@ const App = () => (
           <Route path="/accedi" element={<Accedi />} />
           <Route path="/il-mio-percorso" element={<IlMioPercorso />} />
           <Route path="/admin-login" element={<AdminLogin />} />
-          <Route path="/coach-login" element={<CoachLogin />} />
-          <Route path="/coach/registrati" element={<CoachRegister />} />
-          <Route path="/atleta/accedi" element={<AtletaAuth />} />
+          <Route path="/coach-login" element={<Navigate to="/accedi" replace />} />
+          <Route path="/coach/registrati" element={<Navigate to="/accedi" replace />} />
+          <Route path="/atleta/accedi" element={<Navigate to="/accedi" replace />} />
           <Route path="/atleta" element={<AtletaDashboard />} />
           <Route path="/coach" element={
             <ProtectedCoachRoute>
