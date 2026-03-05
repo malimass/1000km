@@ -282,6 +282,77 @@ async function walkSegmentNew(
 }
 
 /**
+ * Ottieni una rotta DRIVING come "scheletro" per sapere dove passano le strade.
+ * Restituisce le coordinate della rotta oppure null.
+ */
+function getDrivingSkeleton(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  G: any,
+  origin: [number, number],
+  destination: [number, number],
+): Promise<RouteResult | null> {
+  return new Promise((resolve) => {
+    const service = new G.DirectionsService();
+    service.route(
+      {
+        origin:      new G.LatLng(origin[0], origin[1]),
+        destination: new G.LatLng(destination[0], destination[1]),
+        travelMode:  G.TravelMode.DRIVING,
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (response: any, status: string) => {
+        if (status === "OK") {
+          resolve(extractDirectionsResult(response));
+        } else {
+          resolve(null);
+        }
+      },
+    );
+  });
+}
+
+/**
+ * Estrai waypoint equidistanti lungo una polyline di coordinate.
+ * Restituisce N punti spaziati regolarmente lungo il percorso reale.
+ */
+function extractWaypointsFromRoute(
+  coords: [number, number][],
+  n: number,
+): [number, number][] {
+  if (coords.length < 2 || n <= 0) return [];
+
+  // Calcola distanza totale
+  let totalM = 0;
+  for (let i = 1; i < coords.length; i++) {
+    totalM += haversineM(coords[i - 1], coords[i]);
+  }
+
+  const stepM = totalM / (n + 1);
+  const waypoints: [number, number][] = [];
+  let cumM = 0;
+  let nextTarget = stepM;
+  let wpIdx = 0;
+
+  for (let i = 1; i < coords.length && wpIdx < n; i++) {
+    const segM = haversineM(coords[i - 1], coords[i]);
+    const segEnd = cumM + segM;
+
+    while (nextTarget <= segEnd && wpIdx < n) {
+      const t = segM > 0 ? (nextTarget - cumM) / segM : 0;
+      waypoints.push([
+        coords[i - 1][0] + t * (coords[i][0] - coords[i - 1][0]),
+        coords[i - 1][1] + t * (coords[i][1] - coords[i - 1][1]),
+      ]);
+      wpIdx++;
+      nextTarget += stepM;
+    }
+    cumM += segM;
+  }
+
+  return waypoints;
+}
+
+/**
  * Estrai coordinate e distanza da un response DirectionsService.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -427,13 +498,26 @@ async function googleDirections(
     // Determina quanti segmenti servono
     const nSegments = Math.max(1, Math.ceil(straightKm / MAX_SEGMENT_KM));
 
-    // Genera waypoint intermedi e snappali a città reali
+    // Genera waypoint intermedi lungo strade reali (non su linea retta!)
     let waypoints: [number, number][] = [];
     if (nSegments > 1) {
-      const rawWaypoints = interpolatePoints(start, end, nSegments - 1);
       onProgress?.(0);
-      // Snap a città in parallelo per velocità
-      waypoints = await Promise.all(rawWaypoints.map(snapToCity));
+
+      // 1. Ottieni "scheletro" DRIVING per avere punti su strade reali
+      const skeleton = await getDrivingSkeleton(G, start, end);
+
+      if (skeleton && skeleton.coords.length > 2) {
+        // Estrai waypoint equidistanti lungo la rotta DRIVING reale
+        const rawWaypoints = extractWaypointsFromRoute(skeleton.coords, nSegments - 1);
+        // Snap a città per avere waypoint più significativi
+        waypoints = await Promise.all(rawWaypoints.map(snapToCity));
+        console.info(`[PercorsoBuilder] ${waypoints.length} waypoint estratti da scheletro DRIVING`);
+      } else {
+        // Fallback: interpolazione lineare + snap (può fallire per percorsi via mare)
+        console.warn("[PercorsoBuilder] scheletro DRIVING non disponibile, uso interpolazione lineare");
+        const rawWaypoints = interpolatePoints(start, end, nSegments - 1);
+        waypoints = await Promise.all(rawWaypoints.map(snapToCity));
+      }
     }
 
     // Costruisci la lista di coppie [origin, destination]
