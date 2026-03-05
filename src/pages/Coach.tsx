@@ -290,7 +290,7 @@ export default function Coach() {
   const handleLogout = () => {
     clearAuthToken();
     localStorage.removeItem("gp_coach_auth");
-    navigate("/coach-login");
+    navigate("/accedi");
   };
 
   const saveMaxHR = (v: number) => {

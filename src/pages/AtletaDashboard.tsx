@@ -92,7 +92,7 @@ export default function AtletaDashboard() {
   // Auth check
   useEffect(() => {
     getCurrentUser().then(u => {
-      if (!u || u.role !== "athlete") { navigate("/atleta/accedi", { replace: true }); return; }
+      if (!u || u.role !== "athlete") { navigate("/accedi", { replace: true }); return; }
       setUser(u);
       loadAthleteProfile(u.id).then(p => { if (p) setAthleteProfile(p); });
       loadAthleteSessions(u.id).then(s => setSessions(s as TrainingSession[]));
@@ -186,7 +186,7 @@ export default function AtletaDashboard() {
 
   const handleLogout = async () => {
     await signOutUser();
-    navigate("/atleta/accedi", { replace: true });
+    navigate("/accedi", { replace: true });
   };
 
   if (!user) {
