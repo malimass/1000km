@@ -19,7 +19,7 @@
  * Abilita su Cloud Console: Directions API, Geocoding API, Places API
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -28,6 +28,9 @@ import {
   AlertCircle, Save, Trash2, FolderOpen, Map as MapIcon,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+
+const ElevationProfile = lazy(() => import("@/components/ElevationProfile"));
+const RouteMap3D = lazy(() => import("@/components/RouteMap3D"));
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
@@ -592,6 +595,14 @@ export default function PercorsoBuilder() {
 
   const [route,  setRoute]  = useState<RouteResult | null>(null);
   const [tappe,  setTappe]  = useState<TappaPoint[]>([]);
+
+  // Elevation data
+  const [elevationData, setElevationData] = useState<{
+    points: { lat: number; lng: number; elevation: number; resolution: number }[];
+    stats: { minElevation: number; maxElevation: number; totalGainM: number; totalLossM: number };
+  } | null>(null);
+  const [elevLoading, setElevLoading] = useState(false);
+  const [show3D, setShow3D] = useState(false);
   const [copied,   setCopied]   = useState(false);
   const [savePin,  setSavePin]  = useState("");
   const [saving,   setSaving]   = useState(false);
@@ -679,6 +690,19 @@ export default function PercorsoBuilder() {
     setRoute(result);
     setTappe(splitByKm(result.coords, kmPerTappa));
     setLoading(false);
+
+    // Fetch elevation data in background
+    setElevLoading(true);
+    setElevationData(null);
+    fetch("/api/elevation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coords: result.coords }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.points) setElevationData(data); })
+      .catch(() => {})
+      .finally(() => setElevLoading(false));
   }, [partenza, arrivo, kmPerTappa, noKey, mapsReady]);
 
   // ── Ricalcola tappe al cambio di kmPerTappa ───────────────────────────────
@@ -754,7 +778,13 @@ export default function PercorsoBuilder() {
       const res = await fetch("/api/percorso-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: savePin, tappe, coords: route.coords, distanceM: route.distanceM }),
+        body: JSON.stringify({
+          pin: savePin,
+          tappe,
+          coords: route.coords,
+          distanceM: route.distanceM,
+          elevation: elevationData ?? undefined,
+        }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -960,7 +990,36 @@ export default function PercorsoBuilder() {
             ))}
           </div>
 
-          {/* Mappa con layer switcher */}
+          {/* Toggle 2D/3D */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShow3D(false)}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${!show3D ? "bg-dona text-white border-dona" : "bg-card text-muted-foreground border-border hover:border-dona/50"}`}
+            >
+              <MapIcon className="w-3.5 h-3.5 inline mr-1" /> Mappa 2D
+            </button>
+            <button
+              onClick={() => setShow3D(true)}
+              className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${show3D ? "bg-dona text-white border-dona" : "bg-card text-muted-foreground border-border hover:border-dona/50"}`}
+            >
+              🏔️ Vista 3D
+            </button>
+          </div>
+
+          {/* Mappa */}
+          {show3D ? (
+            <Suspense fallback={
+              <div className="flex items-center justify-center rounded-xl bg-card border border-border" style={{ height: 440 }}>
+                <Loader2 className="w-6 h-6 animate-spin text-dona" />
+              </div>
+            }>
+              <RouteMap3D
+                coords={route.coords}
+                waypoints={tappe.map(t => ({ lat: t.lat, lng: t.lng, label: t.label }))}
+                elevationPoints={elevationData?.points}
+              />
+            </Suspense>
+          ) : (
           <div className="rounded-xl overflow-hidden border border-border" style={{ height: 440 }}>
             <MapContainer
               center={route.coords[Math.floor(route.coords.length / 2)]}
@@ -1003,6 +1062,24 @@ export default function PercorsoBuilder() {
               })}
             </MapContainer>
           </div>
+          )}
+
+          {/* Profilo altimetrico */}
+          {elevLoading && (
+            <div className="flex items-center gap-2 p-4 bg-card border border-border rounded-xl">
+              <Loader2 className="w-4 h-4 animate-spin text-dona" />
+              <span className="text-xs text-muted-foreground font-body">Caricamento dati altimetrici…</span>
+            </div>
+          )}
+          {elevationData && (
+            <Suspense fallback={null}>
+              <ElevationProfile
+                points={elevationData.points}
+                stats={elevationData.stats}
+                totalDistanceKm={route!.distanceM / 1000}
+              />
+            </Suspense>
+          )}
 
           {/* Lista tappe */}
           <div className="bg-card border border-border rounded-xl overflow-hidden">
