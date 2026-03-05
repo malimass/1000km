@@ -235,7 +235,7 @@ async function walkSegmentNew(
     const request: Record<string, unknown> = {
       origin:      { lat: origin[0], lng: origin[1] },
       destination: { lat: destination[0], lng: destination[1] },
-      travelMode:  "WALK",
+      travelMode:  "WALKING",
       routeModifiers: {
         avoidHighways: true,
         avoidTolls:    true,
