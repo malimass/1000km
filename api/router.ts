@@ -789,8 +789,8 @@ async function elevation(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) return res.status(500).json({ error: "Google Maps API key non configurata" });
 
-  // Campiona max 512 punti (limite Google Elevation API)
-  const MAX_SAMPLES = 512;
+  // Campiona max 300 punti per evitare URL troppo lunghi
+  const MAX_SAMPLES = 300;
   const sampled: [number, number][] =
     coords.length <= MAX_SAMPLES
       ? coords
@@ -803,17 +803,25 @@ async function elevation(req: VercelRequest, res: VercelResponse) {
           return pts;
         })();
 
-  const locations = sampled.map((c: [number, number]) => `${c[0]},${c[1]}`).join("|");
+  // Batch in gruppi da 100 per restare sotto i limiti URL di Google (~8KB)
+  const BATCH_SIZE = 100;
+  const allResults: { elevation: number; resolution: number }[] = [];
 
   try {
-    const url = `https://maps.googleapis.com/maps/api/elevation/json?locations=${encodeURIComponent(locations)}&key=${apiKey}`;
-    const resp = await fetch(url);
-    const data = await resp.json();
+    for (let start = 0; start < sampled.length; start += BATCH_SIZE) {
+      const batch = sampled.slice(start, start + BATCH_SIZE);
+      const locations = batch.map((c: [number, number]) => `${c[0]},${c[1]}`).join("|");
+      const url = `https://maps.googleapis.com/maps/api/elevation/json?locations=${encodeURIComponent(locations)}&key=${apiKey}`;
+      const resp = await fetch(url);
+      const data = await resp.json();
 
-    if (data.status !== "OK")
-      return res.status(502).json({ error: `Google Elevation API: ${data.status}`, detail: data.error_message });
+      if (data.status !== "OK")
+        return res.status(502).json({ error: `Google Elevation API: ${data.status}`, detail: data.error_message });
 
-    const elevations: number[] = data.results.map((r: any) => r.elevation);
+      allResults.push(...data.results);
+    }
+
+    const elevations: number[] = allResults.map((r: any) => r.elevation);
     let gainM = 0, lossM = 0;
     for (let i = 1; i < elevations.length; i++) {
       const diff = elevations[i] - elevations[i - 1];
@@ -821,7 +829,7 @@ async function elevation(req: VercelRequest, res: VercelResponse) {
       else lossM += Math.abs(diff);
     }
 
-    const points = data.results.map((r: any, i: number) => ({
+    const points = allResults.map((r: any, i: number) => ({
       lat: sampled[i][0],
       lng: sampled[i][1],
       elevation: Math.round(r.elevation),
