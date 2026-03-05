@@ -1,10 +1,9 @@
 -- Migrazione: crea tabella saved_percorsi
--- Esegui in: Supabase Dashboard → SQL Editor → New query → Run
--- Oppure: psql $DATABASE_URL -f migrations/001_saved_percorsi.sql
+-- Esegui con: psql $DATABASE_URL -f migrations/001_saved_percorsi.sql
 
-CREATE TABLE IF NOT EXISTS public.saved_percorsi (
+CREATE TABLE IF NOT EXISTS saved_percorsi (
   id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id       uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id       uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name          text        NOT NULL,
   partenza      text        NOT NULL,
   arrivo        text        NOT NULL,
@@ -16,14 +15,4 @@ CREATE TABLE IF NOT EXISTS public.saved_percorsi (
 );
 
 CREATE INDEX IF NOT EXISTS saved_percorsi_user_idx
-  ON public.saved_percorsi (user_id, created_at DESC);
-
--- RLS (Row Level Security) — ogni utente vede solo i propri percorsi
-ALTER TABLE public.saved_percorsi ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "saved_percorsi_own" ON public.saved_percorsi;
-
-CREATE POLICY "saved_percorsi_own"
-  ON public.saved_percorsi FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  ON saved_percorsi (user_id, created_at DESC);
