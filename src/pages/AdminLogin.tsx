@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { setAuthToken } from "@/lib/supabase";
+import { setAuthToken } from "@/lib/api";
 import { LogIn } from "lucide-react";
 
 export default function AdminLogin() {

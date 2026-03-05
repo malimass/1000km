@@ -17,7 +17,7 @@
 ## 2. Struttura del Progetto
 
 ```
-/home/user/gratitude-path/
+/home/user/1000km/
 ├── src/
 │   ├── pages/                 # Pagine/route dell'app
 │   │   ├── Index.tsx          # Home page
@@ -27,7 +27,7 @@
 │   │   ├── Dona.tsx           # Pagina donazioni
 │   │   ├── Sponsor.tsx        # Pagina sponsor
 │   │   ├── Contatti.tsx       # Pagina contatti
-│   │   ├── AdminLogin.tsx     # Login admin (Supabase Auth)
+│   │   ├── AdminLogin.tsx     # Login admin (JWT)
 │   │   ├── AdminLive.tsx      # Dashboard admin (42KB, funzionalità complete)
 │   │   └── NotFound.tsx       # Pagina 404
 │   ├── components/
@@ -41,8 +41,9 @@
 │   │   ├── ProtectedAdminRoute.tsx # Guard per route admin
 │   │   └── ui/                # Componenti shadcn/ui (50+ file)
 │   ├── lib/
-│   │   ├── supabase.ts        # Inizializzazione client Supabase
-│   │   ├── adminSettings.ts   # Gestione impostazioni admin (Supabase + localStorage)
+│   │   ├── api.ts             # Client API (fetch + JWT auth)
+│   │   ├── auth.ts            # Autenticazione (login, getCurrentUser)
+│   │   ├── adminSettings.ts   # Gestione impostazioni admin (API + localStorage)
 │   │   ├── ltwStore.ts        # Helpers localStorage per URL LocaToWeb
 │   │   └── utils.ts           # Funzioni di utilità
 │   ├── hooks/
@@ -56,15 +57,19 @@
 │   ├── main.tsx               # Entry point
 │   ├── App.css                # Stili globali
 │   └── index.css              # Setup Tailwind CSS
+├── api/                       # API routes Vercel (serverless)
+│   ├── _lib/db.ts             # Client Neon PostgreSQL
+│   ├── _lib/auth.ts           # JWT sign/verify
+│   └── router.ts              # Tutte le API routes
 ├── public/                    # Asset statici
 ├── dist/                      # Output build
-├── supabase-schema.sql        # Schema del database PostgreSQL
+├── neon-schema.sql            # Schema database Neon PostgreSQL
+├── migrations/                # Migrazioni database
 ├── .env.local.example         # Template variabili d'ambiente
 ├── package.json               # Dipendenze e script
 ├── vite.config.ts             # Config Vite
 ├── tailwind.config.ts         # Config Tailwind CSS (colori custom, font)
-├── vercel.json                # Config deployment Vercel
-└── netlify.toml               # Config deployment Netlify
+└── vercel.json                # Config deployment Vercel
 ```
 
 ---
@@ -88,9 +93,11 @@
 ### Backend / Servizi
 | Servizio | Uso |
 |---|---|
-| **Supabase** | Database PostgreSQL, autenticazione, RLS |
+| **Neon PostgreSQL** | Database serverless |
+| **Vercel Serverless Functions** | API routes (Node.js) |
 | **Cloudinary** | Hosting e trasformazione immagini/video |
 | **Meta Graph API** | Post su Facebook e Instagram |
+| **Google Maps Routes API** | Calcolo percorsi pedonali |
 | **LocaToWeb** | Tracking GPS live (iframe embed) |
 
 ---
@@ -106,50 +113,42 @@
 | `/sponsor` | `Sponsor` | Pacchetti di sponsorizzazione |
 | `/contatti` | `Contatti` | Modulo di contatto |
 | `/dona` | `Dona` | Tier donazione e pagamento |
-| `/admin-login` | `AdminLogin` | Login Supabase |
+| `/admin-login` | `AdminLogin` | Login admin (JWT) |
 | `/admin-live` | `AdminLive` | **Protetta** — Dashboard admin |
 | `*` | `NotFound` | Pagina 404 |
 
 ---
 
-## 5. Database (Supabase / PostgreSQL)
+## 5. Database (Neon PostgreSQL)
 
-```sql
--- Tabella admin_settings
-CREATE TABLE admin_settings (
-  user_id   uuid PRIMARY KEY REFERENCES auth.users(id),
-  data      jsonb NOT NULL DEFAULT '{}',  -- JSON con le impostazioni admin
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-```
+Schema completo in `neon-schema.sql`. Tabelle principali:
+- `users` — Utenti con ruoli (athlete, coach, admin)
+- `admin_settings` — Impostazioni admin per utente
+- `iscrizioni` — Iscrizioni alle tappe
+- `notizie` — News feed
+- `raccolta_fondi` — Barra donazioni
+- `live_position` — Posizione GPS runner in tempo reale
+- `route_positions` — Traccia percorso GPS
+- `profiles` — Profili utenti community
+- `coach_sessions` — Sessioni di allenamento
+- `saved_percorsi` — Percorsi salvati dagli utenti
 
-**Modello TypeScript `AdminSettings`:**
-```typescript
-type AdminSettings = {
-  fbPageId: string;      // Facebook Page ID
-  fbToken: string;       // Facebook API token
-  igUserId: string;      // Instagram User ID
-  igImageUrl: string;    // Instagram profile image URL
-  cloudName: string;     // Cloudinary cloud name
-  cloudPreset: string;   // Cloudinary upload preset
-};
-```
-
-**Strategia di storage ibrida:** Supabase come source of truth + localStorage come cache locale. Row-Level Security attivo: ogni utente vede solo i propri dati.
+**Strategia di storage ibrida:** Neon come source of truth + localStorage come cache locale.
 
 ---
 
-## 6. API Esterne Utilizzate
+## 6. API
 
-1. **Supabase Auth** — `supabase.auth.signInWithPassword()`
-2. **Supabase DB** — CRUD su tabella `admin_settings`
-3. **Cloudinary** — Upload immagini/video: `POST /v1_1/{cloudName}/{type}/upload`
-4. **Meta Graph API v20.0:**
-   - `POST /{pageId}/feed` — Post testo su Facebook
-   - `POST /{pageId}/photos` — Post foto su Facebook
-   - `POST /{pageId}/video_reels` — Post reel su Facebook
-   - `POST /{igUserId}/media` — Post su Instagram
-5. **LocaToWeb** — Iframe per tracking GPS live
+Tutte le API sono in `api/router.ts` (Vercel Serverless Functions):
+- **Auth** — `/api/auth/login`, `/api/auth/register`, `/api/auth/me`
+- **Notizie** — `/api/notizie`
+- **Iscrizioni** — `/api/iscrizioni`
+- **Live tracking** — `/api/live-position`, `/api/route-positions`
+- **Community** — `/api/community-live`, `/api/community-route`
+- **Coach** — `/api/coach-sessions`, `/api/athlete-profile`
+- **Percorsi** — `/api/saved-percorsi`
+- **Cloudinary** — Upload immagini/video
+- **Meta Graph API** — Post social
 
 ---
 
@@ -167,7 +166,7 @@ Dashboard admin completa con:
 - Dati delle 14 tappe per generazione automatica caption
 
 ### `adminSettings.ts`
-Gestione ibrida impostazioni: carica da Supabase, fallback a localStorage se Supabase non configurato, sincronizza al salvataggio.
+Gestione ibrida impostazioni: carica da API, fallback a localStorage, sincronizza al salvataggio.
 
 ### `Countdown.tsx`
 Timer real-time che mostra giorni/ore/minuti/secondi alla partenza (18 aprile 2026, ore 06:00 UTC).
@@ -198,7 +197,6 @@ Timer real-time che mostra giorni/ore/minuti/secondi alla partenza (18 aprile 20
 
 ### Donazioni
 - Obiettivo: **€50.000**
-- Attuale: **€2.500** (5%)
 - Progress bar animata nella home
 
 ### Tappe (14 stage)
@@ -209,14 +207,13 @@ Timer real-time che mostra giorni/ore/minuti/secondi alla partenza (18 aprile 20
 
 ## 10. Deployment
 
-**Multi-piattaforma:**
-- **Vercel** (`vercel.json`)
-- **Netlify** (`netlify.toml`)
+**Piattaforma:** Vercel (`vercel.json`)
 
 **Variabili d'ambiente richieste** (`.env.local`):
 ```
-VITE_SUPABASE_URL=<url-supabase>
-VITE_SUPABASE_ANON_KEY=<anon-key-supabase>
+DATABASE_URL=<connection-string-neon>
+JWT_SECRET=<secret-per-jwt>
+VITE_GOOGLE_MAPS_API_KEY=<api-key>
 ```
 
 **SEO & PWA:**

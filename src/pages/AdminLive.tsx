@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, Suspense, lazy } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { clearAuthToken } from "@/lib/supabase";
+import { clearAuthToken } from "@/lib/api";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import { tappe } from "@/lib/tappe";
 import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, saveSiteShareSettings, SHARE_DEFAULTS, type AdminSettings } from "@/lib/adminSettings";
@@ -251,7 +251,7 @@ export default function AdminLive() {
   const [isTracking,  setIsTracking]  = useState(false);
   const [gpsPos,      setGpsPos]      = useState<{ lat: number; lng: number; speed: number | null; accuracy: number | null } | null>(null);
   const [gpsError,    setGpsError]    = useState("");
-  const [dbError,     setDbError]     = useState("");   // errore scrittura Supabase
+  const [dbError,     setDbError]     = useState("");   // errore scrittura Neon
   const [routeCount,    setRouteCount]    = useState(0);  // punti registrati in sessione
   const [clearingRoute, setClearingRoute] = useState(false);
   const [wakeLockOn,    setWakeLockOn]    = useState(false);
@@ -1886,7 +1886,7 @@ export default function AdminLive() {
                 </button>
 
                 <p className="text-[11px] text-muted-foreground text-center">
-                  I dati vengono salvati su Supabase e visibili sulla{" "}
+                  I dati vengono salvati su Neon e visibili sulla{" "}
                   <Link to="/sostenitori" target="_blank" className="underline text-dona">
                     pagina pubblica
                   </Link>.

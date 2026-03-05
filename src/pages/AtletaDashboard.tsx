@@ -25,7 +25,7 @@ import {
   getCurrentUser, signOutUser, listCoaches, saveAthleteProfile,
   loadAthleteProfile, AuthUser, AthleteProfile,
 } from "@/lib/auth";
-import { apiFetch } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 
 // ─── helpers ─────────────────────────────────────────────────
 function fmtDuration(sec: number) {

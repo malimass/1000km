@@ -33,7 +33,7 @@ import {
   SessionAnalysis, WeeklyStats, CoachProfile,
 } from "@/lib/coachAnalysis";
 import { getCurrentUser, loadCoachAthletes, CoachAthlete, saveAthleteProfile, loadAthleteProfile } from "@/lib/auth";
-import { supabase, isSupabaseConfigured, clearAuthToken } from "@/lib/supabase";
+import { clearAuthToken } from "@/lib/api";
 
 // ─── COSTANTI COLORI ─────────────────────────────────────────────────────────
 
@@ -147,7 +147,7 @@ export default function Coach() {
     const hr = maxHRFromAge(p.age);
     setMaxHR(hr);
     localStorage.setItem("gp_coach_maxhr", String(hr));
-    // Salva su Supabase se autenticato (sincronizza tra browser)
+    // Salva su Neon se autenticato (sincronizza tra browser)
     if (coachUserId) saveAthleteProfile(coachUserId, p);
   };
 
@@ -163,13 +163,13 @@ export default function Coach() {
   const [athletes, setAthletes] = useState<CoachAthlete[]>([]);
   const [coachUserId, setCoachUserId] = useState<string | null>(null);
 
-  // Carica atleti e profilo da Supabase se coach autenticato
+  // Carica atleti e profilo da Neon se coach autenticato
   useEffect(() => {
     getCurrentUser().then(async u => {
       if (u?.role === "coach") {
         setCoachUserId(u.id);
         loadCoachAthletes(u.id).then(setAthletes);
-        // Carica profilo da Supabase (sincronizza tra browser)
+        // Carica profilo da Neon (sincronizza tra browser)
         const remote = await loadAthleteProfile(u.id);
         if (remote && (remote.age || remote.weightKg)) {
           const p: CoachProfile = {
@@ -189,12 +189,12 @@ export default function Coach() {
     });
   }, []);
 
-  // Sessioni (metadati persistiti su Supabase + localStorage; trackPoints solo in memoria)
+  // Sessioni (metadati persistiti su Neon + localStorage; trackPoints solo in memoria)
   const [sessions, setSessions] = useState<TrainingSession[]>(() =>
     loadSessionsLocal().map(s => ({ ...s, trackPoints: [] })) as TrainingSession[]
   );
 
-  // Carica da Supabase al mount
+  // Carica da Neon al mount
   useEffect(() => {
     loadSessionsAsync().then(loaded => {
       setSessions(loaded.map(s => ({ ...s, trackPoints: [] })) as TrainingSession[]);
@@ -316,7 +316,7 @@ export default function Coach() {
             <span className="text-primary-foreground/50 text-xs font-body ml-1">Gratitude Path</span>
           </div>
           <div className="flex items-center gap-2">
-            {/* Tab atleti (solo coach Supabase) */}
+            {/* Tab atleti (solo coach Neon) */}
             {coachUserId && (
               <div className="flex bg-primary-foreground/10 rounded-lg p-0.5">
                 <button onClick={() => setActiveTab("dashboard")}

@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dumbbell, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { signInUser } from "@/lib/auth";
-import { setAuthToken } from "@/lib/supabase";
+import { setAuthToken } from "@/lib/api";
 
 export default function CoachLogin() {
   const navigate = useNavigate();

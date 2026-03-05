@@ -2,10 +2,10 @@
  * communityTracking.ts
  * ─────────────────────
  * Funzioni community via Neon API Routes.
- * Il realtime Supabase è sostituito da polling (setInterval).
+ * Il realtime Neon è sostituito da polling (setInterval).
  */
 
-import { apiFetch } from "./supabase";
+import { apiFetch } from "./api";
 import { loadSiteShareSettings } from "./adminSettings";
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ export async function loadActiveCommunityPositions(): Promise<CommunityLivePosit
 }
 
 /**
- * Polling ogni 5 s (sostituisce Supabase Realtime).
+ * Polling ogni 5 s (sostituisce polling API).
  * Ritorna cleanup.
  */
 export function subscribeCommunityLivePosition(
@@ -176,7 +176,7 @@ export async function loadCommunityRoutePositions(
   } catch { return []; }
 }
 
-/** Polling ogni 10 s (sostituisce Supabase Realtime). */
+/** Polling ogni 10 s (sostituisce polling API). */
 export function subscribeCommunityRoutePositions(
   cb: (point: CommunityRoutePoint) => void,
 ): () => void {

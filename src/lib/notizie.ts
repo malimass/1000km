@@ -3,7 +3,7 @@
  * Il "realtime" è sostituito da polling (setInterval).
  */
 
-import { apiFetch } from "./supabase";
+import { apiFetch } from "./api";
 
 // ─── Notizie ─────────────────────────────────────────────────────────────────
 

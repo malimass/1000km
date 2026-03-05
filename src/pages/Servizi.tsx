@@ -10,7 +10,7 @@ import NativeLayout from "@/components/NativeLayout";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
 import { isNativeApp } from "@/lib/capacitorGeo";
-import { apiFetch } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ interface ServiziPage {
   sections: ServizioSection[];
 }
 
-// ─── Dati fallback (se Supabase non è configurato o la pagina è vuota) ────────
+// ─── Dati fallback (se Neon non è configurato o la pagina è vuota) ────────
 
 const FALLBACK: ServiziPage = {
   sections: [

@@ -2,10 +2,10 @@
  * liveTracking.ts
  * ────────────────
  * Helper GPS live e traccia percorso via Neon API Routes.
- * Il realtime Supabase è sostituito da polling (setInterval).
+ * Il realtime Neon è sostituito da polling (setInterval).
  */
 
-import { apiFetch } from "./supabase";
+import { apiFetch } from "./api";
 
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ export async function loadAllLivePositions(): Promise<{ 1: LivePosition | null; 
 }
 
 /**
- * Polling ogni 5 s su live_position (sostituisce Supabase Realtime).
+ * Polling ogni 5 s su live_position (sostituisce polling API).
  * Ritorna cleanup.
  */
 export function subscribeLivePosition(
@@ -130,7 +130,7 @@ export async function loadRoutePositions(
 }
 
 /**
- * Polling ogni 10 s su route_positions (sostituisce Supabase Realtime).
+ * Polling ogni 10 s su route_positions (sostituisce polling API).
  * Ritorna cleanup.
  */
 export function subscribeRoutePositions(

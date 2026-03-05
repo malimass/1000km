@@ -5,7 +5,7 @@
  * Fallback su localStorage se non autenticato.
  */
 
-import { apiFetch, getAuthToken } from "./supabase";
+import { apiFetch, getAuthToken } from "./api";
 
 export type AdminSettings = {
   fbPageId:    string;

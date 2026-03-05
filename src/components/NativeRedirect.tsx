@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { isNativeApp } from "@/lib/capacitorGeo";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { getAuthToken } from "@/lib/api";
 
 interface Props {
   children: React.ReactNode;
@@ -25,19 +25,13 @@ export default function NativeRedirect({ children }: Props) {
   useEffect(() => {
     if (!isNativeApp()) return;
 
-    if (!isSupabaseConfigured || !supabase) {
+    // Se c'è un token JWT → utente loggato
+    if (getAuthToken()) {
+      navigate("/il-mio-percorso", { replace: true });
+    } else {
       navigate("/partecipa", { replace: true });
-      return;
     }
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.user) {
-        navigate("/il-mio-percorso", { replace: true });
-      } else {
-        navigate("/partecipa", { replace: true });
-      }
-      setChecking(false);
-    });
+    setChecking(false);
   }, [navigate]);
 
   if (checking) {

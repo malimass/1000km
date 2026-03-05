@@ -12,7 +12,7 @@
  */
 
 import { TrainingSession, TrackPoint } from "./trainingParser";
-import { apiFetch } from "./supabase";
+import { apiFetch } from "./api";
 
 // ─── COSTANTI ────────────────────────────────────────────────────────────────
 
@@ -745,7 +745,7 @@ export function buildPaceProfile(session: TrainingSession): PaceChartPoint[] {
   return result;
 }
 
-// ─── STORAGE (localStorage + Supabase) ───────────────────────────────────────
+// ─── STORAGE (localStorage + Neon) ───────────────────────────────────────
 
 const STORAGE_KEY = "gp_coach_sessions";
 
