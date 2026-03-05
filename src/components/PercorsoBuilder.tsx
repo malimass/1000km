@@ -81,6 +81,7 @@ function loadGoogleMapsScript(key: string): Promise<void> {
 // ─── Tipi ─────────────────────────────────────────────────────────────────────
 
 type TravelMode = "walking" | "running";  // entrambi usano mode=walking su Google
+type RoutePreference = "default" | "shortest";
 
 interface RouteResult {
   coords:    [number, number][];  // [lat, lng]
@@ -228,9 +229,10 @@ async function walkSegmentNew(
   RouteClass: any,
   origin: [number, number],
   destination: [number, number],
+  preferShortest = false,
 ): Promise<RouteResult | null> {
   try {
-    const request = {
+    const request: Record<string, unknown> = {
       origin:      { lat: origin[0], lng: origin[1] },
       destination: { lat: destination[0], lng: destination[1] },
       travelMode:  "WALK",
@@ -242,10 +244,18 @@ async function walkSegmentNew(
       fields: ["legs", "distanceMeters"],
     };
 
+    // Richiedi rotte alternative per poter scegliere la più breve
+    if (preferShortest) {
+      request.computeAlternativeRoutes = true;
+    }
+
     const { routes } = await RouteClass.computeRoutes(request);
     if (!routes?.length) return null;
 
-    const route = routes[0];
+    // Se preferShortest, scegli la rotta con distanza minore
+    const route = preferShortest && routes.length > 1
+      ? routes.reduce((best: any, r: any) => (r.distanceMeters ?? Infinity) < (best.distanceMeters ?? Infinity) ? r : best)
+      : routes[0];
     const coords: [number, number][] = [];
     let distanceM = route.distanceMeters ?? 0;
 
@@ -387,6 +397,7 @@ function walkSegmentLegacy(
   G: any,
   origin: [number, number],
   destination: [number, number],
+  preferShortest = false,
 ): Promise<RouteResult | null> {
   return new Promise((resolve) => {
     const service = new G.DirectionsService();
@@ -396,6 +407,7 @@ function walkSegmentLegacy(
       avoidHighways: true,
       avoidTolls:    true,
       avoidFerries:  true,
+      provideRouteAlternatives: preferShortest,
     };
 
     // 1. Prova WALKING
@@ -404,6 +416,17 @@ function walkSegmentLegacy(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (response: any, status: string) => {
         if (status === "OK") {
+          // Se preferShortest, confronta tutte le rotte e scegli la più breve
+          if (preferShortest && response.routes?.length > 1) {
+            let best: RouteResult | null = null;
+            for (const r of response.routes) {
+              const candidate = extractDirectionsResult({ ...response, routes: [r] });
+              if (candidate && (!best || candidate.distanceM < best.distanceM)) {
+                best = candidate;
+              }
+            }
+            if (best) { resolve(best); return; }
+          }
           const result = extractDirectionsResult(response);
           if (result) { resolve(result); return; }
         }
@@ -415,6 +438,17 @@ function walkSegmentLegacy(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (resp2: any, status2: string) => {
             if (status2 === "OK") {
+              // Anche per DRIVING, scegli la più breve se richiesto
+              if (preferShortest && resp2.routes?.length > 1) {
+                let best: RouteResult | null = null;
+                for (const r of resp2.routes) {
+                  const candidate = extractDirectionsResult({ ...resp2, routes: [r] });
+                  if (candidate && (!best || candidate.distanceM < best.distanceM)) {
+                    best = candidate;
+                  }
+                }
+                if (best) { resolve(best); return; }
+              }
               resolve(extractDirectionsResult(resp2));
             } else {
               resolve(null);
@@ -437,6 +471,7 @@ async function googleDirections(
   start: [number, number],
   end: [number, number],
   onProgress?: (pct: number) => void,
+  preferShortest = false,
 ): Promise<RouteResult | null> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -461,10 +496,10 @@ async function googleDirections(
       // Prova: 1) computeRoutes WALK, 2) DirectionsService WALKING+DRIVING
       let seg: RouteResult | null = null;
       if (RouteClass) {
-        seg = await walkSegmentNew(RouteClass, origin, dest);
+        seg = await walkSegmentNew(RouteClass, origin, dest, preferShortest);
       }
       if (!seg) {
-        seg = await walkSegmentLegacy(G, origin, dest);
+        seg = await walkSegmentLegacy(G, origin, dest, preferShortest);
       }
       if (seg) return seg;
 
@@ -587,6 +622,7 @@ export default function PercorsoBuilder() {
   const [partenza,   setPartenza]   = useState("");
   const [arrivo,     setArrivo]     = useState("");
   const [mode,       setMode]       = useState<TravelMode>("walking");
+  const [routePref,  setRoutePref]  = useState<RoutePreference>("default");
   const [kmPerTappa, setKmPerTappa] = useState(70);
 
   const [loading,  setLoading]  = useState(false);
@@ -684,7 +720,7 @@ export default function PercorsoBuilder() {
     if (!startC) { setError(`Indirizzo non trovato: "${partenza}"`); setLoading(false); return; }
     if (!endC)   { setError(`Indirizzo non trovato: "${arrivo}"`);   setLoading(false); return; }
 
-    const result = await googleDirections(startC, endC, setProgress);
+    const result = await googleDirections(startC, endC, setProgress, routePref === "shortest");
     if (!result) { setError("Google non ha trovato un percorso pedonale. Prova indirizzi più precisi."); setLoading(false); return; }
 
     setRoute(result);
@@ -703,7 +739,7 @@ export default function PercorsoBuilder() {
       .then(data => { if (data?.points) setElevationData(data); })
       .catch(() => {})
       .finally(() => setElevLoading(false));
-  }, [partenza, arrivo, kmPerTappa, noKey, mapsReady]);
+  }, [partenza, arrivo, kmPerTappa, routePref, noKey, mapsReady]);
 
   // ── Ricalcola tappe al cambio di kmPerTappa ───────────────────────────────
   useEffect(() => {
@@ -911,8 +947,27 @@ export default function PercorsoBuilder() {
             </button>
           ))}
         </div>
+        {/* Preferenza percorso */}
+        <div className="flex gap-2">
+          {([
+            { key: "default" as RoutePreference, icon: "🗺️", label: "Percorso consigliato" },
+            { key: "shortest" as RoutePreference, icon: "📏", label: "Più breve" },
+          ]).map(({ key, icon, label }) => (
+            <button key={key} onClick={() => setRoutePref(key)}
+              className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-colors ${
+                routePref === key
+                  ? "bg-dona text-white border-dona"
+                  : "border-border text-muted-foreground hover:border-dona/50"
+              }`}
+            >
+              {icon} {label}
+            </button>
+          ))}
+        </div>
         <p className="text-[10px] text-muted-foreground -mt-2">
-          Entrambe le modalità usano il routing pedonale Google (strade sicure, niente autostrade).
+          {routePref === "shortest"
+            ? "Confronta rotte alternative e seleziona quella con meno km."
+            : "Entrambe le modalità usano il routing pedonale Google (strade sicure, niente autostrade)."}
         </p>
 
         {/* Partenza */}
