@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Suspense, lazy } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { clearAuthToken } from "@/lib/supabase";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import { tappe } from "@/lib/tappe";
 import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, saveSiteShareSettings, SHARE_DEFAULTS, type AdminSettings } from "@/lib/adminSettings";
@@ -683,6 +684,7 @@ export default function AdminLive() {
 
   // ─ Logout ─
   async function handleLogout() {
+    clearAuthToken();
     localStorage.removeItem("gp_admin_auth");
     navigate("/admin-login", { replace: true });
   }

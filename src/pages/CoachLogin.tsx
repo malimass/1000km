@@ -2,20 +2,18 @@
  * CoachLogin.tsx — Accesso coach
  *
  * Supporta due metodi:
- *  1. Email + password (Supabase Auth) — per coach registrati
- *  2. PIN (backward compat) — per il coach admin configurato via env
+ *  1. Email + password — per coach registrati
+ *  2. PIN — chiama l'API per ottenere un JWT valido
  */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dumbbell, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { signInUser } from "@/lib/auth";
-import { isSupabaseConfigured } from "@/lib/supabase";
-
-const COACH_PIN = import.meta.env.VITE_COACH_PIN || "coach2026";
+import { setAuthToken } from "@/lib/supabase";
 
 export default function CoachLogin() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"email" | "pin">(isSupabaseConfigured ? "email" : "pin");
+  const [mode, setMode] = useState<"email" | "pin">("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pin, setPin] = useState("");
@@ -35,11 +33,30 @@ export default function CoachLogin() {
     setLoading(false);
   }
 
-  function handlePinLogin(e: React.FormEvent) {
+  async function handlePinLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (pin !== COACH_PIN) { setError("PIN non valido. Riprova."); return; }
-    localStorage.setItem("gp_coach_auth", "1");
-    navigate("/coach", { replace: true });
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/pin-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "PIN non valido. Riprova.");
+        setLoading(false);
+        return;
+      }
+      const data = await res.json();
+      if (data.token) setAuthToken(data.token);
+      localStorage.setItem("gp_coach_auth", "1");
+      navigate("/coach", { replace: true });
+    } catch {
+      setError("Errore di rete. Riprova.");
+    }
+    setLoading(false);
   }
 
   return (
@@ -53,16 +70,14 @@ export default function CoachLogin() {
           <p className="text-muted-foreground text-sm mt-1 font-body">Gratitude Path – Analisi Allenamenti</p>
         </div>
 
-        {isSupabaseConfigured && (
-          <div className="flex bg-muted rounded-xl p-1 mb-5">
-            {(["email", "pin"] as const).map(m => (
-              <button key={m} onClick={() => { setMode(m); setError(null); }}
-                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${mode === m ? "bg-card shadow text-foreground" : "text-muted-foreground"}`}>
-                {m === "email" ? "Email / Password" : "PIN (admin)"}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex bg-muted rounded-xl p-1 mb-5">
+          {(["email", "pin"] as const).map(m => (
+            <button key={m} onClick={() => { setMode(m); setError(null); }}
+              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${mode === m ? "bg-card shadow text-foreground" : "text-muted-foreground"}`}>
+              {m === "email" ? "Email / Password" : "PIN"}
+            </button>
+          ))}
+        </div>
 
         {mode === "email" ? (
           <form onSubmit={handleEmailLogin} className="bg-card border border-border rounded-xl p-6 shadow-sm space-y-4">
@@ -101,18 +116,16 @@ export default function CoachLogin() {
                 className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/40 bg-background text-foreground" />
             </div>
             {error && <p className="text-xs text-red-500 font-semibold">{error}</p>}
-            <button type="submit"
-              className="w-full flex items-center justify-center gap-2 bg-green-600 text-white rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity">
+            <button type="submit" disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-green-600 text-white rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50">
               <Dumbbell className="w-4 h-4" />
-              Accedi con PIN
+              {loading ? "Accesso…" : "Accedi con PIN"}
             </button>
           </form>
         )}
 
         <div className="text-center text-xs text-muted-foreground mt-4 space-y-1">
-          {isSupabaseConfigured && (
-            <p>Nuovo coach? <a href="/coach/registrati" className="text-green-600 font-semibold hover:underline">Registrati</a></p>
-          )}
+          <p>Nuovo coach? <a href="/coach/registrati" className="text-green-600 font-semibold hover:underline">Registrati</a></p>
           <p>Sei un atleta? <a href="/atleta/accedi" className="text-primary font-semibold hover:underline">Area atleti</a></p>
         </div>
       </div>
