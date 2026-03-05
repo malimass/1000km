@@ -7,22 +7,52 @@
  * APIs Google Maps (JS SDK — niente CORS):
  *  - AutocompleteSuggestion → suggerimenti mentre si digita
  *  - Geocoder               → converte indirizzo in coordinate
- *  - Routes API (Route.computeRoutes) → calcola percorso a piedi
+ *  - DirectionsService      → calcola percorso a piedi
+ *
+ * Mappe:
+ *  - Stradale (OpenStreetMap)
+ *  - Satellite (Esri World Imagery)
+ *  - Topografica (OpenTopoMap)
  *
  * Richiede: VITE_GOOGLE_MAPS_API_KEY nel file .env
- * Abilita su Cloud Console: Routes API, Geocoding API, Places API
+ * Abilita su Cloud Console: Directions API, Geocoding API, Places API
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   Search, Navigation, Loader2, MapPin, Route, RotateCcw, Copy, CheckCircle2,
-  AlertCircle,
+  AlertCircle, Save, Trash2, FolderOpen, Map as MapIcon,
 } from "lucide-react";
 
 const GOOGLE_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+
+// ─── Tile layers ─────────────────────────────────────────────────────────────
+
+const TILE_LAYERS = {
+  street: {
+    name: "Stradale",
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  },
+  satellite: {
+    name: "Satellite",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: '&copy; Esri, Maxar, Earthstar Geographics',
+    maxZoom: 18,
+  },
+  topo: {
+    name: "Topografica",
+    url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+    attribution: '&copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
+    maxZoom: 17,
+  },
+} as const;
+
+type TileKey = keyof typeof TILE_LAYERS;
 
 // ─── Carica Google Maps JS API una sola volta ─────────────────────────────────
 
@@ -65,21 +95,28 @@ interface Suggestion {
   place_id:    string;
 }
 
-// ─── Decode Google Encoded Polyline ──────────────────────────────────────────
+interface SavedPercorso {
+  id:         string;
+  name:       string;
+  partenza:   string;
+  arrivo:     string;
+  distanceM:  number;
+  kmPerTappa: number;
+  coords:     [number, number][];
+  tappe:      TappaPoint[];
+  createdAt:  string;
+}
 
-function decodePolyline(encoded: string): [number, number][] {
-  const points: [number, number][] = [];
-  let idx = 0, lat = 0, lng = 0;
-  while (idx < encoded.length) {
-    let b, shift = 0, result = 0;
-    do { b = encoded.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lat += result & 1 ? ~(result >> 1) : result >> 1;
-    shift = result = 0;
-    do { b = encoded.charCodeAt(idx++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lng += result & 1 ? ~(result >> 1) : result >> 1;
-    points.push([lat * 1e-5, lng * 1e-5]);
-  }
-  return points;
+const STORAGE_KEY = "gp_saved_percorsi";
+
+function loadSavedPercorsi(): SavedPercorso[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  } catch { return []; }
+}
+
+function saveToDisk(list: SavedPercorso[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
 
 // ─── Haversine (m) ────────────────────────────────────────────────────────────
@@ -136,30 +173,44 @@ function googleGeocode(address: string): Promise<[number, number] | null> {
   });
 }
 
-// ─── Google Routes API (Route.computeRoutes — nuova API) ─────────────────────
+// ─── Google DirectionsService (classica, stabile) ────────────────────────────
 
 async function googleDirections(start: [number, number], end: [number, number]): Promise<RouteResult | null> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G = (window as any).google.maps;
-    const { Route } = await G.importLibrary("routes");
-    const response: any = await Route.computeRoutes(
-      {
-        origin:      new G.LatLng(start[0], start[1]),
-        destination: new G.LatLng(end[0], end[1]),
-        travelMode:  "WALK",
-        routeModifiers: { avoidHighways: true, avoidTolls: false, avoidFerries: false },
-      },
-      ["routes.polyline.encodedPolyline", "routes.legs.distanceMeters"],
-    );
-    if (!response?.routes?.length) return null;
-    const route = response.routes[0];
-    const encoded = route.polyline?.encodedPolyline;
-    if (!encoded) return null;
-    const coords = decodePolyline(encoded);
+    const service = new G.DirectionsService();
+
+    const result = await new Promise<any>((resolve, reject) => {
+      service.route(
+        {
+          origin:      new G.LatLng(start[0], start[1]),
+          destination: new G.LatLng(end[0], end[1]),
+          travelMode:  G.TravelMode.WALKING,
+          avoidHighways: true,
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (response: any, status: string) => {
+          if (status === "OK") resolve(response);
+          else reject(new Error(`DirectionsService: ${status}`));
+        },
+      );
+    });
+
+    if (!result?.routes?.length) return null;
+    const route = result.routes[0];
+
+    // Estrai coordinate dalla overview_path
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const coords: [number, number][] = route.overview_path.map((p: any) => [p.lat(), p.lng()]);
     if (!coords.length) return null;
-    const distanceM = (route.legs as any[]).reduce(
-      (s: number, leg: any) => s + (leg.distanceMeters ?? 0), 0
+
+    // Distanza totale in metri
+    const distanceM = route.legs.reduce(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (s: number, leg: any) => s + (leg.distance?.value ?? 0), 0
     );
+
     return { coords, distanceM };
   } catch (err) {
     console.error("[PercorsoBuilder] directions error:", err);
@@ -209,6 +260,11 @@ export default function PercorsoBuilder() {
   const [mapsReady,    setMapsReady]    = useState(false);
   const [partenzaSugg, setPartenzaSugg] = useState<Suggestion[]>([]);
   const [arrivoSugg,   setArrivoSugg]   = useState<Suggestion[]>([]);
+
+  // Saved percorsi
+  const [savedList, setSavedList] = useState<SavedPercorso[]>(() => loadSavedPercorsi());
+  const [showSaved, setShowSaved] = useState(false);
+  const [saveName,  setSaveName]  = useState("");
 
   const noKey         = !GOOGLE_KEY;
   const partenzaTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -290,7 +346,47 @@ export default function PercorsoBuilder() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  async function savePercorso() {
+  // ── Salva percorso in locale ──────────────────────────────────────────────
+  function savePercorsoLocal() {
+    if (!route || !tappe.length) return;
+    const name = saveName.trim() || `${partenza} → ${arrivo}`;
+    const entry: SavedPercorso = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      partenza,
+      arrivo,
+      distanceM: route.distanceM,
+      kmPerTappa,
+      coords: route.coords,
+      tappe,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [entry, ...savedList];
+    setSavedList(updated);
+    saveToDisk(updated);
+    setSaveName("");
+    setSaveMsg({ ok: true, text: `"${name}" salvato localmente.` });
+    setTimeout(() => setSaveMsg(null), 3000);
+  }
+
+  function deleteSavedPercorso(id: string) {
+    const updated = savedList.filter(p => p.id !== id);
+    setSavedList(updated);
+    saveToDisk(updated);
+  }
+
+  function loadPercorso(p: SavedPercorso) {
+    setPartenza(p.partenza);
+    setArrivo(p.arrivo);
+    setKmPerTappa(p.kmPerTappa);
+    setRoute({ coords: p.coords, distanceM: p.distanceM });
+    setTappe(p.tappe);
+    setShowSaved(false);
+    setError(null);
+  }
+
+  // ── Salva percorso sul server (admin) ─────────────────────────────────────
+  async function savePercorsoServer() {
     if (!route || !tappe.length) return;
     setSaving(true); setSaveMsg(null);
     try {
@@ -336,15 +432,62 @@ export default function PercorsoBuilder() {
     <div className="space-y-6">
 
       {/* Intestazione */}
-      <div>
-        <h2 className="font-heading text-base font-bold text-foreground flex items-center gap-2">
-          <Route className="w-4 h-4 text-dona" />
-          Crea Percorso
-        </h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Percorso a piedi / di corsa calcolato da Google Maps. Evita automaticamente autostrade, tangenziali e strade a scorrimento veloce.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="font-heading text-base font-bold text-foreground flex items-center gap-2">
+            <Route className="w-4 h-4 text-dona" />
+            Crea Percorso
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Percorso a piedi / di corsa calcolato da Google Maps.
+          </p>
+        </div>
+        {savedList.length > 0 && (
+          <button
+            onClick={() => setShowSaved(!showSaved)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-dona hover:opacity-80 transition-opacity"
+          >
+            <FolderOpen className="w-4 h-4" />
+            Salvati ({savedList.length})
+          </button>
+        )}
       </div>
+
+      {/* Percorsi salvati */}
+      {showSaved && savedList.length > 0 && (
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <FolderOpen className="w-3.5 h-3.5 text-dona" />
+              Percorsi salvati
+            </p>
+          </div>
+          <div className="divide-y divide-border max-h-60 overflow-y-auto">
+            {savedList.map(p => (
+              <div key={p.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => loadPercorso(p)}>
+                  <p className="text-xs font-semibold text-foreground truncate">{p.name}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {(p.distanceM / 1000).toFixed(1)} km · {p.tappe.length} tappe · {new Date(p.createdAt).toLocaleDateString("it-IT")}
+                  </p>
+                </div>
+                <button
+                  onClick={() => loadPercorso(p)}
+                  className="text-[10px] text-dona hover:opacity-80 flex items-center gap-1"
+                >
+                  <MapIcon className="w-3 h-3" /> Apri
+                </button>
+                <button
+                  onClick={() => deleteSavedPercorso(p.id)}
+                  className="text-[10px] text-destructive hover:opacity-80 flex items-center gap-1"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Avviso chiave mancante */}
       {noKey && (
@@ -435,7 +578,7 @@ export default function PercorsoBuilder() {
         <button onClick={handleCalcola} disabled={loading || noKey}
           className="w-full flex items-center justify-center gap-2 bg-dona text-white rounded-lg py-2.5 text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-50">
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-          {loading ? "Calcolo in corso…" : "Calcola percorso con Google Maps"}
+          {loading ? "Calcolo in corso…" : "Calcola percorso"}
         </button>
       </div>
 
@@ -456,7 +599,7 @@ export default function PercorsoBuilder() {
             ))}
           </div>
 
-          {/* Mappa */}
+          {/* Mappa con layer switcher */}
           <div className="rounded-xl overflow-hidden border border-border" style={{ height: 440 }}>
             <MapContainer
               center={route.coords[Math.floor(route.coords.length / 2)]}
@@ -464,10 +607,23 @@ export default function PercorsoBuilder() {
               style={{ height: "100%", width: "100%" }}
               scrollWheelZoom={true}
             >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              />
+              <LayersControl position="topright">
+                {(Object.entries(TILE_LAYERS) as [TileKey, typeof TILE_LAYERS[TileKey]][]).map(
+                  ([key, layer]) => (
+                    <LayersControl.BaseLayer
+                      key={key}
+                      checked={key === "street"}
+                      name={layer.name}
+                    >
+                      <TileLayer
+                        url={layer.url}
+                        attribution={layer.attribution}
+                        maxZoom={layer.maxZoom}
+                      />
+                    </LayersControl.BaseLayer>
+                  ),
+                )}
+              </LayersControl>
               <MapFit coords={route.coords} />
               <Polyline positions={route.coords} color="#ef4444" weight={3} opacity={0.85} />
               {tappe.map((t) => {
@@ -534,9 +690,34 @@ export default function PercorsoBuilder() {
               })}
             </div>
           </div>
-          {/* Salva percorso */}
+
+          {/* Salva percorso localmente */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-3">
-            <p className="text-xs font-bold text-foreground">Salva percorso sul sito</p>
+            <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <Save className="w-3.5 h-3.5 text-dona" />
+              Salva percorso per dopo
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Nome percorso (opzionale)"
+                value={saveName}
+                onChange={e => setSaveName(e.target.value)}
+                className="flex-1 px-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-dona/40"
+              />
+              <button
+                onClick={savePercorsoLocal}
+                className="flex items-center gap-1.5 bg-dona text-white rounded-lg px-4 py-2 text-xs font-bold hover:opacity-90 transition-opacity"
+              >
+                <Save className="w-3.5 h-3.5" />
+                Salva
+              </button>
+            </div>
+          </div>
+
+          {/* Pubblica percorso sul sito (admin) */}
+          <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <p className="text-xs font-bold text-foreground">Pubblica percorso sul sito</p>
             <p className="text-[10px] text-muted-foreground">Inserisci il PIN admin per salvare questo percorso e renderlo visibile sulla pagina pubblica.</p>
             <div className="flex gap-2">
               <input
@@ -547,12 +728,12 @@ export default function PercorsoBuilder() {
                 className="flex-1 px-3 py-2 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-dona/40"
               />
               <button
-                onClick={savePercorso}
+                onClick={savePercorsoServer}
                 disabled={saving || !savePin}
-                className="flex items-center gap-1.5 bg-dona text-white rounded-lg px-4 py-2 text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="flex items-center gap-1.5 bg-green-600 text-white rounded-lg px-4 py-2 text-xs font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                Salva
+                Pubblica
               </button>
             </div>
             {saveMsg && (
