@@ -165,8 +165,9 @@ function googleGeocode(address: string): Promise<[number, number] | null> {
 
 // ─── Google Routes API (computeRoutes — nuova, sostituisce DirectionsService) ─
 
-// Max distanza in linea d'aria per un singolo segmento (~150 km)
-const MAX_SEGMENT_KM = 150;
+// Max distanza in linea d'aria per un singolo segmento (~80 km)
+// Segmenti corti funzionano meglio con WALKING mode
+const MAX_SEGMENT_KM = 80;
 
 /**
  * Interpola N punti intermedi equidistanti tra start e end.
@@ -281,7 +282,31 @@ async function walkSegmentNew(
 }
 
 /**
- * Fallback: DirectionsService (legacy) per segmenti che falliscono con la nuova API.
+ * Estrai coordinate e distanza da un response DirectionsService.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractDirectionsResult(response: any): RouteResult | null {
+  if (!response?.routes?.length) return null;
+  const route = response.routes[0];
+  const coords: [number, number][] = [];
+  let distanceM = 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const leg of route.legs as any[]) {
+    distanceM += leg.distance?.value ?? 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const step of leg.steps as any[]) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const pt of step.path as any[]) {
+        coords.push([pt.lat(), pt.lng()]);
+      }
+    }
+  }
+  return coords.length ? { coords, distanceM } : null;
+}
+
+/**
+ * DirectionsService legacy: prova WALKING, poi DRIVING come fallback.
+ * DRIVING segue comunque strade reali (mai linee rette nel mare).
  */
 function walkSegmentLegacy(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -291,36 +316,37 @@ function walkSegmentLegacy(
 ): Promise<RouteResult | null> {
   return new Promise((resolve) => {
     const service = new G.DirectionsService();
+    const baseOpts = {
+      origin:      new G.LatLng(origin[0], origin[1]),
+      destination: new G.LatLng(destination[0], destination[1]),
+      avoidHighways: true,
+      avoidTolls:    true,
+      avoidFerries:  true,
+    };
+
+    // 1. Prova WALKING
     service.route(
-      {
-        origin:      new G.LatLng(origin[0], origin[1]),
-        destination: new G.LatLng(destination[0], destination[1]),
-        travelMode:  G.TravelMode.WALKING,
-        avoidHighways: true,
-        avoidTolls:    true,
-        avoidFerries:  true,
-      },
+      { ...baseOpts, travelMode: G.TravelMode.WALKING },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (response: any, status: string) => {
-        if (status !== "OK" || !response?.routes?.length) {
-          resolve(null);
-          return;
+        if (status === "OK") {
+          const result = extractDirectionsResult(response);
+          if (result) { resolve(result); return; }
         }
-        const route = response.routes[0];
-        const coords: [number, number][] = [];
-        let distanceM = 0;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for (const leg of route.legs as any[]) {
-          distanceM += leg.distance?.value ?? 0;
+
+        // 2. Fallback DRIVING — almeno segue strade reali
+        console.warn("[PercorsoBuilder] WALKING fallito, provo DRIVING per questo segmento");
+        service.route(
+          { ...baseOpts, travelMode: G.TravelMode.DRIVING, avoidHighways: false },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          for (const step of leg.steps as any[]) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            for (const pt of step.path as any[]) {
-              coords.push([pt.lat(), pt.lng()]);
+          (resp2: any, status2: string) => {
+            if (status2 === "OK") {
+              resolve(extractDirectionsResult(resp2));
+            } else {
+              resolve(null);
             }
-          }
-        }
-        resolve(coords.length ? { coords, distanceM } : null);
+          },
+        );
       },
     );
   });
@@ -381,7 +407,7 @@ async function googleDirections(
     for (let i = 0; i < segments.length; i++) {
       onProgress?.(Math.round(((i) / segments.length) * 100));
 
-      // Prova nuova API, poi fallback a legacy
+      // Prova: 1) computeRoutes WALK, 2) DirectionsService WALKING, 3) DirectionsService DRIVING
       let seg: RouteResult | null = null;
       if (RouteClass) {
         seg = await walkSegmentNew(RouteClass, segments[i][0], segments[i][1]);
@@ -391,13 +417,8 @@ async function googleDirections(
       }
 
       if (!seg) {
-        console.error(`[PercorsoBuilder] segmento ${i + 1}/${segments.length} fallito (entrambe le API)`);
-        // Ultimo tentativo: salta il waypoint e unisci con il segmento successivo
-        if (i < segments.length - 1) {
-          console.warn(`[PercorsoBuilder] unisco segmento ${i + 1} con ${i + 2}`);
-          segments[i + 1] = [segments[i][0], segments[i + 1][1]];
-          continue;
-        }
+        console.error(`[PercorsoBuilder] segmento ${i + 1}/${segments.length} fallito su tutte le API`);
+        // NON unire segmenti — meglio fallire che disegnare linee rette
         return null;
       }
       allCoords.push(...seg.coords);
