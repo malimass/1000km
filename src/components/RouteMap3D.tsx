@@ -21,56 +21,6 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
   const stableWaypoints = useMemo(() => waypoints, [waypointsKey]);
   const stableElevation = useMemo(() => elevationPoints, [elevKey]);
 
-  // Build 3D coordinates [lng, lat, elevation] by interpolating elevation data
-  const coords3D = useMemo(() => {
-    if (!stableElevation?.length || stableCoords.length < 2) {
-      return stableCoords.map(([lat, lng]) => [lng, lat, 0] as [number, number, number]);
-    }
-
-    // Build a lookup: for each elevation point, find the nearest coord index
-    const elevMap = new Map<number, number>(); // coordIndex → elevation
-    for (const ep of stableElevation) {
-      let bestIdx = 0;
-      let bestDist = Infinity;
-      for (let i = 0; i < stableCoords.length; i++) {
-        const dlat = stableCoords[i][0] - ep.lat;
-        const dlng = stableCoords[i][1] - ep.lng;
-        const d = dlat * dlat + dlng * dlng;
-        if (d < bestDist) {
-          bestDist = d;
-          bestIdx = i;
-        }
-      }
-      elevMap.set(bestIdx, ep.elevation);
-    }
-
-    // Sorted indices that have elevation
-    const knownIndices = [...elevMap.keys()].sort((a, b) => a - b);
-    if (knownIndices.length < 2) {
-      const fallbackElev = stableElevation[0]?.elevation ?? 100;
-      return stableCoords.map(([lat, lng]) => [lng, lat, fallbackElev + 50] as [number, number, number]);
-    }
-
-    // Interpolate elevation for all coords
-    return stableCoords.map(([lat, lng], i) => {
-      if (elevMap.has(i)) return [lng, lat, elevMap.get(i)! + 50] as [number, number, number];
-
-      // Find surrounding known indices and lerp
-      let lo = knownIndices[0], hi = knownIndices[knownIndices.length - 1];
-      for (let k = 0; k < knownIndices.length - 1; k++) {
-        if (knownIndices[k] <= i && knownIndices[k + 1] >= i) {
-          lo = knownIndices[k];
-          hi = knownIndices[k + 1];
-          break;
-        }
-      }
-      if (lo === hi) return [lng, lat, elevMap.get(lo)! + 50] as [number, number, number];
-      const t = (i - lo) / (hi - lo);
-      const elev = elevMap.get(lo)! * (1 - t) + elevMap.get(hi)! * t;
-      return [lng, lat, elev + 50] as [number, number, number];
-    });
-  }, [stableCoords, stableElevation]);
-
   useEffect(() => {
     if (!containerRef.current || stableCoords.length < 2) return;
 
@@ -85,13 +35,13 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
     const centerLat = (minLat + maxLat) / 2;
     const centerLng = (minLng + maxLng) / 2;
 
+    // Start WITHOUT terrain in the style — add it later as progressive enhancement
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: {
         version: 8,
         sources: {
-          // Terrain raster tiles
-          "terrain-tiles": {
+          "satellite-tiles": {
             type: "raster",
             tiles: [
               "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -99,28 +49,14 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
             tileSize: 256,
             attribution: "Esri, Maxar, Earthstar Geographics",
           },
-          // Terrain DEM for 3D
-          "terrain-dem": {
-            type: "raster-dem",
-            tiles: [
-              "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
-            ],
-            tileSize: 256,
-            encoding: "terrarium",
-            attribution: "AWS Terrain Tiles",
-          },
         },
         layers: [
           {
             id: "satellite",
             type: "raster",
-            source: "terrain-tiles",
+            source: "satellite-tiles",
           },
         ],
-        terrain: {
-          source: "terrain-dem",
-          exaggeration: 1.5,
-        },
       },
       center: [centerLng, centerLat],
       zoom: 7,
@@ -132,7 +68,9 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
     map.addControl(new maplibregl.NavigationControl(), "top-left");
 
     map.on("load", () => {
-      // Route line (3D coordinates so line drapes above terrain)
+      // ── 1. Add route line FIRST (always works, no terrain dependency) ──
+      const routeCoords = stableCoords.map(([lat, lng]) => [lng, lat]);
+
       map.addSource("route", {
         type: "geojson",
         data: {
@@ -140,7 +78,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
           properties: {},
           geometry: {
             type: "LineString",
-            coordinates: coords3D,
+            coordinates: routeCoords,
           },
         },
       });
@@ -174,7 +112,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
         },
       });
 
-      // Waypoint markers
+      // ── 2. Waypoint markers ──
       if (stableWaypoints?.length) {
         for (const wp of stableWaypoints) {
           const el = document.createElement("div");
@@ -200,6 +138,21 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
         bounds.extend([lng, lat]);
       }
       map.fitBounds(bounds, { padding: 60, pitch: 60, bearing: -20 });
+
+      // ── 3. Enable 3D terrain as progressive enhancement ──
+      try {
+        map.addSource("terrain-dem", {
+          type: "raster-dem",
+          tiles: [
+            "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+          ],
+          tileSize: 256,
+          encoding: "terrarium",
+        });
+        map.setTerrain({ source: "terrain-dem", exaggeration: 1.5 });
+      } catch (err) {
+        console.warn("[RouteMap3D] Terrain not available:", err);
+      }
     });
 
     mapRef.current = map;
