@@ -24,6 +24,8 @@ import {
 
 // Caricamento lazy per evitare problemi SSR con Leaflet
 const RouteMap = lazy(() => import("@/components/RouteMap"));
+const ElevationProfile = lazy(() => import("@/components/ElevationProfile"));
+const RouteMap3D = lazy(() => import("@/components/RouteMap3D"));
 
 // Fallback usato solo se non è stato salvato nulla tramite /admin-live
 const LOCATOWEB_FALLBACK = "";
@@ -158,11 +160,17 @@ function LiveTrackingSection({
 export default function Percorso() {
   // Indice del waypoint selezionato (tappa i → waypoint i+1, cioè la destinazione)
   const [selectedWaypoint, setSelectedWaypoint] = useState<number | null>(null);
+  const [mapView, setMapView] = useState<"2d" | "3d">("2d");
   const mapRef = useRef<HTMLDivElement>(null);
 
   // Tappe salvate dall'admin via PercorsoBuilder (sovrascrivono quelle hardcoded)
   const [savedTappe, setSavedTappe] = useState<{ tappaNum: number; lat: number; lng: number; kmProgr: number; label: string }[] | null>(null);
   const [savedCoords, setSavedCoords] = useState<[number, number][] | null>(null);
+  const [savedElevation, setSavedElevation] = useState<{
+    points: { lat: number; lng: number; elevation: number; resolution: number }[];
+    stats: { minElevation: number; maxElevation: number; totalGainM: number; totalLossM: number };
+  } | null>(null);
+  const [savedDistanceM, setSavedDistanceM] = useState<number | null>(null);
 
   // Contatori iscritti per tappa (chiave = tappa_numero 1-14)
   const [iscritti, setIscritti] = useState<Record<number, number>>({});
@@ -206,6 +214,8 @@ export default function Percorso() {
       .then(data => {
         if (data?.tappe?.length) setSavedTappe(data.tappe);
         if (data?.coords?.length) setSavedCoords(data.coords);
+        if (data?.elevation) setSavedElevation(data.elevation);
+        if (data?.distanceM) setSavedDistanceM(data.distanceM);
       })
       .catch(() => {});
   }, []);
@@ -330,10 +340,44 @@ export default function Percorso() {
             <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-2 text-center">
               Mappa del percorso
             </h2>
-            <p className="text-center text-muted-foreground font-body text-sm mb-8">
+            <p className="text-center text-muted-foreground font-body text-sm mb-4">
               Clicca su una tappa per centrarla nella mappa
             </p>
+
+            {/* Toggle 2D / 3D */}
+            {savedCoords && savedCoords.length > 0 && (
+              <div className="flex gap-2 mb-4 max-w-xs mx-auto">
+                <button
+                  onClick={() => setMapView("2d")}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${mapView === "2d" ? "bg-dona text-white border-dona" : "bg-card text-muted-foreground border-border hover:border-dona/50"}`}
+                >
+                  <MapPin className="w-3.5 h-3.5 inline mr-1" /> Mappa 2D
+                </button>
+                <button
+                  onClick={() => setMapView("3d")}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${mapView === "3d" ? "bg-dona text-white border-dona" : "bg-card text-muted-foreground border-border hover:border-dona/50"}`}
+                >
+                  🏔️ Vista 3D
+                </button>
+              </div>
+            )}
+
             <div ref={mapRef}>
+              {mapView === "3d" && savedCoords ? (
+                <Suspense
+                  fallback={
+                    <div className="flex items-center justify-center rounded-xl bg-card border border-border" style={{ height: 480 }}>
+                      <MapPin className="w-10 h-10 text-dona mx-auto mb-3 animate-bounce" />
+                    </div>
+                  }
+                >
+                  <RouteMap3D
+                    coords={savedCoords}
+                    waypoints={savedTappe?.map(t => ({ lat: t.lat, lng: t.lng, label: t.label }))}
+                    elevationPoints={savedElevation?.points}
+                  />
+                </Suspense>
+              ) : (
               <Suspense
                 fallback={
                   <div className="flex items-center justify-center rounded-xl bg-card border border-border" style={{ height: 480 }}>
@@ -357,6 +401,7 @@ export default function Percorso() {
                   publishedCoords={savedCoords}
                 />
               </Suspense>
+              )}
             </div>
 
             {/* Legenda */}
@@ -389,6 +434,29 @@ export default function Percorso() {
           </AnimatedSection>
         </div>
       </section>
+
+      {/* Profilo altimetrico */}
+      {savedElevation && (
+        <section className="section-padding bg-background">
+          <div className="container-narrow">
+            <AnimatedSection>
+              <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-2 text-center">
+                Profilo altimetrico
+              </h2>
+              <p className="text-center text-muted-foreground font-body text-sm mb-6">
+                Altitudine, dislivello e tipo di terreno lungo il percorso
+              </p>
+              <Suspense fallback={null}>
+                <ElevationProfile
+                  points={savedElevation.points}
+                  stats={savedElevation.stats}
+                  totalDistanceKm={(savedDistanceM ?? 1000000) / 1000}
+                />
+              </Suspense>
+            </AnimatedSection>
+          </div>
+        </section>
+      )}
 
       {/* Timeline tappe */}
       <section className="section-padding bg-background">

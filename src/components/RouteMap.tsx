@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { MapContainer, TileLayer, Polyline, Marker, Popup, ZoomControl, useMap } from "react-leaflet";
+import { useEffect, useState, useCallback } from "react";
+import { MapContainer, TileLayer, Polyline, Marker, Popup, ZoomControl, useMap, LayersControl } from "react-leaflet";
 import { divIcon } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { LivePosition } from "@/lib/liveTracking";
@@ -212,22 +212,59 @@ export default function RouteMap({
   // Centro mappa spostato per coprire il percorso reale (adriatica + tirrenica)
   const center: [number, number] = [41.5, 14.0];
 
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen(prev => !prev);
+  }, []);
+
   return (
-    <div id={containerId} className="w-full rounded-xl overflow-hidden shadow-lg border border-border" style={{ height: 480 }}>
+    <div
+      id={containerId}
+      className={`w-full rounded-xl overflow-hidden shadow-lg border border-border ${isFullscreen ? "fixed inset-0 z-[9999] rounded-none" : ""}`}
+      style={isFullscreen ? { height: "100vh" } : { height: 480 }}
+    >
+      {/* Fullscreen toggle */}
+      <button
+        onClick={toggleFullscreen}
+        className="absolute top-3 left-3 z-[1000] bg-white/90 hover:bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-medium shadow-md transition-colors flex items-center gap-1"
+        title={isFullscreen ? "Esci da schermo intero" : "Schermo intero"}
+      >
+        {isFullscreen ? "✕ Esci" : "⛶ Schermo intero"}
+      </button>
+
       <MapContainer
         center={center}
         zoom={6}
         zoomControl={false}
-        scrollWheelZoom={false}
+        scrollWheelZoom={isFullscreen}
         style={{ height: "100%", width: "100%" }}
       >
         <MapController selectedIndex={selectedIndex} waypoints={waypoints} />
         {liveLatlng && <LiveController pos={liveLatlng} />}
         <ZoomControl position="bottomright" />
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="Stradale">
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Satellite">
+            <TileLayer
+              attribution="Esri, Maxar, Earthstar Geographics"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={18}
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Terreno">
+            <TileLayer
+              attribution='&copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
+              url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+              maxZoom={17}
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
 
         {/* Linea del percorso pianificato (usa polyline reale se pubblicata) */}
         <Polyline

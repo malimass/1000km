@@ -33,6 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/community/route-positions") return await communityRoutePositions(req, res);
     if (path === "/percorso-config") return await percorsoConfig(req, res);
     if (path === "/saved-percorsi") return await savedPercorsi(req, res);
+    if (path === "/elevation") return await elevation(req, res);
     return res.status(404).json({ error: "Not found" });
   } catch (err: any) {
     console.error(err);
@@ -703,12 +704,12 @@ async function percorsoConfig(req: VercelRequest, res: VercelResponse) {
     return res.json(rows[0]?.data ?? null);
   }
   if (req.method === "POST") {
-    const { pin, tappe, coords, distanceM } = req.body ?? {};
+    const { pin, tappe, coords, distanceM, elevation } = req.body ?? {};
     const adminPin = process.env.VITE_ADMIN_PIN || process.env.ADMIN_PIN || "gratitude2026";
     if (!pin || pin !== adminPin) return res.status(401).json({ error: "PIN non valido" });
     await sql`
       INSERT INTO site_settings (id, data, updated_at)
-      VALUES (3, ${JSON.stringify({ tappe, coords, distanceM })}, now())
+      VALUES (3, ${JSON.stringify({ tappe, coords, distanceM, elevation })}, now())
       ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()
     `;
     return res.json({ ok: true });
@@ -774,4 +775,70 @@ async function savedPercorsi(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(405).end();
+}
+
+// ─── ELEVATION ───────────────────────────────────────────────────────────────
+
+async function elevation(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") return res.status(405).end();
+
+  const { coords } = req.body ?? {};
+  if (!Array.isArray(coords) || coords.length < 2)
+    return res.status(400).json({ error: "coords array richiesto (min 2 punti)" });
+
+  const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: "Google Maps API key non configurata" });
+
+  // Campiona max 512 punti (limite Google Elevation API)
+  const MAX_SAMPLES = 512;
+  const sampled: [number, number][] =
+    coords.length <= MAX_SAMPLES
+      ? coords
+      : (() => {
+          const step = (coords.length - 1) / (MAX_SAMPLES - 1);
+          const pts: [number, number][] = [];
+          for (let i = 0; i < MAX_SAMPLES; i++) {
+            pts.push(coords[Math.round(i * step)]);
+          }
+          return pts;
+        })();
+
+  const locations = sampled.map((c: [number, number]) => `${c[0]},${c[1]}`).join("|");
+
+  try {
+    const url = `https://maps.googleapis.com/maps/api/elevation/json?locations=${encodeURIComponent(locations)}&key=${apiKey}`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (data.status !== "OK")
+      return res.status(502).json({ error: `Google Elevation API: ${data.status}`, detail: data.error_message });
+
+    const elevations: number[] = data.results.map((r: any) => r.elevation);
+    let gainM = 0, lossM = 0;
+    for (let i = 1; i < elevations.length; i++) {
+      const diff = elevations[i] - elevations[i - 1];
+      if (diff > 0) gainM += diff;
+      else lossM += Math.abs(diff);
+    }
+
+    const points = data.results.map((r: any, i: number) => ({
+      lat: sampled[i][0],
+      lng: sampled[i][1],
+      elevation: Math.round(r.elevation),
+      resolution: Math.round(r.resolution),
+    }));
+
+    return res.json({
+      points,
+      stats: {
+        minElevation: Math.round(Math.min(...elevations)),
+        maxElevation: Math.round(Math.max(...elevations)),
+        totalGainM: Math.round(gainM),
+        totalLossM: Math.round(lossM),
+      },
+    });
+  } catch (err: any) {
+    console.error("[elevation]", err);
+    return res.status(502).json({ error: "Errore chiamata Google Elevation API" });
+  }
 }
