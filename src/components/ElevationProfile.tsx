@@ -63,7 +63,7 @@ export default function ElevationProfile({ points, stats, totalDistanceKm }: Pro
   return (
     <div className="space-y-4">
       {/* Statistiche */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
         <StatCard
           icon={<Mountain className="w-4 h-4" />}
           label="Quota max"
@@ -91,8 +91,8 @@ export default function ElevationProfile({ points, stats, totalDistanceKm }: Pro
       </div>
 
       {/* Tipo terreno */}
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 text-sm font-body">
-        <span className="text-lg">{terrainType.emoji}</span>
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 text-xs sm:text-sm font-body flex-wrap">
+        <span className="text-lg shrink-0">{terrainType.emoji}</span>
         <span className="font-medium">{terrainType.label}</span>
         <span className="text-muted-foreground">— {terrainType.description}</span>
       </div>
@@ -152,11 +152,11 @@ function StatCard({
   color: string;
 }) {
   return (
-    <div className="flex items-center gap-2 bg-card rounded-lg border border-border px-3 py-2">
-      <span className={color}>{icon}</span>
-      <div>
+    <div className="flex items-center gap-1.5 sm:gap-2 bg-card rounded-lg border border-border px-2 sm:px-3 py-2">
+      <span className={`${color} shrink-0`}>{icon}</span>
+      <div className="min-w-0">
         <p className="text-[10px] text-muted-foreground font-body leading-tight">{label}</p>
-        <p className="text-sm font-semibold font-body">{value}</p>
+        <p className="text-xs sm:text-sm font-semibold font-body truncate">{value}</p>
       </div>
     </div>
   );
