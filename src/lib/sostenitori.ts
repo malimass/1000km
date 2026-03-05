@@ -5,7 +5,7 @@
  * Fallback su localStorage.
  */
 
-import { apiFetch } from "./supabase";
+import { apiFetch, getAuthToken } from "./supabase";
 
 export type Sostenitore = {
   id:      string;
@@ -57,6 +57,7 @@ export async function loadSosteniPage(): Promise<SosteniPage> {
 
 export async function saveSosteniPage(page: SosteniPage): Promise<void> {
   lsSaveSosteni(page);
+  if (!getAuthToken()) return;
   try {
     await apiFetch("/api/sostenitori", {
       method: "POST",

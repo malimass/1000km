@@ -3,12 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { setAuthToken } from "@/lib/supabase";
 import { LogIn } from "lucide-react";
 
-// PIN letto da env (VITE_ADMIN_PIN) con fallback sicuro.
-// Le credenziali Supabase sono usate solo in background per i permessi RLS.
-const ADMIN_PIN   = import.meta.env.VITE_ADMIN_PIN   || "gratitude2026";
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || "";
-const ADMIN_PASS  = import.meta.env.VITE_ADMIN_PASS  || "";
-
 export default function AdminLogin() {
   const navigate = useNavigate();
   const [pin,     setPin]     = useState("");
@@ -17,34 +11,29 @@ export default function AdminLogin() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-
-    if (pin !== ADMIN_PIN) {
-      setError("PIN non valido. Riprova.");
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
-    // Segna accesso nel localStorage (valido per questo dispositivo)
-    localStorage.setItem("gp_admin_auth", "1");
-
-    // Ottieni JWT tramite l'endpoint Neon auth per le chiamate API protette
-    if (ADMIN_EMAIL && ADMIN_PASS) {
-      try {
-        const res = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASS }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.token) setAuthToken(data.token);
-        }
-      } catch { /* login JWT fallito — le operazioni di lettura funzioneranno comunque */ }
+    try {
+      const res = await fetch("/api/auth/pin-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "PIN non valido. Riprova.");
+        setLoading(false);
+        return;
+      }
+      const data = await res.json();
+      if (data.token) setAuthToken(data.token);
+      localStorage.setItem("gp_admin_auth", "1");
+      navigate("/admin-live", { replace: true });
+    } catch {
+      setError("Errore di rete. Riprova.");
+      setLoading(false);
     }
-
-    navigate("/admin-live", { replace: true });
   }
 
   return (

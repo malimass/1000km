@@ -13,6 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const path = getPath(req);
   try {
     if (path === "/auth/login") return await authLogin(req, res);
+    if (path === "/auth/pin-login") return await authPinLogin(req, res);
     if (path === "/auth/register") return await authRegister(req, res);
     if (path === "/auth/me") return await authMe(req, res);
     if (path === "/notizie") return await notizie(req, res);
@@ -58,6 +59,22 @@ async function authLogin(req: VercelRequest, res: VercelResponse) {
     token,
     user: { id: user.id, email: user.email, displayName: user.display_name, role: user.role },
   });
+}
+
+async function authPinLogin(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") return res.status(405).end();
+  const { pin } = req.body ?? {};
+  const adminPin = process.env.VITE_ADMIN_PIN || process.env.ADMIN_PIN || "gratitude2026";
+  if (!pin || pin !== adminPin)
+    return res.status(401).json({ error: "PIN non valido" });
+  // Trova il primo utente admin (o il primo utente se nessuno ha role=admin)
+  const rows = await sql`
+    SELECT id, email, role FROM users ORDER BY id LIMIT 1
+  `;
+  const user = rows[0] as any;
+  if (!user) return res.status(500).json({ error: "Nessun utente nel DB" });
+  const token = await signToken({ sub: user.id, email: user.email, role: user.role });
+  return res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
 }
 
 async function authRegister(req: VercelRequest, res: VercelResponse) {
