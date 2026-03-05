@@ -334,10 +334,10 @@ function walkSegmentLegacy(
           if (result) { resolve(result); return; }
         }
 
-        // 2. Fallback DRIVING — almeno segue strade reali
+        // 2. Fallback DRIVING — almeno segue strade reali (ferries OK)
         console.warn("[PercorsoBuilder] WALKING fallito, provo DRIVING per questo segmento");
         service.route(
-          { ...baseOpts, travelMode: G.TravelMode.DRIVING, avoidHighways: false },
+          { ...baseOpts, travelMode: G.TravelMode.DRIVING, avoidHighways: false, avoidFerries: false },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (resp2: any, status2: string) => {
             if (status2 === "OK") {
@@ -378,6 +378,49 @@ async function googleDirections(
       console.warn("[PercorsoBuilder] Routes library non disponibile, uso DirectionsService legacy");
     }
 
+    // Risolvi un singolo segmento, con split ricorsivo se fallisce (max depth 3)
+    async function resolveSegment(
+      origin: [number, number],
+      dest: [number, number],
+      depth = 0,
+    ): Promise<RouteResult | null> {
+      // Prova: 1) computeRoutes WALK, 2) DirectionsService WALKING+DRIVING
+      let seg: RouteResult | null = null;
+      if (RouteClass) {
+        seg = await walkSegmentNew(RouteClass, origin, dest);
+      }
+      if (!seg) {
+        seg = await walkSegmentLegacy(G, origin, dest);
+      }
+      if (seg) return seg;
+
+      // Se fallisce e possiamo ancora splittare, dividi a metà con snap a città
+      if (depth >= 3) {
+        console.error(`[PercorsoBuilder] segmento irrisolvibile dopo ${depth} split`);
+        return null;
+      }
+
+      const mid: [number, number] = [
+        (origin[0] + dest[0]) / 2,
+        (origin[1] + dest[1]) / 2,
+      ];
+      const snappedMid = await snapToCity(mid);
+      console.warn(`[PercorsoBuilder] segmento fallito, split via ${snappedMid} (depth=${depth + 1})`);
+
+      await new Promise(r => setTimeout(r, 300));
+      const first = await resolveSegment(origin, snappedMid, depth + 1);
+      if (!first) return null;
+
+      await new Promise(r => setTimeout(r, 300));
+      const second = await resolveSegment(snappedMid, dest, depth + 1);
+      if (!second) return null;
+
+      return {
+        coords: [...first.coords, ...second.coords],
+        distanceM: first.distanceM + second.distanceM,
+      };
+    }
+
     // Calcola distanza in linea d'aria
     const straightKm = haversineM(start, end) / 1000;
 
@@ -407,18 +450,10 @@ async function googleDirections(
     for (let i = 0; i < segments.length; i++) {
       onProgress?.(Math.round(((i) / segments.length) * 100));
 
-      // Prova: 1) computeRoutes WALK, 2) DirectionsService WALKING, 3) DirectionsService DRIVING
-      let seg: RouteResult | null = null;
-      if (RouteClass) {
-        seg = await walkSegmentNew(RouteClass, segments[i][0], segments[i][1]);
-      }
-      if (!seg) {
-        seg = await walkSegmentLegacy(G, segments[i][0], segments[i][1]);
-      }
+      const seg = await resolveSegment(segments[i][0], segments[i][1]);
 
       if (!seg) {
         console.error(`[PercorsoBuilder] segmento ${i + 1}/${segments.length} fallito su tutte le API`);
-        // NON unire segmenti — meglio fallire che disegnare linee rette
         return null;
       }
       allCoords.push(...seg.coords);
