@@ -162,6 +162,7 @@ export default function Percorso() {
 
   // Tappe salvate dall'admin via PercorsoBuilder (sovrascrivono quelle hardcoded)
   const [savedTappe, setSavedTappe] = useState<{ tappaNum: number; lat: number; lng: number; kmProgr: number; label: string }[] | null>(null);
+  const [savedCoords, setSavedCoords] = useState<[number, number][] | null>(null);
 
   // Contatori iscritti per tappa (chiave = tappa_numero 1-14)
   const [iscritti, setIscritti] = useState<Record<number, number>>({});
@@ -204,6 +205,7 @@ export default function Percorso() {
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.tappe?.length) setSavedTappe(data.tappe);
+        if (data?.coords?.length) setSavedCoords(data.coords);
       })
       .catch(() => {});
   }, []);
@@ -351,6 +353,8 @@ export default function Percorso() {
                   traveledRoute2={traveledRoute2}
                   communityPositions={communityPositions}
                   communityRoutes={communityRoutes}
+                  publishedTappe={savedTappe}
+                  publishedCoords={savedCoords}
                 />
               </Suspense>
             </div>
