@@ -107,7 +107,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
           "line-width": 8,
           "line-opacity": 0.4,
           "line-blur": 4,
-          ...(terrainActive ? { "line-z-offset": 150 } : {}),
+          ...(terrainActive ? { "line-translate": [0, -2] } : {}),
         } as any,
       });
 
@@ -124,7 +124,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
           "line-color": "#e11d48",
           "line-width": 4,
           "line-opacity": 1,
-          ...(terrainActive ? { "line-z-offset": 150 } : {}),
+          ...(terrainActive ? { "line-translate": [0, -2] } : {}),
         } as any,
       });
 
