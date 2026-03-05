@@ -71,8 +71,16 @@ async function authPinLogin(req: VercelRequest, res: VercelResponse) {
   const rows = await sql`
     SELECT id, email, role FROM users ORDER BY id LIMIT 1
   `;
-  const user = rows[0] as any;
-  if (!user) return res.status(500).json({ error: "Nessun utente nel DB" });
+  let user = rows[0] as any;
+  if (!user) {
+    // Auto-create admin user on first pin-login
+    const created = await sql`
+      INSERT INTO users (email, password_hash, display_name, role)
+      VALUES ('admin@1000km.it', 'pin-only', 'Admin', 'admin')
+      RETURNING id, email, role
+    `;
+    user = created[0] as any;
+  }
   const token = await signToken({ sub: user.id, email: user.email, role: user.role });
   return res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
 }
