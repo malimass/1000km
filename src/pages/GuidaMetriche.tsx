@@ -5,6 +5,7 @@
  * Spiega tutte le formule e i parametri utilizzati per la
  * valutazione degli allenamenti nella piattaforma.
  */
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Heart, TrendingUp, Zap, Mountain, Timer, Flame, ShieldAlert, Target, Activity } from "lucide-react";
 
@@ -244,6 +245,13 @@ const SECTIONS: Section[] = [
 /* ─── Component ────────────────────────────────────────────── */
 export default function GuidaMetriche() {
   const nav = useNavigate();
+
+  // Auth guard: richiede login come atleta o coach
+  useEffect(() => {
+    const isCoach = localStorage.getItem("gp_coach_auth") === "1";
+    const hasToken = !!localStorage.getItem("gp_jwt");
+    if (!isCoach && !hasToken) nav("/accedi", { replace: true });
+  }, [nav]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
