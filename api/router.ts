@@ -423,14 +423,14 @@ async function profiles(req: VercelRequest, res: VercelResponse) {
     const { id, role } = req.query;
     if (id) {
       const rows = await sql`
-        SELECT id, display_name, activity_type, city FROM profiles
+        SELECT id, display_name, activity_type, city, bio, specializzazione FROM profiles
         WHERE id = ${id as string} LIMIT 1
       `;
       return res.json(rows[0] ?? null);
     }
     if (role) {
       const rows = await sql`
-        SELECT id, display_name FROM profiles
+        SELECT id, display_name, bio, specializzazione, city FROM profiles
         WHERE role = ${role as string} ORDER BY display_name
       `;
       return res.json(rows);
@@ -440,15 +440,17 @@ async function profiles(req: VercelRequest, res: VercelResponse) {
   if (req.method === "POST") {
     const auth = await requireAuth(req);
     if (!auth) return res.status(401).json({ error: "Non autenticato" });
-    const { display_name, activity_type, city } = req.body ?? {};
+    const { display_name, activity_type, city, bio, specializzazione } = req.body ?? {};
     await sql`
-      INSERT INTO profiles (id, display_name, activity_type, city, updated_at)
-      VALUES (${auth.sub}, ${display_name}, ${activity_type ?? "cammino"}, ${city ?? null}, now())
+      INSERT INTO profiles (id, display_name, activity_type, city, bio, specializzazione, updated_at)
+      VALUES (${auth.sub}, ${display_name}, ${activity_type ?? "cammino"}, ${city ?? null}, ${bio ?? null}, ${specializzazione ?? null}, now())
       ON CONFLICT (id) DO UPDATE
-        SET display_name  = EXCLUDED.display_name,
-            activity_type = EXCLUDED.activity_type,
-            city          = EXCLUDED.city,
-            updated_at    = now()
+        SET display_name     = EXCLUDED.display_name,
+            activity_type    = EXCLUDED.activity_type,
+            city             = EXCLUDED.city,
+            bio              = EXCLUDED.bio,
+            specializzazione = EXCLUDED.specializzazione,
+            updated_at       = now()
     `;
     return res.json({ ok: true });
   }

@@ -219,10 +219,15 @@ CREATE TABLE IF NOT EXISTS profiles (
   activity_type text        NOT NULL DEFAULT 'cammino',
   -- valori: 'corri' | 'cammino' | 'altro'
   city          text,
+  bio           text,
+  specializzazione text,
   created_at    timestamptz DEFAULT now(),
   updated_at    timestamptz DEFAULT now()
 );
 
+-- Aggiungi colonne coach se non esistono (migrazione)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS bio text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS specializzazione text;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 13. ATHLETE PROFILES  (dati fisici atleta + assegnazione coach)

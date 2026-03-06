@@ -28,12 +28,12 @@ import {
   analyzeSession, generateRecommendations, calculateFitnessMetrics,
   buildFitnessHistory, buildWeeklyStats, calculateReadiness, buildPaceProfile,
   calculateHRZones, saveSessions, loadSessionsLocal, loadSessionsAsync, deleteSession,
-  defaultMaxHR, maxHRFromAge, calcBMI,
+  defaultMaxHR, maxHRFromAge,
   loadProfile, saveProfile, calculateInjuryRisk, evaluateSession,
   SessionAnalysis, WeeklyStats, CoachProfile,
 } from "@/lib/coachAnalysis";
-import { getCurrentUser, loadCoachAthletes, CoachAthlete, saveAthleteProfile, loadAthleteProfile } from "@/lib/auth";
-import { clearAuthToken } from "@/lib/api";
+import { getCurrentUser, loadCoachAthletes, CoachAthlete } from "@/lib/auth";
+import { clearAuthToken, apiFetch } from "@/lib/api";
 
 // ─── COSTANTI COLORI ─────────────────────────────────────────────────────────
 
@@ -68,61 +68,88 @@ function sportIcon(sport: string): string {
 
 // ─── COMPONENTE PRINCIPALE ───────────────────────────────────────────────────
 
-// ─── PROFILE MODAL ───────────────────────────────────────────────────────────
+// ─── COACH PROFILE MODAL ────────────────────────────────────────────────────
 
-function ProfileModal({ initial, onSave }: { initial: CoachProfile | null; onSave: (p: CoachProfile) => void }) {
-  const empty: CoachProfile = { age: 35, weightKg: 70, heightCm: 170, gender: "M", restHR: 60, experienceYears: 2 };
-  const [form, setForm] = useState<CoachProfile>(initial ?? empty);
-  const set = (k: keyof CoachProfile) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm(f => ({ ...f, [k]: k === "gender" ? e.target.value : (parseFloat(e.target.value) || 0) }));
-  const bmi = form.heightCm > 0 ? (form.weightKg / Math.pow(form.heightCm / 100, 2)).toFixed(1) : "—";
-  const suggestedMaxHR = maxHRFromAge(form.age);
+interface CoachPresentation {
+  displayName: string;
+  bio: string;
+  specializzazione: string;
+  city: string;
+}
+
+function ProfileModal({ initial, onSave, onClose }: {
+  initial: CoachPresentation | null;
+  onSave: (p: CoachPresentation) => void;
+  onClose?: () => void;
+}) {
+  const empty: CoachPresentation = { displayName: "", bio: "", specializzazione: "", city: "" };
+  const [form, setForm] = useState<CoachPresentation>(initial ?? empty);
+  const set = (k: keyof CoachPresentation) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const specializzazioni = [
+    "Corsa", "Trail Running", "Camminata sportiva", "Ciclismo",
+    "Triathlon", "Preparazione atletica", "Riabilitazione sportiva", "Altro",
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <User className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-bold font-heading">Profilo Atleta</h2>
-          <span className="text-xs text-muted-foreground ml-1">— per un'analisi personalizzata</span>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <User className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-bold font-heading">Profilo Coach</h2>
+          </div>
+          {onClose && (
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: "Età (anni)", key: "age", min: 16, max: 80, step: 1 },
-            { label: "Peso (kg)", key: "weightKg", min: 40, max: 150, step: 0.5 },
-            { label: "Altezza (cm)", key: "heightCm", min: 140, max: 220, step: 1 },
-            { label: "FC riposo (bpm)", key: "restHR", min: 35, max: 90, step: 1 },
-            { label: "Anni di allenamento", key: "experienceYears", min: 0, max: 50, step: 0.5 },
-          ].map(f => (
-            <label key={f.key} className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-muted-foreground">{f.label}</span>
-              <input
-                type="number" min={f.min} max={f.max} step={f.step}
-                value={form[f.key as keyof CoachProfile]}
-                onChange={set(f.key as keyof CoachProfile)}
-                className="px-3 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-            </label>
-          ))}
+        <div className="space-y-3">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold text-muted-foreground">Sesso</span>
-            <select value={form.gender} onChange={set("gender")}
+            <span className="text-[11px] font-semibold text-muted-foreground">Nome visualizzato</span>
+            <input
+              type="text" value={form.displayName} onChange={set("displayName")}
+              placeholder="Es. Marco Rossi"
+              className="px-3 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-semibold text-muted-foreground">Specializzazione</span>
+            <select value={form.specializzazione} onChange={set("specializzazione")}
               className="px-3 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50">
-              <option value="M">Uomo</option>
-              <option value="F">Donna</option>
+              <option value="">Seleziona...</option>
+              {specializzazioni.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </label>
-        </div>
 
-        <div className="mt-4 flex gap-4 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
-          <span>BMI: <strong>{bmi}</strong></span>
-          <span>FC max suggerita (Tanaka): <strong>{suggestedMaxHR} bpm</strong></span>
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-semibold text-muted-foreground">Città</span>
+            <input
+              type="text" value={form.city} onChange={set("city")}
+              placeholder="Es. Bologna"
+              className="px-3 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] font-semibold text-muted-foreground">Presentazione</span>
+            <textarea
+              value={form.bio} onChange={set("bio")}
+              rows={4}
+              placeholder="Descrivi la tua esperienza, il tuo approccio e cosa offri ai tuoi atleti..."
+              className="px-3 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+            />
+          </label>
         </div>
 
         <button
           onClick={() => onSave(form)}
-          className="mt-5 w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity"
+          disabled={!form.displayName.trim()}
+          className="mt-5 w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
         >
           Salva profilo
         </button>
@@ -136,19 +163,35 @@ function ProfileModal({ initial, onSave }: { initial: CoachProfile | null; onSav
 export default function Coach() {
   const navigate = useNavigate();
 
-  // Profilo atleta
-  const [profile, setProfile] = useState<CoachProfile | null>(() => loadProfile());
-  const [showProfileModal, setShowProfileModal] = useState(() => !loadProfile());
+  // Profilo coach (presentazione)
+  const [coachPres, setCoachPres] = useState<CoachPresentation | null>(() => {
+    try { const raw = localStorage.getItem("gp_coach_pres"); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
+  const [showProfileModal, setShowProfileModal] = useState(() => {
+    try { return !localStorage.getItem("gp_coach_pres"); } catch { return true; }
+  });
 
-  const handleSaveProfile = (p: CoachProfile) => {
-    saveProfile(p); // localStorage
-    setProfile(p);
+  // Profilo analisi (per zone HR etc.)
+  const [profile, setProfile] = useState<CoachProfile | null>(() => loadProfile());
+
+  const handleSaveCoachPres = async (p: CoachPresentation) => {
+    try { localStorage.setItem("gp_coach_pres", JSON.stringify(p)); } catch { /* noop */ }
+    setCoachPres(p);
     setShowProfileModal(false);
-    const hr = maxHRFromAge(p.age);
-    setMaxHR(hr);
-    localStorage.setItem("gp_coach_maxhr", String(hr));
-    // Salva su Neon se autenticato (sincronizza tra browser)
-    if (coachUserId) saveAthleteProfile(coachUserId, p);
+    // Salva su Neon
+    if (coachUserId) {
+      try {
+        await apiFetch("/api/profiles", {
+          method: "POST",
+          body: JSON.stringify({
+            display_name: p.displayName,
+            bio: p.bio,
+            specializzazione: p.specializzazione,
+            city: p.city,
+          }),
+        });
+      } catch { /* noop */ }
+    }
   };
 
   // FC max (auto-calcolata da età, o manuale)
@@ -163,28 +206,30 @@ export default function Coach() {
   const [athletes, setAthletes] = useState<CoachAthlete[]>([]);
   const [coachUserId, setCoachUserId] = useState<string | null>(null);
 
-  // Carica atleti e profilo da Neon se coach autenticato
+  // Carica atleti e profilo coach da Neon se autenticato
   useEffect(() => {
     getCurrentUser().then(async u => {
       if (u?.role === "coach") {
         setCoachUserId(u.id);
         loadCoachAthletes(u.id).then(setAthletes);
-        // Carica profilo da Neon (sincronizza tra browser)
-        const remote = await loadAthleteProfile(u.id);
-        if (remote && (remote.age || remote.weightKg)) {
-          const p: CoachProfile = {
-            age: remote.age ?? 35,
-            weightKg: remote.weightKg ?? 70,
-            heightCm: remote.heightCm ?? 170,
-            gender: (remote.gender as "M" | "F") ?? "M",
-            restHR: remote.restHR ?? 60,
-            experienceYears: remote.experienceYears ?? 2,
-          };
-          saveProfile(p); // aggiorna localStorage locale
-          setProfile(p);
-          setShowProfileModal(false);
-          setMaxHR(maxHRFromAge(p.age));
-        }
+        // Carica presentazione coach da Neon
+        try {
+          const res = await apiFetch(`/api/profiles?id=${u.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.display_name) {
+              const p: CoachPresentation = {
+                displayName: data.display_name ?? "",
+                bio: data.bio ?? "",
+                specializzazione: data.specializzazione ?? "",
+                city: data.city ?? "",
+              };
+              try { localStorage.setItem("gp_coach_pres", JSON.stringify(p)); } catch { /* noop */ }
+              setCoachPres(p);
+              setShowProfileModal(false);
+            }
+          }
+        } catch { /* noop */ }
       }
     });
   }, []);
@@ -304,7 +349,11 @@ export default function Coach() {
 
       {/* ── PROFILE MODAL ───────────────────────────── */}
       {showProfileModal && (
-        <ProfileModal initial={profile} onSave={handleSaveProfile} />
+        <ProfileModal
+          initial={coachPres}
+          onSave={handleSaveCoachPres}
+          onClose={coachPres ? () => setShowProfileModal(false) : undefined}
+        />
       )}
 
       {/* ── HEADER ─────────────────────────────────── */}
@@ -330,9 +379,9 @@ export default function Coach() {
                 </button>
               </div>
             )}
-            <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-1.5 text-xs text-primary-foreground/70 hover:text-primary-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-primary-foreground/10" title="Profilo atleta">
+            <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-1.5 text-xs text-primary-foreground/70 hover:text-primary-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-primary-foreground/10" title="Profilo coach">
               <User className="w-4 h-4" />
-              {profile ? `${profile.age}a · ${profile.weightKg}kg` : "Profilo"}
+              {coachPres?.displayName || "Profilo"}
             </button>
             <button onClick={() => setShowSettings(s => !s)} className="p-2 text-primary-foreground/70 hover:text-primary-foreground transition-colors" title="FC Max">
               <RefreshCw className="w-4 h-4" />
@@ -610,11 +659,11 @@ export default function Coach() {
                   </div>
                 </div>
               ))}
-              {!profile && (
+              {!coachPres && (
                 <button onClick={() => setShowProfileModal(true)}
                   className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg border border-dashed border-border text-muted-foreground hover:text-foreground transition-colors">
                   <User className="w-3 h-3" />
-                  Inserisci profilo per analisi completa
+                  Completa il tuo profilo coach
                 </button>
               )}
             </div>
