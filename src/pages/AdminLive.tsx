@@ -635,26 +635,23 @@ export default function AdminLive() {
     e.target.value = "";
     if (!file || !targetId) return;
 
-    if (!cloudName || !cloudPreset) {
-      // Senza Cloudinary usa object URL temporaneo (locale)
-      const url = URL.createObjectURL(file);
-      updateSostenitore(targetId, "logoUrl", url);
-      return;
-    }
+    // Convert file to base64 data URL (no Cloudinary needed)
     setSosteniUploading(targetId);
-    const url = await uploadToCloudinary(file, cloudName, cloudPreset, "image");
-    setSosteniUploading(null);
-    if (url) {
-      // Aggiorna state e salva subito nel DB
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setSosteniUploading(null);
       setSosteniItems(prev => {
-        const updated = prev.map(it => it.id === targetId ? { ...it, logoUrl: url } : it);
+        const updated = prev.map(it => it.id === targetId ? { ...it, logoUrl: dataUrl } : it);
         const page: SosteniPage = { title: sosteniTitle, intro: sosteniIntro, items: updated };
         saveSosteniPage(page);
         setSosteniSaved(true);
         setTimeout(() => setSosteniSaved(false), 2500);
         return updated;
       });
-    }
+    };
+    reader.onerror = () => setSosteniUploading(null);
+    reader.readAsDataURL(file);
   }
 
   // ─ GPS tracking ─

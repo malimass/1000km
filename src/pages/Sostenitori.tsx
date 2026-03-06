@@ -2,13 +2,26 @@ import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
 import { loadSosteniPage, type SosteniPage, SOSTENI_DEFAULTS } from "@/lib/sostenitori";
+import { getDominantColor } from "@/lib/dominantColor";
 
 export default function Sostenitori() {
   const [page, setPage] = useState<SosteniPage>(SOSTENI_DEFAULTS);
+  const [colors, setColors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadSosteniPage().then(setPage);
   }, []);
+
+  // Extract dominant colour from each logo
+  useEffect(() => {
+    page.items.forEach((item) => {
+      if (item.logoUrl && !colors[item.id]) {
+        getDominantColor(item.logoUrl).then((c) =>
+          setColors((prev) => ({ ...prev, [item.id]: c })),
+        );
+      }
+    });
+  }, [page.items]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Layout>
@@ -39,9 +52,17 @@ export default function Sostenitori() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
               {page.items.map((item, i) => (
                 <AnimatedSection key={item.id} delay={i * 0.1}>
-                  <div className="bg-muted/40 rounded-2xl shadow-sm hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden">
+                  <div
+                    className="rounded-2xl shadow-sm hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden"
+                    style={{ backgroundColor: colors[item.id] || "hsl(var(--muted) / 0.4)" }}
+                  >
                     {/* Logo area */}
-                    <div className="bg-card border-b border-border mx-5 mt-5 rounded-xl flex items-center justify-center p-6 min-h-[160px]">
+                    <div
+                      className="border-b border-white/30 mx-5 mt-5 rounded-xl flex items-center justify-center p-6 min-h-[160px]"
+                      style={{ backgroundColor: colors[item.id]
+                        ? colors[item.id].replace("0.18)", "0.35)")
+                        : "hsl(var(--card))" }}
+                    >
                       {item.logoUrl ? (
                         <img
                           src={item.logoUrl}
@@ -72,7 +93,12 @@ export default function Sostenitori() {
                           href={item.siteUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="block w-full text-center bg-foreground/80 hover:bg-foreground text-background font-semibold text-sm py-3 rounded-full transition-colors"
+                          className="block w-full text-center font-semibold text-sm py-3 rounded-full transition-colors text-white"
+                          style={{
+                            backgroundColor: colors[item.id]
+                              ? colors[item.id].replace("0.18)", "0.9)")
+                              : "hsl(var(--foreground) / 0.8)",
+                          }}
                         >
                           Scopri di più
                         </a>
