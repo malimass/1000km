@@ -221,6 +221,74 @@ async function snapToCity(pt: [number, number]): Promise<[number, number]> {
 }
 
 /**
+ * Reverse-geocoding: restituisce il nome della località più vicina a un punto.
+ */
+async function reverseGeocodeCity(lat: number, lng: number): Promise<string | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const G = (window as any).google.maps;
+    return new Promise((resolve) => {
+      new G.Geocoder().geocode(
+        { location: new G.LatLng(lat, lng), language: "it" },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (results: any[], status: string) => {
+          if (status === "OK" && results?.length) {
+            const locality = results.find((r: any) => r.types?.includes("locality"));
+            if (locality) {
+              // Estrai solo il nome della città (primo componente address)
+              const cityComp = locality.address_components?.find(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (c: any) => c.types?.includes("locality"),
+              );
+              resolve(cityComp?.long_name ?? locality.formatted_address?.split(",")[0] ?? null);
+            } else {
+              // Fallback: primo risultato, primo componente
+              const name = results[0].formatted_address?.split(",")[0] ?? null;
+              resolve(name);
+            }
+          } else {
+            resolve(null);
+          }
+        },
+      );
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Arricchisce le tappe con il nome della località tramite reverse geocoding.
+ */
+async function enrichTappeWithNames(tappe: TappaPoint[]): Promise<TappaPoint[]> {
+  const enriched = [...tappe];
+  // Batch di 5 alla volta per evitare rate limiting
+  for (let i = 0; i < enriched.length; i += 5) {
+    const batch = enriched.slice(i, i + 5);
+    const names = await Promise.all(
+      batch.map(t => reverseGeocodeCity(t.lat, t.lng)),
+    );
+    for (let j = 0; j < batch.length; j++) {
+      const idx = i + j;
+      const name = names[j];
+      if (name) {
+        if (idx === 0) {
+          enriched[idx] = { ...enriched[idx], label: `Partenza - ${name}` };
+        } else if (idx === enriched.length - 1) {
+          enriched[idx] = { ...enriched[idx], label: `Arrivo - ${name}` };
+        } else {
+          enriched[idx] = { ...enriched[idx], label: `Tappa ${enriched[idx].tappaNum} - ${name}` };
+        }
+      }
+    }
+    if (i + 5 < enriched.length) {
+      await new Promise(r => setTimeout(r, 200));
+    }
+  }
+  return enriched;
+}
+
+/**
  * Chiama Route.computeRoutes per un singolo segmento.
  * Usa WALK con avoidHighways/avoidTolls/avoidFerries per strade sicure.
  */
@@ -824,8 +892,12 @@ export default function PercorsoBuilder() {
     if (!result) { setError("Google non ha trovato un percorso pedonale. Prova indirizzi più precisi."); setLoading(false); return; }
 
     setRoute(result);
-    setTappe(splitByKm(result.coords, kmPerTappa));
+    const rawTappe = splitByKm(result.coords, kmPerTappa);
+    setTappe(rawTappe);
     setLoading(false);
+
+    // Arricchisci le tappe con i nomi delle località (in background)
+    enrichTappeWithNames(rawTappe).then(setTappe);
 
     // Fetch elevation data in background
     setElevLoading(true);
@@ -843,7 +915,11 @@ export default function PercorsoBuilder() {
 
   // ── Ricalcola tappe al cambio di kmPerTappa ───────────────────────────────
   useEffect(() => {
-    if (route) setTappe(splitByKm(route.coords, kmPerTappa));
+    if (route) {
+      const rawTappe = splitByKm(route.coords, kmPerTappa);
+      setTappe(rawTappe);
+      enrichTappeWithNames(rawTappe).then(setTappe);
+    }
   }, [kmPerTappa, route]);
 
   // ── Copia tappe negli appunti ─────────────────────────────────────────────
