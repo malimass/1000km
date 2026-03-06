@@ -26,6 +26,7 @@ import {
   loadAthleteProfile, AuthUser, AthleteProfile,
 } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
+import ProiezionePercorso from "@/components/ProiezionePercorso";
 
 // ─── helpers ─────────────────────────────────────────────────
 function fmtDuration(sec: number) {
@@ -527,6 +528,14 @@ export default function AtletaDashboard() {
               })}
             </div>
           </section>
+        )}
+
+        {/* PROIEZIONE PERCORSO */}
+        {sessions.length > 0 && (
+          <ProiezionePercorso
+            sessions={sessions}
+            weightKg={athleteProfile.weightKg}
+          />
         )}
 
         {sessions.length === 0 && (
