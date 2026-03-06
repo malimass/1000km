@@ -9,29 +9,51 @@ import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import ProtectedCoachRoute from "./components/ProtectedCoachRoute";
 import NativeRedirect from "./components/NativeRedirect";
 
-const Index = lazy(() => import("./pages/Index"));
-const Percorso = lazy(() => import("./pages/Percorso"));
-const SanLuca = lazy(() => import("./pages/SanLuca"));
-const CrocifissoNero = lazy(() => import("./pages/CrocifissoNero"));
-const Sponsor = lazy(() => import("./pages/Sponsor"));
-const Sostenitori = lazy(() => import("./pages/Sostenitori"));
-const Contatti = lazy(() => import("./pages/Contatti"));
-const Dona = lazy(() => import("./pages/Dona"));
-const Notizie = lazy(() => import("./pages/Notizie"));
-const Servizi = lazy(() => import("./pages/Servizi"));
-const AdminLive = lazy(() => import("./pages/AdminLive"));
-const AdminLogin = lazy(() => import("./pages/AdminLogin"));
-const Iscriviti = lazy(() => import("./pages/Iscriviti"));
-const IscrizioneSuccesso = lazy(() => import("./pages/IscrizioneSuccesso"));
-const Partecipa = lazy(() => import("./pages/Partecipa"));
-const Accedi = lazy(() => import("./pages/Accedi"));
-const IlMioPercorso = lazy(() => import("./pages/IlMioPercorso"));
-const CoachLogin = lazy(() => import("./pages/CoachLogin"));
-const CoachRegister = lazy(() => import("./pages/CoachRegister"));
-const Coach = lazy(() => import("./pages/Coach"));
-const AtletaAuth = lazy(() => import("./pages/AtletaAuth"));
-const AtletaDashboard = lazy(() => import("./pages/AtletaDashboard"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+/**
+ * Wrapper per lazy() che ricarica la pagina se il chunk JS non viene trovato
+ * (tipico dopo un nuovo deploy quando il browser ha in cache vecchi riferimenti).
+ */
+function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType }>) {
+  return lazy(() =>
+    factory().catch((err) => {
+      // Se è un errore di import (chunk non trovato), ricarica una sola volta
+      const key = "chunk_reload_" + window.location.pathname;
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, "1");
+        window.location.reload();
+        // Restituisci una promise che non si risolve mai (la pagina si ricarica)
+        return new Promise(() => {});
+      }
+      // Se abbiamo già provato a ricaricare, rilancia l'errore
+      sessionStorage.removeItem(key);
+      throw err;
+    }),
+  );
+}
+
+const Index = lazyWithRetry(() => import("./pages/Index"));
+const Percorso = lazyWithRetry(() => import("./pages/Percorso"));
+const SanLuca = lazyWithRetry(() => import("./pages/SanLuca"));
+const CrocifissoNero = lazyWithRetry(() => import("./pages/CrocifissoNero"));
+const Sponsor = lazyWithRetry(() => import("./pages/Sponsor"));
+const Sostenitori = lazyWithRetry(() => import("./pages/Sostenitori"));
+const Contatti = lazyWithRetry(() => import("./pages/Contatti"));
+const Dona = lazyWithRetry(() => import("./pages/Dona"));
+const Notizie = lazyWithRetry(() => import("./pages/Notizie"));
+const Servizi = lazyWithRetry(() => import("./pages/Servizi"));
+const AdminLive = lazyWithRetry(() => import("./pages/AdminLive"));
+const AdminLogin = lazyWithRetry(() => import("./pages/AdminLogin"));
+const Iscriviti = lazyWithRetry(() => import("./pages/Iscriviti"));
+const IscrizioneSuccesso = lazyWithRetry(() => import("./pages/IscrizioneSuccesso"));
+const Partecipa = lazyWithRetry(() => import("./pages/Partecipa"));
+const Accedi = lazyWithRetry(() => import("./pages/Accedi"));
+const IlMioPercorso = lazyWithRetry(() => import("./pages/IlMioPercorso"));
+const CoachLogin = lazyWithRetry(() => import("./pages/CoachLogin"));
+const CoachRegister = lazyWithRetry(() => import("./pages/CoachRegister"));
+const Coach = lazyWithRetry(() => import("./pages/Coach"));
+const AtletaAuth = lazyWithRetry(() => import("./pages/AtletaAuth"));
+const AtletaDashboard = lazyWithRetry(() => import("./pages/AtletaDashboard"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
