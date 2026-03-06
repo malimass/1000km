@@ -597,11 +597,21 @@ export default function AdminLive() {
         return;
       }
       const data = await resp.json();
+
+      // Upload logo su Cloudinary se disponibile
+      let savedLogoUrl = data.logoUrl || "";
+      if (savedLogoUrl && cloudName && cloudPreset) {
+        try {
+          const uploaded = await uploadToCloudinary(savedLogoUrl, cloudName, cloudPreset, "image");
+          if (uploaded) savedLogoUrl = uploaded;
+        } catch { /* mantieni URL originale come fallback */ }
+      }
+
       setScrapePreview({
         id:      crypto.randomUUID(),
         nome:    data.nome || "",
         testo:   data.testo || "",
-        logoUrl: data.logoUrl || "",
+        logoUrl: savedLogoUrl,
         siteUrl: data.siteUrl || url,
       });
     } catch {
