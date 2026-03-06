@@ -172,7 +172,7 @@ const OBIETTIVI: Record<string, string> = {
 
 // ─── ATLETI TAB ─────────────────────────────────────────────────────────────
 
-function AtletiTab({ athletes }: { athletes: CoachAthlete[] }) {
+function AtletiTab({ athletes, onSelectAthlete }: { athletes: CoachAthlete[]; onSelectAthlete?: (a: CoachAthlete) => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [athleteSessions, setAthleteSessions] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState<string | null>(null);
@@ -314,6 +314,17 @@ function AtletiTab({ athletes }: { athletes: CoachAthlete[] }) {
                   </div>
                 )}
 
+                {/* Pulsante per aprire dashboard completa dell'atleta */}
+                {onSelectAthlete && sess.length > 0 && (
+                  <button
+                    onClick={() => onSelectAthlete(a)}
+                    className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                  >
+                    <Activity className="w-4 h-4" />
+                    Visualizza Dashboard Completa
+                  </button>
+                )}
+
                 {/* Sessioni dell'atleta */}
                 {sess.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-4">Nessun allenamento caricato da questo atleta.</p>
@@ -446,9 +457,11 @@ export default function Coach() {
     return p ? maxHRFromAge(p.age) : defaultMaxHR(35);
   });
   const [showSettings, setShowSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "atleti">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "atleti">("atleti");
   const [athletes, setAthletes] = useState<CoachAthlete[]>([]);
   const [coachUserId, setCoachUserId] = useState<string | null>(null);
+  const [selectedAthlete, setSelectedAthlete] = useState<CoachAthlete | null>(null);
+  const [athleteDashSessions, setAthleteDashSessions] = useState<TrainingSession[]>([]);
 
   // Carica atleti e profilo coach da Neon se autenticato
   useEffect(() => {
@@ -498,6 +511,16 @@ export default function Coach() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Profilo atleta selezionato (per injury risk e valutazioni)
+  const activeProfile: CoachProfile | null = selectedAthlete ? {
+    age: selectedAthlete.profile.age ?? 30,
+    weightKg: selectedAthlete.profile.weightKg ?? 70,
+    heightCm: selectedAthlete.profile.heightCm ?? 170,
+    gender: (selectedAthlete.profile.gender as "M" | "F") ?? "M",
+    restHR: selectedAthlete.profile.restHR ?? 60,
+    experienceYears: selectedAthlete.profile.experienceYears ?? 1,
+  } : profile;
+
   // Analisi derivate
   const allSessions = sessions.map(s => richSessions.get(s.id) ?? s);
   const weekly: WeeklyStats[] = buildWeeklyStats(allSessions, maxHR);
@@ -505,7 +528,7 @@ export default function Coach() {
   const fitnessHistory = buildFitnessHistory(allSessions, maxHR, 90);
   const readiness = calculateReadiness(allSessions, weekly);
   const recommendations = generateRecommendations(allSessions, fitness, weekly, maxHR);
-  const injuryRisk = calculateInjuryRisk(allSessions, weekly, fitness, profile);
+  const injuryRisk = calculateInjuryRisk(allSessions, weekly, fitness, activeProfile);
 
   // Ultima sessione con traccia per pace profile
   const lastRich = Array.from(richSessions.values()).sort((a, b) => b.startTime.getTime() - a.startTime.getTime())[0];
@@ -587,6 +610,43 @@ export default function Coach() {
     localStorage.setItem("gp_coach_maxhr", String(v));
   };
 
+  // Seleziona atleta e carica le sue sessioni per il dashboard
+  const handleSelectAthlete = useCallback(async (a: CoachAthlete) => {
+    setSelectedAthlete(a);
+    setActiveTab("dashboard");
+    // Calcola maxHR dall'atleta
+    const athleteMaxHR = a.profile.maxHR ?? (a.profile.age ? maxHRFromAge(a.profile.age) : 185);
+    setMaxHR(athleteMaxHR);
+    try {
+      const res = await apiFetch(`/api/coach-sessions?user_id=${a.id}`);
+      const data = res.ok ? await res.json() : [];
+      const mapped = (data as any[]).map((r: any) => ({
+        id: r.id,
+        sport: r.sport,
+        fileName: r.file_name ?? "import",
+        startTime: new Date(r.start_time),
+        durationSec: Number(r.duration_sec),
+        distanceM: Number(r.distance_m),
+        avgSpeedKmh: Number(r.avg_speed_kmh),
+        maxSpeedKmh: Number(r.max_speed_kmh),
+        avgHeartRate: r.avg_heart_rate ? Number(r.avg_heart_rate) : null,
+        maxHeartRate: r.max_heart_rate ? Number(r.max_heart_rate) : null,
+        totalElevationGainM: Number(r.total_elevation_gain_m),
+        totalElevationLossM: Number(r.total_elevation_loss_m),
+        calories: r.calories ? Number(r.calories) : null,
+        trimp: r.trimp ? Number(r.trimp) : null,
+        tss: r.tss ? Number(r.tss) : null,
+        hrZonesSec: r.hr_zones_sec ?? undefined,
+        trackPoints: [],
+      })) as TrainingSession[];
+      setAthleteDashSessions(mapped);
+      setSessions(mapped);
+    } catch {
+      setAthleteDashSessions([]);
+      setSessions([]);
+    }
+  }, []);
+
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -664,11 +724,49 @@ export default function Coach() {
 
         {/* ── VISTA ATLETI (solo tab atleti) ─────────── */}
         {activeTab === "atleti" && (
-          <AtletiTab athletes={athletes} />
+          <AtletiTab athletes={athletes} onSelectAthlete={handleSelectAthlete} />
         )}
 
         {/* Tutto il resto solo in tab dashboard */}
-        {activeTab !== "atleti" && <>
+        {activeTab !== "atleti" && !selectedAthlete && (
+          <section className="text-center py-20 text-muted-foreground">
+            <Users className="w-16 h-16 mx-auto mb-4 opacity-20" />
+            <p className="text-lg font-bold text-foreground">Seleziona un atleta</p>
+            <p className="text-sm mt-2">Vai alla tab <strong>Atleti</strong> e clicca su &quot;Visualizza Dashboard Completa&quot; per vedere i dati di un atleta.</p>
+            <button
+              onClick={() => setActiveTab("atleti")}
+              className="mt-6 px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-opacity inline-flex items-center gap-2"
+            >
+              <Users className="w-4 h-4" />
+              Vai agli Atleti
+            </button>
+          </section>
+        )}
+
+        {activeTab !== "atleti" && selectedAthlete && <>
+
+        {/* ── ATLETA SELEZIONATO HEADER ────────────── */}
+        <div className="flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3">
+          <button
+            onClick={() => { setSelectedAthlete(null); setActiveTab("atleti"); }}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+          >
+            ← Atleti
+          </button>
+          <div className="w-px h-6 bg-border" />
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <User className="w-4 h-4 text-primary" />
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-foreground text-sm">{selectedAthlete.displayName}</p>
+            <p className="text-xs text-muted-foreground">{selectedAthlete.email}</p>
+          </div>
+          {selectedAthlete.profile.obiettivo && (
+            <span className="text-[10px] font-semibold bg-dona/10 text-dona rounded-full px-2 py-0.5">
+              {OBIETTIVI[selectedAthlete.profile.obiettivo] ?? selectedAthlete.profile.obiettivo}
+            </span>
+          )}
+        </div>
 
         {/* ── VALUTAZIONE ─────────────────────────── */}
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -853,50 +951,12 @@ export default function Coach() {
                   </div>
                 </div>
               ))}
-              {!coachPres && (
-                <button onClick={() => setShowProfileModal(true)}
-                  className="flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg border border-dashed border-border text-muted-foreground hover:text-foreground transition-colors">
-                  <User className="w-3 h-3" />
-                  Completa il tuo profilo coach
-                </button>
-              )}
+              {/* Rimosso: prompt profilo coach non serve qui */}
             </div>
           </div>
         </section>
 
-        {/* ── UPLOAD AREA ──────────────────────────── */}
-        <section>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Carica Allenamento</h2>
-          <div
-            onDragOver={e => e.preventDefault()}
-            onDrop={handleDrop}
-            onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-green-500/50 hover:bg-green-500/5 transition-all"
-          >
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".fit,.tcx"
-              multiple
-              className="hidden"
-              onChange={e => handleFiles(e.target.files)}
-            />
-            <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-            {uploading ? (
-              <p className="text-sm text-green-600 font-semibold animate-pulse">Analisi in corso…</p>
-            ) : (
-              <>
-                <p className="text-sm font-semibold text-foreground">Trascina file .fit o .tcx</p>
-                <p className="text-xs text-muted-foreground mt-1">oppure clicca per selezionare · Garmin, Polar, Wahoo, Strava export</p>
-              </>
-            )}
-          </div>
-          {uploadError && (
-            <div className="mt-2 text-xs text-red-500 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
-              ⚠️ {uploadError}
-            </div>
-          )}
-        </section>
+        {/* Upload rimosso: solo l'atleta carica i propri allenamenti */}
 
         {/* ── LISTA SESSIONI ───────────────────────── */}
         {sessions.length > 0 && (
@@ -929,7 +989,7 @@ export default function Coach() {
                           {s.totalElevationGainM > 0 && <span className="text-xs text-muted-foreground flex items-center gap-1"><Mountain className="w-3 h-3" />+{Math.round(s.totalElevationGainM)}m</span>}
                           <span className="text-xs font-semibold" style={{ color: "#f97316" }}>TRIMP {analysis.trimp}</span>
                           {/* Stelle valutazione nella row */}
-                          <span className="text-xs text-yellow-400">{"★".repeat(evaluateSession(analysis, profile, maxHR).stars)}{"☆".repeat(5 - evaluateSession(analysis, profile, maxHR).stars)}</span>
+                          <span className="text-xs text-yellow-400">{"★".repeat(evaluateSession(analysis, activeProfile, maxHR).stars)}{"☆".repeat(5 - evaluateSession(analysis, activeProfile, maxHR).stars)}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
@@ -946,7 +1006,7 @@ export default function Coach() {
 
                     {/* ─ Drawer valutazione ─ */}
                     {isExpanded && (() => {
-                      const ev = evaluateSession(analysis, profile, maxHR);
+                      const ev = evaluateSession(analysis, activeProfile, maxHR);
                       const zd = analysis.zoneDist;
                       const dominantZoneIdx = zd
                         ? [zd.z1Sec, zd.z2Sec, zd.z3Sec, zd.z4Sec, zd.z5Sec].reduce((mi, v, i, a) => v > a[mi] ? i : mi, 0)
@@ -1173,8 +1233,8 @@ export default function Coach() {
         {sessions.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <Footprints className="w-12 h-12 mx-auto mb-4 opacity-30" />
-            <p className="text-base font-semibold">Nessun allenamento caricato</p>
-            <p className="text-sm mt-1">Carica un file .fit o .tcx per iniziare l'analisi</p>
+            <p className="text-base font-semibold">Nessun allenamento</p>
+            <p className="text-sm mt-1">Questo atleta non ha ancora caricato allenamenti</p>
           </div>
         )}
 
