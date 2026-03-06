@@ -13,7 +13,6 @@ export default function RouteMap3D({ coords, waypoints }: Props) {
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Stabilize props to prevent continuous re-renders
   const coordsKey = useMemo(() => JSON.stringify(coords), [coords]);
   const waypointsKey = useMemo(() => JSON.stringify(waypoints), [waypoints]);
   const stableCoords = useMemo(() => coords, [coordsKey]);
@@ -22,7 +21,6 @@ export default function RouteMap3D({ coords, waypoints }: Props) {
   useEffect(() => {
     if (!containerRef.current || stableCoords.length < 2) return;
 
-    // Calculate center
     let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
     for (const [lat, lng] of stableCoords) {
       if (lat < minLat) minLat = lat;
@@ -46,12 +44,13 @@ export default function RouteMap3D({ coords, waypoints }: Props) {
             tileSize: 256,
             attribution: "Esri, Maxar, Earthstar Geographics",
           },
-          "terrain-dem": {
+          "hillshade-dem": {
             type: "raster-dem",
             tiles: [
               "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
             ],
             tileSize: 256,
+            maxzoom: 14,
             encoding: "terrarium",
           },
         },
@@ -64,31 +63,26 @@ export default function RouteMap3D({ coords, waypoints }: Props) {
           {
             id: "hillshade",
             type: "hillshade",
-            source: "terrain-dem",
+            source: "hillshade-dem",
             paint: {
-              "hillshade-exaggeration": 0.5,
+              "hillshade-exaggeration": 0.6,
               "hillshade-shadow-color": "#000000",
               "hillshade-highlight-color": "#ffffff",
-              "hillshade-accent-color": "#000000",
             },
           },
         ],
-        terrain: {
-          source: "terrain-dem",
-          exaggeration: 1.5,
-        },
+        // NO terrain — lines render correctly without 3D terrain
       },
       center: [centerLng, centerLat],
       zoom: 7,
-      pitch: 60,
-      bearing: -20,
+      pitch: 55,
+      bearing: -15,
       maxPitch: 85,
     });
 
     map.addControl(new maplibregl.NavigationControl(), "top-left");
 
     map.on("load", () => {
-      // ── Route line ──
       const routeCoords = stableCoords.map(([lat, lng]) => [lng, lat]);
 
       map.addSource("route", {
@@ -110,9 +104,9 @@ export default function RouteMap3D({ coords, waypoints }: Props) {
         source: "route",
         paint: {
           "line-color": "#e11d48",
-          "line-width": 8,
-          "line-opacity": 0.5,
-          "line-blur": 4,
+          "line-width": 10,
+          "line-opacity": 0.35,
+          "line-blur": 6,
         },
       });
 
@@ -127,12 +121,12 @@ export default function RouteMap3D({ coords, waypoints }: Props) {
         },
         paint: {
           "line-color": "#ffffff",
-          "line-width": 3,
-          "line-opacity": 1,
+          "line-width": 3.5,
+          "line-opacity": 0.95,
         },
       });
 
-      // ── Waypoint markers ──
+      // Waypoint markers
       if (stableWaypoints?.length) {
         for (const wp of stableWaypoints) {
           const el = document.createElement("div");
@@ -157,12 +151,13 @@ export default function RouteMap3D({ coords, waypoints }: Props) {
       for (const [lat, lng] of stableCoords) {
         bounds.extend([lng, lat]);
       }
-      map.fitBounds(bounds, { padding: 60, pitch: 60, bearing: -20 });
+      map.fitBounds(bounds, { padding: 60, pitch: 55, bearing: -15 });
     });
 
-    // Suppress minor errors
     map.on("error", (e) => {
-      if (e?.error?.message?.includes("Ne is not defined")) return;
+      // Suppress DEM tile 404s at high zoom — tiles only go to z14
+      const msg = e?.error?.message ?? "";
+      if (msg.includes("elevation-tiles-prod") || msg.includes("404")) return;
       console.warn("[RouteMap3D]", e);
     });
 
@@ -174,7 +169,6 @@ export default function RouteMap3D({ coords, waypoints }: Props) {
     };
   }, [coordsKey, waypointsKey]);
 
-  // Resize map on fullscreen toggle
   useEffect(() => {
     setTimeout(() => mapRef.current?.resize(), 100);
   }, [isFullscreen]);
