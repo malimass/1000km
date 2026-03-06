@@ -7,7 +7,7 @@
  */
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Heart, TrendingUp, Zap, Mountain, Timer, Flame, ShieldAlert, Target, Activity } from "lucide-react";
+import { ArrowLeft, Heart, TrendingUp, Zap, Mountain, Timer, Flame, ShieldAlert, Target, Activity, Map } from "lucide-react";
 
 /* ─── Singola sezione del manuale ──────────────────────────── */
 interface Section {
@@ -239,6 +239,85 @@ const SECTIONS: Section[] = [
       { label: "25–30", color: "#eab308", desc: "Sovrappeso" },
       { label: "> 30", color: "#ef4444", desc: "Obesità" },
     ],
+  },
+
+  /* ── Proiezione Percorso ────────────────────────────────── */
+  {
+    icon: <Map className="w-5 h-5 text-sky-500" />,
+    title: "Proiezione Percorso",
+    anchor: "proiezione",
+    what: "Confronta i tuoi allenamenti con le 14 tappe del percorso 1000 km. Per ogni tappa stima tempo, calorie e TRIMP, e indica se la tua preparazione è sufficiente.",
+    details: [
+      "Le proiezioni si aggiornano automaticamente ogni volta che carichi un nuovo allenamento.",
+      "I calcoli si basano interamente sui dati dei tuoi allenamenti reali (passo, calorie, FC).",
+    ],
+    ranges: [
+      { label: "Pronto (≥ 80%)", color: "#22c55e", desc: "Hai già coperto distanza e dislivello simili in allenamento" },
+      { label: "Parziale (50–80%)", color: "#f59e0b", desc: "Copertura intermedia — intensifica le uscite lunghe" },
+      { label: "Gap (< 50%)", color: "#ef4444", desc: "Servono uscite più lunghe per avvicinarti ai requisiti della tappa" },
+    ],
+  },
+
+  /* ── Tempo stimato per tappa ────────────────────────────── */
+  {
+    icon: <Timer className="w-5 h-5 text-sky-500" />,
+    title: "Tempo Stimato per Tappa",
+    anchor: "tempo-tappa",
+    what: "Proiezione del tempo necessario per completare ogni singola tappa, basata sul tuo passo medio reale aggiustato per il dislivello.",
+    formula: "Passo ponderato = Σ(passo_i × distanza_i) / Σ(distanza_i)\nFattore salita = 1 + (D+/km × 0,035)\nTempo = Passo ponderato × Fattore salita × km tappa / 60",
+    details: [
+      "Il passo medio è ponderato per distanza: le sessioni più lunghe pesano di più nel calcolo.",
+      "Il fattore salita aggiunge circa 3,5% di tempo per ogni metro di dislivello per km (+30 sec/km ogni ~100m D+ extra).",
+      "Il dislivello per tappa è stimato a ~8,6 m/km (media di 600m D+ su 70 km).",
+      "Sessioni con distanza < 100m vengono ignorate nel calcolo del passo.",
+    ],
+    example: "Passo medio 10 min/km, tappa 70 km con ~600m D+ → fattore 1,30 → Tempo ≈ 10 × 1,30 × 70 / 60 ≈ 15h 10m",
+  },
+
+  /* ── Calorie stimate per tappa ──────────────────────────── */
+  {
+    icon: <Flame className="w-5 h-5 text-sky-500" />,
+    title: "Calorie Stimate per Tappa",
+    anchor: "calorie-tappa",
+    what: "Proiezione delle calorie che brucerai in ogni tappa, calcolata dal rapporto calorie/km dei tuoi allenamenti.",
+    formula: "cal/km = media(calorie_sessione / km_sessione)\nCalorie tappa = cal/km × km tappa",
+    details: [
+      "Vengono considerate solo le sessioni con calorie > 0 e distanza > 500m.",
+      "Se non ci sono dati di calorie, il fallback è 0,9 kcal/kg/km (stima per camminata).",
+      "Il rapporto cal/km tiene conto del tuo peso e della tua efficienza metabolica reale.",
+    ],
+    example: "Consumo medio 55 kcal/km, tappa 90 km → Calorie stimate ≈ 4.950 kcal",
+  },
+
+  /* ── TRIMP stimato per tappa ────────────────────────────── */
+  {
+    icon: <Zap className="w-5 h-5 text-sky-500" />,
+    title: "TRIMP Stimato per Tappa",
+    anchor: "trimp-tappa",
+    what: "Proiezione del carico cardiaco (TRIMP) che accumulerai in ogni tappa, basata sul tuo rapporto TRIMP/ora dagli allenamenti.",
+    formula: "TRIMP/h = media(TRIMP_sessione / ore_sessione)\nTRIMP tappa = TRIMP/h × ore stimate tappa",
+    details: [
+      "Vengono considerate solo sessioni con TRIMP > 0 e durata > 5 minuti.",
+      "Se non ci sono dati TRIMP, il fallback è 40 TRIMP/ora (sforzo aerobico moderato).",
+      "Il TRIMP stimato per tappa dipende sia dal tempo stimato (che include il fattore salita) sia dalla tua intensità media abituale.",
+    ],
+    example: "TRIMP/ora medio = 50, tappa stimata in 15 ore → TRIMP tappa ≈ 750",
+  },
+
+  /* ── Copertura tappa ────────────────────────────────────── */
+  {
+    icon: <Target className="w-5 h-5 text-sky-500" />,
+    title: "Copertura Tappa (Stato Preparazione)",
+    anchor: "copertura",
+    what: "Per ogni tappa, indica quanto la tua sessione di allenamento più lunga copre le esigenze di distanza e dislivello richieste.",
+    formula: "Copertura km = min(100, sessione_max_km / km_tappa × 100)\nCopertura D+ = min(100, sessione_max_D+ / D+_tappa × 100)\nCopertura media = (Copertura km + Copertura D+) / 2",
+    details: [
+      "Si confronta la tua sessione più lunga (non la media) con i requisiti della tappa.",
+      "La logica: se hai già fatto almeno una volta una distanza simile, sei pronto per quella tappa.",
+      "Il dislivello è stimato a ~8,6 m D+/km per tutte le tappe (in assenza di dati altimetrici reali del percorso).",
+      "Copertura ≥ 80% = Pronto, 50–80% = Parziale, < 50% = Gap.",
+    ],
+    example: "Sessione più lunga: 45 km, 400m D+. Tappa: 70 km, ~600m D+ → Cop. km = 64%, Cop. D+ = 67% → Media 65% = Parziale",
   },
 ];
 
