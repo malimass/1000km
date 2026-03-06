@@ -12,6 +12,7 @@ export type Sostenitore = {
   nome:    string;
   testo:   string;
   logoUrl: string;
+  siteUrl?: string;
 };
 
 export type SosteniPage = {

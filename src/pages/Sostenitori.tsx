@@ -39,36 +39,55 @@ export default function Sostenitori() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
               {page.items.map((item, i) => (
                 <AnimatedSection key={item.id} delay={i * 0.1}>
-                  <div className="bg-card rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow p-6 flex flex-col items-center text-center gap-4 h-full">
-                    {/* Logo o iniziale */}
-                    {item.logoUrl ? (
-                      <div className="h-24 flex items-center justify-center">
-                        <img
-                          src={item.logoUrl}
-                          alt={item.nome}
-                          className="max-h-24 max-w-[180px] w-auto object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="h-24 w-24 rounded-full bg-dona/10 flex items-center justify-center">
-                        <span className="text-3xl font-heading font-bold text-dona">
-                          {item.nome.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
+                  {(() => {
+                    const Wrapper = item.siteUrl
+                      ? (props: { children: React.ReactNode }) => (
+                          <a href={item.siteUrl} target="_blank" rel="noopener noreferrer" className="block h-full">
+                            {props.children}
+                          </a>
+                        )
+                      : (props: { children: React.ReactNode }) => <>{props.children}</>;
+                    return (
+                      <Wrapper>
+                        <div className={`bg-card rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow p-6 flex flex-col items-center text-center gap-4 h-full${item.siteUrl ? " cursor-pointer" : ""}`}>
+                          {/* Logo o iniziale */}
+                          {item.logoUrl ? (
+                            <div className="h-24 flex items-center justify-center">
+                              <img
+                                src={item.logoUrl}
+                                alt={item.nome}
+                                className="max-h-24 max-w-[180px] w-auto object-contain"
+                              />
+                            </div>
+                          ) : (
+                            <div className="h-24 w-24 rounded-full bg-dona/10 flex items-center justify-center">
+                              <span className="text-3xl font-heading font-bold text-dona">
+                                {item.nome.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
 
-                    {/* Nome e testo */}
-                    <div className="flex-1">
-                      <h3 className="font-heading text-lg font-bold text-foreground mb-2">
-                        {item.nome}
-                      </h3>
-                      {item.testo && (
-                        <p className="font-body text-sm text-muted-foreground leading-relaxed">
-                          {item.testo}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                          {/* Nome e testo */}
+                          <div className="flex-1">
+                            <h3 className="font-heading text-lg font-bold text-foreground mb-2">
+                              {item.nome}
+                            </h3>
+                            {item.testo && (
+                              <p className="font-body text-sm text-muted-foreground leading-relaxed">
+                                {item.testo}
+                              </p>
+                            )}
+                          </div>
+
+                          {item.siteUrl && (
+                            <span className="text-xs text-dona font-medium flex items-center gap-1 mt-auto">
+                              Visita il sito →
+                            </span>
+                          )}
+                        </div>
+                      </Wrapper>
+                    );
+                  })()}
                 </AnimatedSection>
               ))}
             </div>

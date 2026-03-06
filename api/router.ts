@@ -34,6 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/percorso-config") return await percorsoConfig(req, res);
     if (path === "/saved-percorsi") return await savedPercorsi(req, res);
     if (path === "/elevation") return await elevation(req, res);
+    if (path === "/scrape-site") return await scrapeSite(req, res);
     return res.status(404).json({ error: "Not found" });
   } catch (err: any) {
     console.error(err);
@@ -214,6 +215,96 @@ async function sostenitori(req: VercelRequest, res: VercelResponse) {
     return res.json({ ok: true });
   }
   return res.status(405).end();
+}
+
+// ─── SCRAPE SITE (metadata extraction) ──────────────────────────────────────
+
+async function scrapeSite(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") return res.status(405).end();
+  const auth = await requireAuth(req);
+  if (!auth) return res.status(401).json({ error: "Non autenticato" });
+
+  const { url } = req.body ?? {};
+  if (!url || typeof url !== "string") return res.status(400).json({ error: "URL mancante" });
+
+  try {
+    // Normalise URL
+    let targetUrl = url.trim();
+    if (!/^https?:\/\//i.test(targetUrl)) targetUrl = "https://" + targetUrl;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(targetUrl, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; GratitudePathBot/1.0)",
+        "Accept": "text/html,application/xhtml+xml",
+      },
+      redirect: "follow",
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) return res.status(502).json({ error: `Sito ha risposto con ${response.status}` });
+
+    const html = await response.text();
+
+    // Extract meta tags with regex (no DOM parser needed on server)
+    const meta = (name: string): string => {
+      // Try og: tags first, then regular meta
+      const ogMatch = html.match(new RegExp(`<meta[^>]+property=["']og:${name}["'][^>]+content=["']([^"']+)["']`, "i"))
+        || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:${name}["']`, "i"));
+      if (ogMatch) return ogMatch[1];
+
+      const metaMatch = html.match(new RegExp(`<meta[^>]+name=["']${name}["'][^>]+content=["']([^"']+)["']`, "i"))
+        || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${name}["']`, "i"));
+      return metaMatch?.[1] ?? "";
+    };
+
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const ogTitle = meta("title") || meta("site_name") || (titleMatch?.[1] ?? "").trim();
+    const ogDesc = meta("description");
+    const ogImage = meta("image");
+
+    // Build absolute URL for the image
+    let logoUrl = "";
+    if (ogImage) {
+      try {
+        logoUrl = new URL(ogImage, targetUrl).href;
+      } catch {
+        logoUrl = ogImage;
+      }
+    }
+
+    // Fallback: try to get favicon
+    if (!logoUrl) {
+      const iconMatch = html.match(/<link[^>]+rel=["'](?:icon|shortcut icon|apple-touch-icon)["'][^>]+href=["']([^"']+)["']/i)
+        || html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["'](?:icon|shortcut icon|apple-touch-icon)["']/i);
+      if (iconMatch) {
+        try {
+          logoUrl = new URL(iconMatch[1], targetUrl).href;
+        } catch {
+          logoUrl = iconMatch[1];
+        }
+      } else {
+        // Try default favicon
+        try {
+          const faviconUrl = new URL("/favicon.ico", targetUrl).href;
+          logoUrl = faviconUrl;
+        } catch { /* noop */ }
+      }
+    }
+
+    return res.json({
+      nome: ogTitle,
+      testo: ogDesc,
+      logoUrl,
+      siteUrl: targetUrl,
+    });
+  } catch (err: any) {
+    if (err.name === "AbortError") return res.status(504).json({ error: "Timeout: il sito non risponde" });
+    return res.status(502).json({ error: `Impossibile raggiungere il sito: ${err.message}` });
+  }
 }
 
 // ─── SERVIZI ─────────────────────────────────────────────────────────────────
