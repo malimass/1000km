@@ -37,12 +37,13 @@ export default function Accedi() {
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
 
-  // ── Se già loggato, redirige subito ──
+  // ── Se già loggato, mostra info e opzione di proseguire ──
+  const [existingUser, setExistingUser] = useState<{ role?: string } | null>(null);
   useEffect(() => {
     getCurrentUser().then(user => {
-      if (user) navigate(redirectForRole(user.role), { replace: true });
+      if (user) setExistingUser(user);
     });
-  }, [navigate]);
+  }, []);
 
   // ── Login ──
   async function handleLogin(e: React.FormEvent) {
@@ -114,6 +115,21 @@ export default function Accedi() {
             1000km di Gratitudine — {tab === "login" ? "entra con il tuo account" : "crea il tuo account"}
           </p>
         </div>
+
+        {/* Banner se già loggato */}
+        {existingUser && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-5 text-center space-y-2">
+            <p className="font-body text-sm text-green-800 font-medium">
+              Sei già connesso.
+            </p>
+            <button
+              onClick={() => navigate(redirectForRole(existingUser.role))}
+              className="inline-block bg-dona text-white font-semibold text-sm rounded-lg px-4 py-2 hover:bg-dona/90 transition-colors"
+            >
+              Vai al tuo profilo
+            </button>
+          </div>
+        )}
 
         {/* Tab Accedi / Registrati */}
         <div className="flex bg-muted rounded-xl p-1 mb-5">
