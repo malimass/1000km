@@ -553,27 +553,30 @@ async function googleDirections(
 
     onProgress?.(5);
 
-    // ── 1. Prova l'intero percorso in una singola chiamata WALKING ──
-    console.info("[PercorsoBuilder] Tentativo singola chiamata WALKING...");
-    let fullRoute: RouteResult | null = null;
-
-    if (RouteClass) {
-      fullRoute = await walkSegmentNew(RouteClass, start, end, preferShortest);
-    }
-    if (!fullRoute) {
-      fullRoute = await walkSegmentLegacy(G, start, end, preferShortest);
-    }
-
-    if (fullRoute) {
-      console.info(`[PercorsoBuilder] Percorso completo ottenuto: ${(fullRoute.distanceM / 1000).toFixed(1)} km`);
-      onProgress?.(100);
-      return fullRoute;
-    }
-
-    // ── 2. Singola chiamata fallita → spezza in segmenti ──
-    console.warn("[PercorsoBuilder] Singola chiamata fallita, spezzamento in segmenti...");
-
     const straightKm = haversineM(start, end) / 1000;
+
+    // ── 1. Per distanze brevi, prova una singola chiamata WALKING ──
+    if (straightKm <= MAX_SEGMENT_KM) {
+      console.info("[PercorsoBuilder] Distanza breve, singola chiamata WALKING...");
+      let fullRoute: RouteResult | null = null;
+
+      if (RouteClass) {
+        fullRoute = await walkSegmentNew(RouteClass, start, end, preferShortest);
+      }
+      if (!fullRoute) {
+        fullRoute = await walkSegmentLegacy(G, start, end, preferShortest);
+      }
+
+      if (fullRoute) {
+        console.info(`[PercorsoBuilder] Percorso completo: ${(fullRoute.distanceM / 1000).toFixed(1)} km`);
+        onProgress?.(100);
+        return fullRoute;
+      }
+    }
+
+    // ── 2. Distanza lunga o singola chiamata fallita → spezza in segmenti ──
+    console.info(`[PercorsoBuilder] Splitting percorso (${straightKm.toFixed(0)} km in linea d'aria)...`);
+
     const nSegments = Math.max(2, Math.ceil(straightKm / MAX_SEGMENT_KM));
 
     // Risolvi un singolo segmento, con split ricorsivo se fallisce
@@ -625,11 +628,22 @@ async function googleDirections(
     console.info("[PercorsoBuilder] Ottengo scheletro WALKING per waypoint...");
     const walkSkeleton = await getWalkingSkeleton(G, start, end);
 
-    if (walkSkeleton && walkSkeleton.coords.length > 2) {
-      const rawWaypoints = extractWaypointsFromRoute(walkSkeleton.coords, nSegments - 1);
-      waypoints = await Promise.all(rawWaypoints.map(snapToCity));
-      console.info(`[PercorsoBuilder] ${waypoints.length} waypoint da scheletro WALKING`);
-    } else {
+    if (walkSkeleton && walkSkeleton.coords.length > 10) {
+      // Valida: il percorso deve essere ragionevole (non più di 2x la linea d'aria)
+      const skeletonKm = walkSkeleton.distanceM / 1000;
+      const ratio = skeletonKm / straightKm;
+      console.info(`[PercorsoBuilder] Scheletro WALKING: ${skeletonKm.toFixed(0)} km, ratio=${ratio.toFixed(1)}x`);
+
+      if (ratio < 3) {
+        const rawWaypoints = extractWaypointsFromRoute(walkSkeleton.coords, nSegments - 1);
+        waypoints = await Promise.all(rawWaypoints.map(snapToCity));
+        console.info(`[PercorsoBuilder] ${waypoints.length} waypoint da scheletro WALKING`);
+      } else {
+        console.warn(`[PercorsoBuilder] Scheletro WALKING sospetto (ratio ${ratio.toFixed(1)}x), scarto`);
+      }
+    }
+
+    if (!waypoints.length) {
       // 2b. Fallback: scheletro DRIVING
       console.warn("[PercorsoBuilder] Scheletro WALKING non disponibile, provo DRIVING...");
       const driveSkeleton = await getDrivingSkeleton(G, start, end, RouteClass);
