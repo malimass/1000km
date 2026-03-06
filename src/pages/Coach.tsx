@@ -369,14 +369,14 @@ function AtletiTab({ athletes, onSelectAthlete }: { athletes: CoachAthlete[]; on
                               {/* Metriche */}
                               <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-xs">
                                 {[
-                                  { l: "Velocità", v: `${s.avgSpeedKmh.toFixed(1)} km/h` },
-                                  { l: "FC media", v: s.avgHeartRate ? `${s.avgHeartRate} bpm` : "—" },
-                                  { l: "FC max", v: s.maxHeartRate ? `${s.maxHeartRate} bpm` : "—" },
-                                  { l: "D+", v: `${Math.round(s.totalElevationGainM)}m` },
-                                  { l: "Calorie", v: s.calories ? `${s.calories} kcal` : "—" },
-                                  { l: "TRIMP", v: s.trimp ? String(Math.round(s.trimp)) : "—" },
+                                  { l: "Velocità", v: `${s.avgSpeedKmh.toFixed(1)} km/h`, t: "Velocità media mantenuta durante la sessione" },
+                                  { l: "FC media", v: s.avgHeartRate ? `${s.avgHeartRate} bpm` : "—", t: "Frequenza cardiaca media registrata" },
+                                  { l: "FC max", v: s.maxHeartRate ? `${s.maxHeartRate} bpm` : "—", t: "Frequenza cardiaca massima raggiunta" },
+                                  { l: "D+", v: `${Math.round(s.totalElevationGainM)}m`, t: "Dislivello positivo: metri totali di salita" },
+                                  { l: "Calorie", v: s.calories ? `${s.calories} kcal` : "—", t: "Stima delle calorie bruciate" },
+                                  { l: "TRIMP", v: s.trimp ? String(Math.round(s.trimp)) : "—", t: "Training Impulse: carico allenamento basato su durata e intensità cardiaca" },
                                 ].map(m => (
-                                  <div key={m.l} className="bg-background rounded px-2 py-1 border border-border">
+                                  <div key={m.l} className="bg-background rounded px-2 py-1 border border-border cursor-help" title={m.t}>
                                     <span className="text-[9px] text-muted-foreground block">{m.l}</span>
                                     <strong className="text-[11px]">{m.v}</strong>
                                   </div>
@@ -1036,16 +1036,16 @@ export default function Coach() {
                           {/* Metriche griglia */}
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             {[
-                              { label: "Velocità media", value: `${s.avgSpeedKmh.toFixed(1)} km/h` },
-                              { label: "Andatura media", value: fmtPace(analysis.paceMinKm) },
-                              { label: "FC media / max", value: s.avgHeartRate ? `${s.avgHeartRate} / ${s.maxHeartRate ?? "—"} bpm` : "—" },
-                              { label: "Calorie", value: s.calories ? `${s.calories} kcal` : "—" },
-                              { label: "Dislivello +/−", value: `+${Math.round(s.totalElevationGainM)}m / −${Math.round(s.totalElevationLossM)}m` },
-                              { label: "TSS", value: String(analysis.tss), color: "#6366f1" },
-                              { label: "TRIMP", value: String(analysis.trimp), color: "#f97316" },
-                              { label: "Zona prevalente", value: dominantZoneIdx >= 0 ? ZONE_LABELS[dominantZoneIdx] : "—", color: ZONE_COLORS[dominantZoneIdx] ?? undefined },
+                              { label: "Velocità media", value: `${s.avgSpeedKmh.toFixed(1)} km/h`, tip: "Velocità media mantenuta durante la sessione" },
+                              { label: "Andatura media", value: fmtPace(analysis.paceMinKm), tip: "Passo medio: minuti impiegati per percorrere 1 km" },
+                              { label: "FC media / max", value: s.avgHeartRate ? `${s.avgHeartRate} / ${s.maxHeartRate ?? "—"} bpm` : "—", tip: "Frequenza cardiaca media e massima registrata durante la sessione" },
+                              { label: "Calorie", value: s.calories ? `${s.calories} kcal` : "—", tip: "Stima delle calorie bruciate durante la sessione" },
+                              { label: "Dislivello +/−", value: `+${Math.round(s.totalElevationGainM)}m / −${Math.round(s.totalElevationLossM)}m`, tip: "Metri totali di salita (+) e discesa (−)" },
+                              { label: "TSS", value: String(analysis.tss), color: "#6366f1", tip: "Training Stress Score: carico di allenamento normalizzato sulla soglia funzionale. 100 = 1 ora a soglia" },
+                              { label: "TRIMP", value: String(analysis.trimp), color: "#f97316", tip: "Training Impulse: carico di allenamento basato su durata e intensità cardiaca. Valori più alti = sessione più impegnativa" },
+                              { label: "Zona prevalente", value: dominantZoneIdx >= 0 ? ZONE_LABELS[dominantZoneIdx] : "—", color: ZONE_COLORS[dominantZoneIdx] ?? undefined, tip: "La zona di frequenza cardiaca in cui hai trascorso più tempo" },
                             ].map(m => (
-                              <div key={m.label} className="bg-background rounded-lg px-3 py-2 border border-border">
+                              <div key={m.label} className="bg-background rounded-lg px-3 py-2 border border-border cursor-help" title={m.tip}>
                                 <span className="text-[10px] text-muted-foreground block">{m.label}</span>
                                 <p className="font-bold text-sm mt-0.5" style={{ color: m.color }}>{m.value}</p>
                               </div>

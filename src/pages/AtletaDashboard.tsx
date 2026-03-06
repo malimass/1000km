@@ -489,12 +489,12 @@ export default function AtletaDashboard() {
                         {/* Metriche */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                           {[
-                            { l: "Velocità", v: `${s.avgSpeedKmh.toFixed(1)} km/h` },
-                            { l: "FC media/max", v: s.avgHeartRate ? `${s.avgHeartRate}/${s.maxHeartRate ?? "—"} bpm` : "—" },
-                            { l: "Calorie", v: s.calories ? `${s.calories} kcal` : "—" },
-                            { l: "TRIMP", v: String(analysis.trimp) },
+                            { l: "Velocità", v: `${s.avgSpeedKmh.toFixed(1)} km/h`, t: "Velocità media mantenuta durante la sessione" },
+                            { l: "FC media/max", v: s.avgHeartRate ? `${s.avgHeartRate}/${s.maxHeartRate ?? "—"} bpm` : "—", t: "Frequenza cardiaca media e massima registrata" },
+                            { l: "Calorie", v: s.calories ? `${s.calories} kcal` : "—", t: "Stima delle calorie bruciate durante la sessione" },
+                            { l: "TRIMP", v: String(analysis.trimp), t: "Training Impulse: misura il carico di allenamento combinando durata e intensità cardiaca. Valori più alti = sessione più impegnativa" },
                           ].map(m => (
-                            <div key={m.l} className="bg-background rounded px-2 py-1.5 border border-border">
+                            <div key={m.l} className="bg-background rounded px-2 py-1.5 border border-border cursor-help" title={m.t}>
                               <span className="text-muted-foreground block text-[10px]">{m.l}</span>
                               <strong>{m.v}</strong>
                             </div>
