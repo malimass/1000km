@@ -102,6 +102,7 @@ export interface AthleteProfile {
   experienceYears?: number;
   maxHR?: number;
   coachId?: string;
+  obiettivo?: string;
 }
 
 export async function saveAthleteProfile(_userId: string, p: AthleteProfile): Promise<void> {
@@ -116,6 +117,7 @@ export async function saveAthleteProfile(_userId: string, p: AthleteProfile): Pr
       experience_years: p.experienceYears,
       max_hr: p.maxHR,
       coach_id: p.coachId,
+      obiettivo: p.obiettivo,
     }),
   });
 }
@@ -135,6 +137,7 @@ export async function loadAthleteProfile(userId: string): Promise<AthleteProfile
       experienceYears: data.experience_years,
       maxHR: data.max_hr,
       coachId: data.coach_id,
+      obiettivo: data.obiettivo,
     };
   } catch {
     return null;
@@ -167,6 +170,7 @@ export async function loadCoachAthletes(coachId: string): Promise<CoachAthlete[]
         restHR: r.rest_hr,
         experienceYears: r.experience_years,
         maxHR: r.max_hr,
+        obiettivo: r.obiettivo,
       },
     }));
   } catch {

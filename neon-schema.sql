@@ -243,8 +243,14 @@ CREATE TABLE IF NOT EXISTS athlete_profiles (
   experience_years int,
   max_hr           int,
   coach_id         uuid        REFERENCES users(id) ON DELETE SET NULL,
+  obiettivo        text,
   updated_at       timestamptz DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS athlete_profiles_coach_idx ON athlete_profiles (coach_id);
+
+-- Migrazione: aggiungi obiettivo se non esiste
+ALTER TABLE athlete_profiles ADD COLUMN IF NOT EXISTS obiettivo text;
 
 CREATE INDEX IF NOT EXISTS athlete_profiles_coach_idx ON athlete_profiles (coach_id);
 

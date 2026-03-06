@@ -158,6 +158,250 @@ function ProfileModal({ initial, onSave, onClose }: {
   );
 }
 
+// ─── OBIETTIVI ──────────────────────────────────────────────────────────────
+
+const OBIETTIVI: Record<string, string> = {
+  pellegrinaggio: "Pellegrinaggio 1000km",
+  maratona: "Maratona",
+  mezza: "Mezza maratona",
+  trail: "Trail/Ultra",
+  forma: "Forma fisica",
+  peso: "Perdita peso",
+  benessere: "Benessere",
+};
+
+// ─── ATLETI TAB ─────────────────────────────────────────────────────────────
+
+function AtletiTab({ athletes }: { athletes: CoachAthlete[] }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [athleteSessions, setAthleteSessions] = useState<Record<string, any[]>>({});
+  const [loading, setLoading] = useState<string | null>(null);
+  const [expandedSession, setExpandedSession] = useState<string | null>(null);
+
+  const loadSessions = async (athleteId: string) => {
+    if (athleteSessions[athleteId]) {
+      setSelectedId(selectedId === athleteId ? null : athleteId);
+      return;
+    }
+    setLoading(athleteId);
+    try {
+      const res = await apiFetch(`/api/coach-sessions?user_id=${athleteId}`);
+      const data = res.ok ? await res.json() : [];
+      const mapped = (data as any[]).map((r: any) => ({
+        id: r.id,
+        sport: r.sport,
+        startTime: new Date(r.start_time),
+        durationSec: Number(r.duration_sec),
+        distanceM: Number(r.distance_m),
+        avgSpeedKmh: Number(r.avg_speed_kmh),
+        maxSpeedKmh: Number(r.max_speed_kmh),
+        avgHeartRate: r.avg_heart_rate ? Number(r.avg_heart_rate) : null,
+        maxHeartRate: r.max_heart_rate ? Number(r.max_heart_rate) : null,
+        totalElevationGainM: Number(r.total_elevation_gain_m),
+        totalElevationLossM: Number(r.total_elevation_loss_m),
+        calories: r.calories ? Number(r.calories) : null,
+        trimp: r.trimp ? Number(r.trimp) : null,
+        tss: r.tss ? Number(r.tss) : null,
+        hrZonesSec: r.hr_zones_sec ?? undefined,
+        trackPoints: [],
+      }));
+      setAthleteSessions(prev => ({ ...prev, [athleteId]: mapped }));
+      setSelectedId(athleteId);
+    } catch {
+      setAthleteSessions(prev => ({ ...prev, [athleteId]: [] }));
+      setSelectedId(athleteId);
+    }
+    setLoading(null);
+  };
+
+  if (athletes.length === 0) {
+    return (
+      <section className="text-center py-16 text-muted-foreground">
+        <Users className="w-12 h-12 mx-auto mb-4 opacity-30" />
+        <p className="font-semibold">Nessun atleta assegnato</p>
+        <p className="text-sm mt-1">Gli atleti ti vedranno nella lista quando si registrano e scelgono il loro coach</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+        I tuoi atleti ({athletes.length})
+      </h2>
+      {athletes.map(a => {
+        const bmi = a.profile.weightKg && a.profile.heightCm
+          ? (a.profile.weightKg / Math.pow(a.profile.heightCm / 100, 2)).toFixed(1)
+          : null;
+        const mhr = a.profile.maxHR ?? (a.profile.age ? maxHRFromAge(a.profile.age) : 185);
+        const isSelected = selectedId === a.id;
+        const sess = athleteSessions[a.id] ?? [];
+        const totalKm = sess.reduce((s: number, x: any) => s + x.distanceM / 1000, 0);
+        const totalElev = sess.reduce((s: number, x: any) => s + (x.totalElevationGainM || 0), 0);
+        const fm = isSelected && sess.length > 0 ? calculateFitnessMetrics(sess as any, mhr) : { ctl: 0, atl: 0, tsb: 0 };
+        const wk = isSelected && sess.length > 0 ? buildWeeklyStats(sess as any, mhr) : [];
+        const rd = isSelected && sess.length > 0 ? calculateReadiness(sess as any, wk) : { score: 0, label: "", color: "#999" };
+
+        return (
+          <div key={a.id} className="bg-card border border-border rounded-xl overflow-hidden">
+            {/* Header atleta */}
+            <button
+              onClick={() => loadSessions(a.id)}
+              className="w-full px-5 py-4 flex items-center gap-4 text-left hover:bg-muted/30 transition-colors"
+            >
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <User className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-bold text-foreground">{a.displayName}</p>
+                  {a.profile.obiettivo && (
+                    <span className="text-[10px] font-semibold bg-dona/10 text-dona rounded-full px-2 py-0.5">
+                      {OBIETTIVI[a.profile.obiettivo] ?? a.profile.obiettivo}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">{a.email}</p>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                {isSelected && sess.length > 0 && (
+                  <>
+                    <span className="font-bold text-foreground">{sess.length} sessioni</span>
+                    <span>{totalKm.toFixed(0)} km</span>
+                  </>
+                )}
+                {loading === a.id
+                  ? <RefreshCw className="w-4 h-4 animate-spin" />
+                  : isSelected ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                }
+              </div>
+            </button>
+
+            {/* Dettagli atleta espanso */}
+            {isSelected && (
+              <div className="border-t border-border bg-muted/10 px-5 py-4 space-y-4">
+                {/* Dati fisici compatti */}
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    a.profile.age && `${a.profile.age} anni`,
+                    a.profile.weightKg && `${a.profile.weightKg} kg`,
+                    a.profile.heightCm && `${a.profile.heightCm} cm`,
+                    bmi && `BMI ${bmi}`,
+                    a.profile.restHR && `FC rip ${a.profile.restHR}`,
+                    `FC max ${mhr}`,
+                    a.profile.gender && (a.profile.gender === "M" ? "Uomo" : "Donna"),
+                    a.profile.experienceYears && `${a.profile.experienceYears}a esperienza`,
+                  ].filter(Boolean).map((v, i) => (
+                    <span key={i} className="text-[11px] bg-muted rounded-full px-2.5 py-1 text-muted-foreground">{v}</span>
+                  ))}
+                </div>
+
+                {/* KPI se ci sono sessioni */}
+                {sess.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {[
+                      { l: "Idoneità", v: `${rd.score}%`, c: rd.color },
+                      { l: "Forma CTL", v: String(fm.ctl), c: "#22c55e" },
+                      { l: "Fatica ATL", v: String(fm.atl), c: "#f97316" },
+                      { l: "Km totali", v: `${totalKm.toFixed(0)}`, c: "#3b82f6" },
+                      { l: "D+ totale", v: `${Math.round(totalElev)}m`, c: "#8b5cf6" },
+                    ].map(k => (
+                      <div key={k.l} className="bg-background rounded-lg px-3 py-2 border border-border">
+                        <span className="text-[10px] text-muted-foreground block">{k.l}</span>
+                        <span className="text-lg font-bold font-heading" style={{ color: k.c }}>{k.v}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Sessioni dell'atleta */}
+                {sess.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">Nessun allenamento caricato da questo atleta.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Allenamenti</p>
+                    {sess.map((s: any) => {
+                      const analysis = analyzeSession(s, mhr);
+                      const ev = evaluateSession(analysis, {
+                        age: a.profile.age ?? 30,
+                        weightKg: a.profile.weightKg ?? 70,
+                        heightCm: a.profile.heightCm ?? 170,
+                        gender: a.profile.gender ?? "M",
+                        restHR: a.profile.restHR ?? 60,
+                        experienceYears: a.profile.experienceYears ?? 1,
+                      }, mhr);
+                      const isExp = expandedSession === s.id;
+                      return (
+                        <div key={s.id} className="bg-background rounded-lg border border-border overflow-hidden">
+                          <button
+                            onClick={() => setExpandedSession(isExp ? null : s.id)}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/30"
+                          >
+                            <span className="text-base">{sportIcon(s.sport)}</span>
+                            <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold">{(s.distanceM / 1000).toFixed(1)} km</span>
+                              <span className="text-[11px] text-muted-foreground">{fmtDuration(s.durationSec)}</span>
+                              <span className="text-[11px] text-muted-foreground">{fmtDate(s.startTime)}</span>
+                              {s.avgHeartRate && <span className="text-[11px] text-muted-foreground">&#9829; {s.avgHeartRate}</span>}
+                              <span className="text-xs text-yellow-400">{"★".repeat(ev.stars)}{"☆".repeat(5 - ev.stars)}</span>
+                            </div>
+                            {isExp ? <ChevronUp className="w-3 h-3 text-muted-foreground" /> : <ChevronDown className="w-3 h-3 text-muted-foreground" />}
+                          </button>
+                          {isExp && (
+                            <div className="border-t border-border px-3 py-2.5 space-y-2 bg-muted/10">
+                              {/* Insights */}
+                              <div className="flex flex-wrap gap-1">
+                                {ev.insights.map((ins: string, i: number) => (
+                                  <span key={i} className="text-[11px] text-muted-foreground bg-background border border-border rounded px-2 py-0.5">💬 {ins}</span>
+                                ))}
+                              </div>
+                              {/* Metriche */}
+                              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-xs">
+                                {[
+                                  { l: "Velocità", v: `${s.avgSpeedKmh.toFixed(1)} km/h` },
+                                  { l: "FC media", v: s.avgHeartRate ? `${s.avgHeartRate} bpm` : "—" },
+                                  { l: "FC max", v: s.maxHeartRate ? `${s.maxHeartRate} bpm` : "—" },
+                                  { l: "D+", v: `${Math.round(s.totalElevationGainM)}m` },
+                                  { l: "Calorie", v: s.calories ? `${s.calories} kcal` : "—" },
+                                  { l: "TRIMP", v: s.trimp ? String(Math.round(s.trimp)) : "—" },
+                                ].map(m => (
+                                  <div key={m.l} className="bg-background rounded px-2 py-1 border border-border">
+                                    <span className="text-[9px] text-muted-foreground block">{m.l}</span>
+                                    <strong className="text-[11px]">{m.v}</strong>
+                                  </div>
+                                ))}
+                              </div>
+                              {/* Zone bar */}
+                              {analysis.zoneDist && analysis.zoneDist.totalSec > 0 && (
+                                <div className="flex h-4 rounded overflow-hidden gap-0.5">
+                                  {[analysis.zoneDist.z1Sec, analysis.zoneDist.z2Sec, analysis.zoneDist.z3Sec, analysis.zoneDist.z4Sec, analysis.zoneDist.z5Sec].map((v, i) => {
+                                    const pct = (v / analysis.zoneDist!.totalSec) * 100;
+                                    return pct > 0.5 ? (
+                                      <div key={i} className="flex items-center justify-center text-[9px] font-bold text-white"
+                                        title={`Z${i+1}: ${Math.round(pct)}%`}
+                                        style={{ width: `${pct}%`, backgroundColor: ZONE_COLORS[i] }}>
+                                        {pct > 12 ? `Z${i+1}` : ""}
+                                      </div>
+                                    ) : null;
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 // ─── COMPONENTE PRINCIPALE ───────────────────────────────────────────────────
 
 export default function Coach() {
@@ -420,57 +664,7 @@ export default function Coach() {
 
         {/* ── VISTA ATLETI (solo tab atleti) ─────────── */}
         {activeTab === "atleti" && (
-          <section>
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-              I tuoi atleti ({athletes.length})
-            </h2>
-            {athletes.length === 0 ? (
-              <div className="text-center py-16 text-muted-foreground">
-                <Users className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                <p className="font-semibold">Nessun atleta assegnato</p>
-                <p className="text-sm mt-1">Gli atleti ti vedranno nella lista quando si registrano e scelgono il loro coach</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {athletes.map(a => {
-                  const bmi = a.profile.weightKg && a.profile.heightCm
-                    ? (a.profile.weightKg / Math.pow(a.profile.heightCm / 100, 2)).toFixed(1)
-                    : null;
-                  const maxHRAtleta = a.profile.maxHR ?? (a.profile.age ? maxHRFromAge(a.profile.age) : 185);
-                  return (
-                    <div key={a.id} className="bg-card border border-border rounded-xl p-5">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <p className="font-bold text-foreground">{a.displayName}</p>
-                          <p className="text-xs text-muted-foreground">{a.email}</p>
-                        </div>
-                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
-                          <User className="w-5 h-5 text-primary" />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        {[
-                          { label: "Età", value: a.profile.age ? `${a.profile.age}a` : "—" },
-                          { label: "Peso", value: a.profile.weightKg ? `${a.profile.weightKg} kg` : "—" },
-                          { label: "BMI", value: bmi ?? "—" },
-                          { label: "Altezza", value: a.profile.heightCm ? `${a.profile.heightCm} cm` : "—" },
-                          { label: "FC riposo", value: a.profile.restHR ? `${a.profile.restHR} bpm` : "—" },
-                          { label: "FC max", value: `${maxHRAtleta} bpm` },
-                          { label: "Esperienza", value: a.profile.experienceYears ? `${a.profile.experienceYears}a` : "—" },
-                          { label: "Sesso", value: a.profile.gender ?? "—" },
-                        ].map(m => (
-                          <div key={m.label} className="bg-muted rounded-lg px-2 py-1.5">
-                            <span className="text-[10px] text-muted-foreground block">{m.label}</span>
-                            <span className="text-xs font-bold">{m.value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+          <AtletiTab athletes={athletes} />
         )}
 
         {/* Tutto il resto solo in tab dashboard */}
