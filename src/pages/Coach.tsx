@@ -330,7 +330,12 @@ function AtletiTab({ athletes, onSelectAthlete }: { athletes: CoachAthlete[]; on
                   <p className="text-xs text-muted-foreground text-center py-4">Nessun allenamento caricato da questo atleta.</p>
                 ) : (
                   <div className="space-y-1.5">
-                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Allenamenti</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Allenamenti</p>
+                      <Link to="/guida-metriche" className="flex items-center gap-1 text-[10px] text-primary hover:underline">
+                        <BookOpen className="w-3 h-3" /> Guida
+                      </Link>
+                    </div>
                     {sess.map((s: any) => {
                       const analysis = analyzeSession(s, mhr);
                       const ev = evaluateSession(analysis, {
@@ -961,9 +966,14 @@ export default function Coach() {
         {/* ── LISTA SESSIONI ───────────────────────── */}
         {sessions.length > 0 && (
           <section>
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-              Sessioni caricate ({sessions.length})
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Sessioni caricate ({sessions.length})
+              </h2>
+              <Link to="/guida-metriche" className="flex items-center gap-1 text-xs text-primary hover:underline">
+                <BookOpen className="w-3.5 h-3.5" /> Guida metriche
+              </Link>
+            </div>
             <div className="space-y-2">
               {sessions.map(s => {
                 const rich = richSessions.get(s.id) ?? s;
