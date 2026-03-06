@@ -13,13 +13,13 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import {
-  Upload, Trash2, LogOut, Activity, TrendingUp, Heart,
+  Upload, Trash2, LogOut, Activity, TrendingUp, Heart, BookOpen,
   Mountain, Timer, Flame, Footprints, ChevronDown, ChevronUp, RefreshCw,
   Zap, User, ShieldAlert, Star, X, Users,
 } from "lucide-react";
@@ -1051,6 +1051,9 @@ export default function Coach() {
                               </div>
                             ))}
                           </div>
+                          <Link to="/guida-metriche" className="flex items-center gap-1 text-xs text-primary hover:underline mt-1">
+                            <BookOpen className="w-3.5 h-3.5" /> Cosa significano queste metriche?
+                          </Link>
 
                           {/* Zone FC bar */}
                           {zd && zd.totalSec > 0 && (
