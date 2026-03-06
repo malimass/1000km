@@ -644,7 +644,17 @@ export default function AdminLive() {
     setSosteniUploading(targetId);
     const url = await uploadToCloudinary(file, cloudName, cloudPreset, "image");
     setSosteniUploading(null);
-    if (url) updateSostenitore(targetId, "logoUrl", url);
+    if (url) {
+      // Aggiorna state e salva subito nel DB
+      setSosteniItems(prev => {
+        const updated = prev.map(it => it.id === targetId ? { ...it, logoUrl: url } : it);
+        const page: SosteniPage = { title: sosteniTitle, intro: sosteniIntro, items: updated };
+        saveSosteniPage(page);
+        setSosteniSaved(true);
+        setTimeout(() => setSosteniSaved(false), 2500);
+        return updated;
+      });
+    }
   }
 
   // ─ GPS tracking ─
