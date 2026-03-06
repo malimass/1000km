@@ -8,35 +8,7 @@ interface Props {
   elevationPoints?: { lat: number; lng: number; elevation: number }[];
 }
 
-/**
- * Interpola elevazione per ogni coordinata del percorso usando i punti altimetrici.
- * Per ogni coord, trova il punto elevazione più vicino e usa la sua altitudine + offset.
- */
-function buildElevatedCoords(
-  coords: [number, number][],
-  elevationPoints: { lat: number; lng: number; elevation: number }[],
-  offsetM = 80,
-): [number, number, number][] {
-  if (!elevationPoints.length) return coords.map(([lat, lng]) => [lng, lat, offsetM]);
-
-  return coords.map(([lat, lng]) => {
-    // Trova il punto elevazione più vicino (distanza euclidea approssimata)
-    let bestDist = Infinity;
-    let bestElev = 0;
-    for (const ep of elevationPoints) {
-      const dLat = lat - ep.lat;
-      const dLng = lng - ep.lng;
-      const dist = dLat * dLat + dLng * dLng;
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestElev = ep.elevation;
-      }
-    }
-    return [lng, lat, Math.max(0, bestElev) + offsetM];
-  });
-}
-
-export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props) {
+export default function RouteMap3D({ coords, waypoints }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -44,10 +16,8 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
   // Stabilize props to prevent continuous re-renders
   const coordsKey = useMemo(() => JSON.stringify(coords), [coords]);
   const waypointsKey = useMemo(() => JSON.stringify(waypoints), [waypoints]);
-  const elevKey = useMemo(() => elevationPoints?.length ?? 0, [elevationPoints]);
   const stableCoords = useMemo(() => coords, [coordsKey]);
   const stableWaypoints = useMemo(() => waypoints, [waypointsKey]);
-  const stableElevation = useMemo(() => elevationPoints, [elevKey]);
 
   useEffect(() => {
     if (!containerRef.current || stableCoords.length < 2) return;
@@ -76,6 +46,14 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
             tileSize: 256,
             attribution: "Esri, Maxar, Earthstar Geographics",
           },
+          "terrain-dem": {
+            type: "raster-dem",
+            tiles: [
+              "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+            ],
+            tileSize: 256,
+            encoding: "terrarium",
+          },
         },
         layers: [
           {
@@ -83,7 +61,22 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
             type: "raster",
             source: "satellite-tiles",
           },
+          {
+            id: "hillshade",
+            type: "hillshade",
+            source: "terrain-dem",
+            paint: {
+              "hillshade-exaggeration": 0.5,
+              "hillshade-shadow-color": "#000000",
+              "hillshade-highlight-color": "#ffffff",
+              "hillshade-accent-color": "#000000",
+            },
+          },
         ],
+        terrain: {
+          source: "terrain-dem",
+          exaggeration: 1.5,
+        },
       },
       center: [centerLng, centerLat],
       zoom: 7,
@@ -95,29 +88,8 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
     map.addControl(new maplibregl.NavigationControl(), "top-left");
 
     map.on("load", () => {
-      // ── 1. Enable 3D terrain ──
-      try {
-        map.addSource("terrain-dem", {
-          type: "raster-dem",
-          tiles: [
-            "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
-          ],
-          tileSize: 256,
-          encoding: "terrarium",
-        });
-        map.setTerrain({ source: "terrain-dem", exaggeration: 1.5 });
-      } catch (err) {
-        console.warn("[RouteMap3D] Terrain not available:", err);
-      }
-
-      // ── 2. Build route coordinates ──
-      // Se abbiamo dati di elevazione, crea coordinate 3D [lng, lat, altitude]
-      // con offset sopra il terreno così la linea è sempre visibile.
-      // Altrimenti usa coordinate 2D flat.
-      const hasElevation = stableElevation && stableElevation.length > 0;
-      const routeCoords = hasElevation
-        ? buildElevatedCoords(stableCoords, stableElevation, 80)
-        : stableCoords.map(([lat, lng]) => [lng, lat]);
+      // ── Route line ──
+      const routeCoords = stableCoords.map(([lat, lng]) => [lng, lat]);
 
       map.addSource("route", {
         type: "geojson",
@@ -139,7 +111,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
         paint: {
           "line-color": "#e11d48",
           "line-width": 8,
-          "line-opacity": 0.4,
+          "line-opacity": 0.5,
           "line-blur": 4,
         },
       });
@@ -154,22 +126,22 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
           "line-join": "round",
         },
         paint: {
-          "line-color": "#e11d48",
-          "line-width": 4,
+          "line-color": "#ffffff",
+          "line-width": 3,
           "line-opacity": 1,
         },
       });
 
-      // ── 3. Waypoint markers (HTML overlays — always above terrain) ──
+      // ── Waypoint markers ──
       if (stableWaypoints?.length) {
         for (const wp of stableWaypoints) {
           const el = document.createElement("div");
           el.style.cssText = `
-            width: 12px; height: 12px;
+            width: 14px; height: 14px;
             background: #f97316;
             border: 2px solid white;
             border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
           `;
           new maplibregl.Marker({ element: el })
             .setLngLat([wp.lng, wp.lat])
@@ -188,10 +160,10 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
       map.fitBounds(bounds, { padding: 60, pitch: 60, bearing: -20 });
     });
 
-    // Suppress terrain DEM errors to prevent console spam
+    // Suppress minor errors
     map.on("error", (e) => {
       if (e?.error?.message?.includes("Ne is not defined")) return;
-      console.error("[RouteMap3D]", e);
+      console.warn("[RouteMap3D]", e);
     });
 
     mapRef.current = map;
@@ -200,7 +172,7 @@ export default function RouteMap3D({ coords, waypoints, elevationPoints }: Props
       map.remove();
       mapRef.current = null;
     };
-  }, [coordsKey, waypointsKey, elevKey]);
+  }, [coordsKey, waypointsKey]);
 
   // Resize map on fullscreen toggle
   useEffect(() => {
