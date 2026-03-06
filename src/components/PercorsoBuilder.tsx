@@ -236,10 +236,6 @@ async function walkSegmentNew(
       origin:      { lat: origin[0], lng: origin[1] },
       destination: { lat: destination[0], lng: destination[1] },
       travelMode:  "WALKING",
-      routeModifiers: {
-        avoidHighways: true,
-        avoidFerries:  true,
-      },
       fields: ["legs", "distanceMeters"],
     };
 
