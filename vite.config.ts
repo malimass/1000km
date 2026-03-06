@@ -24,6 +24,20 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
+        // Tutte le richieste di navigazione ricevono sempre index.html fresco
+        navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/api\//, /^\/assets\//],
+        // I file JS/CSS in /assets/ scadono dopo 1 giorno max
+        runtimeCaching: [
+          {
+            urlPattern: /\/assets\/.*\.(js|css)$/,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "js-css-cache",
+              expiration: { maxEntries: 100, maxAgeSeconds: 86400 },
+            },
+          },
+        ],
       },
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "icon-512.png"],
       manifest: {
