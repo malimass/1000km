@@ -9,9 +9,9 @@
  *  - KPI personali (readiness, rischio infortuni)
  */
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
-  Upload, LogOut, User, Heart, Mountain, Timer,
+  Upload, LogOut, User, Heart, Mountain, Timer, BookOpen,
   Footprints, TrendingUp, Flame, Zap, ChevronDown, ChevronUp, Trash2, ShieldAlert, Target,
 } from "lucide-react";
 import { parseActivityFile, TrainingSession } from "@/lib/trainingParser";
@@ -437,9 +437,14 @@ export default function AtletaDashboard() {
         {/* SESSIONI */}
         {sessions.length > 0 && (
           <section>
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              Le mie sessioni ({sessions.length})
-            </h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Le mie sessioni ({sessions.length})
+              </h2>
+              <Link to="/guida-metriche" className="flex items-center gap-1 text-xs text-primary hover:underline">
+                <BookOpen className="w-3.5 h-3.5" /> Guida metriche
+              </Link>
+            </div>
             <div className="space-y-2">
               {sessions.map(s => {
                 const analysis = analyzeSession(s, maxHR);
