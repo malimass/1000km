@@ -220,13 +220,21 @@ export default function IlMioPercorso() {
     return (
       <NativeLayout>
         <div className="min-h-[60vh] flex items-center justify-center px-4">
-          <div className="text-center">
-            <p className="text-muted-foreground font-body text-sm mb-4">
-              Profilo non trovato.
+          <div className="text-center space-y-4">
+            <p className="text-foreground font-body text-base font-semibold">
+              Non hai ancora un profilo attività.
             </p>
-            <Button variant="dona" onClick={() => navigate("/partecipa")}>
-              Vai alla registrazione
-            </Button>
+            <p className="text-muted-foreground font-body text-sm">
+              Per tracciare il tuo percorso, iscriviti prima a una tappa.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button variant="dona" onClick={() => navigate("/partecipa")}>
+                Scegli una tappa
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate("/accedi")}>
+                Torna all'accesso
+              </Button>
+            </div>
           </div>
         </div>
       </NativeLayout>
