@@ -295,10 +295,33 @@ async function scrapeSite(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Download image and convert to base64 data URL
+    let logoDataUrl = "";
+    if (logoUrl) {
+      try {
+        const imgCtrl = new AbortController();
+        const imgTimeout = setTimeout(() => imgCtrl.abort(), 6000);
+        const imgResp = await fetch(logoUrl, {
+          signal: imgCtrl.signal,
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; GratitudePathBot/1.0)" },
+          redirect: "follow",
+        });
+        clearTimeout(imgTimeout);
+        if (imgResp.ok) {
+          const contentType = imgResp.headers.get("content-type") || "image/png";
+          const buf = Buffer.from(await imgResp.arrayBuffer());
+          // Limit to ~500KB to avoid bloating the DB
+          if (buf.length <= 512_000) {
+            logoDataUrl = `data:${contentType.split(";")[0]};base64,${buf.toString("base64")}`;
+          }
+        }
+      } catch { /* keep empty if download fails */ }
+    }
+
     return res.json({
       nome: ogTitle,
       testo: ogDesc,
-      logoUrl,
+      logoUrl: logoDataUrl,
       siteUrl: targetUrl,
     });
   } catch (err: any) {
