@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Upload, LogOut, User, Heart, Mountain, Timer,
-  Footprints, TrendingUp, Flame, Zap, ChevronDown, ChevronUp, Trash2, ShieldAlert,
+  Footprints, TrendingUp, Flame, Zap, ChevronDown, ChevronUp, Trash2, ShieldAlert, Target,
 } from "lucide-react";
 import { parseActivityFile, TrainingSession } from "@/lib/trainingParser";
 import {
@@ -71,6 +71,77 @@ async function loadAthleteSessions(athleteId: string): Promise<Omit<TrainingSess
   } catch {
     return [];
   }
+}
+
+const OBIETTIVI: Record<string, string> = {
+  pellegrinaggio: "Completare il pellegrinaggio 1000km",
+  maratona: "Preparare una maratona",
+  mezza: "Preparare una mezza maratona",
+  trail: "Preparare un trail/ultra",
+  forma: "Migliorare la forma fisica",
+  peso: "Perdere peso camminando/correndo",
+  benessere: "Benessere e salute generale",
+};
+
+function generateGoalAdvice(
+  obiettivo: string,
+  sessions: TrainingSession[],
+  fitness: { ctl: number; atl: number; tsb: number },
+  weekly: WeeklyStats[],
+  readiness: { score: number },
+): { icon: string; title: string; detail: string; priority: "alta" | "media" | "bassa" }[] {
+  const advice: { icon: string; title: string; detail: string; priority: "alta" | "media" | "bassa" }[] = [];
+  const totalKm = sessions.reduce((s, x) => s + x.distanceM / 1000, 0);
+  const totalSessions = sessions.length;
+  const lastWeek = weekly.length > 0 ? weekly[weekly.length - 1] : null;
+  const weeklyKm = lastWeek?.totalKm ?? 0;
+
+  // Generic advice based on data
+  if (totalSessions === 0) {
+    advice.push({ icon: "📤", title: "Carica il tuo primo allenamento", detail: "Importa un file .fit o .tcx per ricevere consigli personalizzati sul tuo obiettivo.", priority: "alta" });
+    return advice;
+  }
+
+  // Goal-specific advice
+  if (obiettivo === "pellegrinaggio") {
+    const target = 1000;
+    const pct = Math.min(100, Math.round((totalKm / target) * 100));
+    advice.push({ icon: "🗺️", title: `Progresso: ${totalKm.toFixed(0)} / ${target} km (${pct}%)`, detail: pct < 30 ? "Sei all'inizio del percorso. Aumenta gradualmente il volume settimanale." : pct < 70 ? "Buon lavoro! Mantieni la costanza e inserisci uscite lunghe." : "Sei nella fase finale! Focus sulla resistenza e il recupero.", priority: pct < 30 ? "alta" : "media" });
+    if (weeklyKm < 40) advice.push({ icon: "📏", title: "Aumenta il chilometraggio settimanale", detail: `Questa settimana: ${weeklyKm.toFixed(1)} km. Per il pellegrinaggio servono almeno 40-50 km/settimana.`, priority: "alta" });
+    if (fitness.tsb < -15) advice.push({ icon: "😴", title: "Recupera prima di continuare", detail: "Il tuo stato di forma indica stanchezza accumulata. Inserisci 2-3 giorni leggeri.", priority: "alta" });
+  } else if (obiettivo === "maratona") {
+    if (weeklyKm < 50) advice.push({ icon: "📏", title: "Volume settimanale insufficiente", detail: `${weeklyKm.toFixed(1)} km/sett. Per la maratona servono 50-70 km/sett in fase di carico.`, priority: "alta" });
+    advice.push({ icon: "💪", title: "Inserisci un lungo settimanale", detail: "Almeno un'uscita da 28-35 km ogni 2 settimane per abituare il corpo alla distanza.", priority: "media" });
+    if (fitness.ctl < 40) advice.push({ icon: "📈", title: "Costruisci la base aerobica", detail: "Il tuo CTL è basso. Punta a 8-10 settimane di volume progressivo in Z2.", priority: "alta" });
+  } else if (obiettivo === "mezza") {
+    if (weeklyKm < 30) advice.push({ icon: "📏", title: "Aumenta il volume", detail: `${weeklyKm.toFixed(1)} km/sett. Per la mezza maratona servono 30-50 km/sett.`, priority: "alta" });
+    advice.push({ icon: "⚡", title: "Lavoro in soglia", detail: "Inserisci 1 seduta settimanale con tratti a ritmo gara (Z3-Z4) per migliorare la resistenza specifica.", priority: "media" });
+  } else if (obiettivo === "trail") {
+    const totalElev = sessions.reduce((s, x) => s + (x.totalElevationGainM || 0), 0);
+    advice.push({ icon: "⛰️", title: `Dislivello totale: ${Math.round(totalElev)} D+`, detail: totalElev < 5000 ? "Cerca percorsi con più dislivello per prepararti al trail." : "Buon lavoro sul dislivello! Continua a variare i terreni.", priority: totalElev < 5000 ? "alta" : "bassa" });
+    advice.push({ icon: "🦵", title: "Allena la discesa", detail: "Le discese tecniche sono il punto debole di molti trail runner. Pratica discese ripide per rinforzare i quadricipiti.", priority: "media" });
+  } else if (obiettivo === "forma") {
+    if (totalSessions < 3) advice.push({ icon: "📅", title: "Costanza è la chiave", detail: "Punta a 3-4 allenamenti settimanali. Anche brevi, ma regolari.", priority: "alta" });
+    if (fitness.ctl > 20) advice.push({ icon: "🎉", title: "Ottimo progresso!", detail: "La tua forma sta migliorando. Varia gli allenamenti con diversi tipi di attività.", priority: "bassa" });
+    advice.push({ icon: "🔄", title: "Varia l'intensità", detail: "Alterna giorni facili (Z1-Z2) a giorni più intensi (Z3-Z4) per stimolare l'adattamento.", priority: "media" });
+  } else if (obiettivo === "peso") {
+    const totalCal = sessions.reduce((s, x) => s + (x.calories ?? 0), 0);
+    advice.push({ icon: "🔥", title: `Calorie bruciate: ${Math.round(totalCal)} kcal`, detail: "Mantieni sessioni lunghe a bassa intensità (Z1-Z2) per massimizzare il consumo di grassi.", priority: "media" });
+    if (weeklyKm < 20) advice.push({ icon: "🚶", title: "Cammina di più", detail: "Anche camminare a passo sostenuto brucia calorie. Punta a 20+ km/settimana.", priority: "alta" });
+  } else if (obiettivo === "benessere") {
+    advice.push({ icon: "🧘", title: "Ascolta il tuo corpo", detail: "Non forzare mai. 3-4 uscite settimanali a ritmo confortevole sono l'ideale.", priority: "bassa" });
+    if (fitness.tsb < -10) advice.push({ icon: "⚠️", title: "Stai esagerando", detail: "I tuoi dati mostrano troppa fatica accumulata. Riduci intensità e volume per qualche giorno.", priority: "alta" });
+  }
+
+  // Universal advice
+  if (fitness.tsb > 10 && totalSessions > 3) {
+    advice.push({ icon: "✅", title: "Sei fresco e pronto", detail: "Buon momento per un allenamento impegnativo o una gara di test.", priority: "bassa" });
+  }
+  if (fitness.atl > fitness.ctl * 1.3 && totalSessions > 5) {
+    advice.push({ icon: "⚠️", title: "Carico acuto elevato", detail: "La fatica recente supera di molto la tua base. Rischio infortuni. Riduci il volume.", priority: "alta" });
+  }
+
+  return advice;
 }
 
 // ─── COMPONENTE PRINCIPALE ────────────────────────────────────
@@ -253,13 +324,22 @@ export default function AtletaDashboard() {
                     <option value="F">Donna</option>
                   </select>
                 </label>
-                <label className="flex flex-col gap-1 flex-1 min-w-[160px]">
+                <label className="flex flex-col gap-1 min-w-[140px]">
                   <span className="text-[10px] text-primary-foreground/60">Coach assegnato</span>
                   <select value={athleteProfile.coachId ?? ""}
                     onChange={e => setAthleteProfile(p => ({ ...p, coachId: e.target.value || undefined }))}
                     className="px-2 py-1.5 text-xs bg-primary-foreground/10 border border-primary-foreground/20 rounded text-primary-foreground focus:outline-none">
                     <option value="">— Nessun coach —</option>
                     {coaches.map(c => <option key={c.id} value={c.id}>{c.displayName}</option>)}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 flex-1 min-w-[160px]">
+                  <span className="text-[10px] text-primary-foreground/60">Il mio obiettivo</span>
+                  <select value={athleteProfile.obiettivo ?? ""}
+                    onChange={e => setAthleteProfile(p => ({ ...p, obiettivo: e.target.value || undefined }))}
+                    className="px-2 py-1.5 text-xs bg-primary-foreground/10 border border-primary-foreground/20 rounded text-primary-foreground focus:outline-none">
+                    <option value="">— Scegli obiettivo —</option>
+                    {Object.entries(OBIETTIVI).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </label>
                 <button onClick={handleSaveProfile} disabled={savingProfile}
@@ -290,6 +370,45 @@ export default function AtletaDashboard() {
             </div>
           ))}
         </section>
+
+        {/* CONSIGLI PERSONALIZZATI */}
+        {athleteProfile.obiettivo && (
+          <section>
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="w-4 h-4 text-dona" />
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Consigli per: {OBIETTIVI[athleteProfile.obiettivo] ?? athleteProfile.obiettivo}
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {generateGoalAdvice(athleteProfile.obiettivo, sessions, fitness, weekly, readiness).map((a, i) => (
+                <div key={i} className="bg-card border border-border rounded-xl p-3 flex gap-3">
+                  <span className="text-xl flex-shrink-0">{a.icon}</span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold leading-tight">{a.title}</p>
+                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
+                        a.priority === "alta" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        : a.priority === "media" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      }`}>{a.priority}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{a.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Suggerimento per scegliere obiettivo */}
+        {!athleteProfile.obiettivo && sessions.length > 0 && (
+          <div className="bg-dona/5 border border-dona/20 rounded-xl p-4 text-center">
+            <Target className="w-6 h-6 text-dona mx-auto mb-2" />
+            <p className="text-sm font-semibold">Scegli il tuo obiettivo</p>
+            <p className="text-xs text-muted-foreground mt-1">Apri il <strong>Profilo</strong> e seleziona un obiettivo per ricevere consigli personalizzati.</p>
+          </div>
+        )}
 
         {/* UPLOAD */}
         <section>

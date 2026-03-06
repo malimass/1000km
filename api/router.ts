@@ -467,7 +467,7 @@ async function athleteProfiles(req: VercelRequest, res: VercelResponse) {
     if (coach_id) {
       const rows = await sql`
         SELECT ap.id, ap.age, ap.weight_kg, ap.height_cm, ap.gender,
-               ap.rest_hr, ap.experience_years, ap.max_hr, ap.coach_id,
+               ap.rest_hr, ap.experience_years, ap.max_hr, ap.coach_id, ap.obiettivo,
                p.display_name, p.email
         FROM athlete_profiles ap JOIN profiles p ON p.id = ap.id
         WHERE ap.coach_id = ${coach_id as string}
@@ -482,11 +482,11 @@ async function athleteProfiles(req: VercelRequest, res: VercelResponse) {
     const p = req.body ?? {};
     await sql`
       INSERT INTO athlete_profiles
-        (id, age, weight_kg, height_cm, gender, rest_hr, experience_years, max_hr, coach_id, updated_at)
+        (id, age, weight_kg, height_cm, gender, rest_hr, experience_years, max_hr, coach_id, obiettivo, updated_at)
       VALUES
         (${auth.sub}, ${p.age ?? null}, ${p.weight_kg ?? null}, ${p.height_cm ?? null},
          ${p.gender ?? null}, ${p.rest_hr ?? null}, ${p.experience_years ?? null},
-         ${p.max_hr ?? null}, ${p.coach_id ?? null}, now())
+         ${p.max_hr ?? null}, ${p.coach_id ?? null}, ${p.obiettivo ?? null}, now())
       ON CONFLICT (id) DO UPDATE
         SET age              = EXCLUDED.age,
             weight_kg        = EXCLUDED.weight_kg,
@@ -496,6 +496,7 @@ async function athleteProfiles(req: VercelRequest, res: VercelResponse) {
             experience_years = EXCLUDED.experience_years,
             max_hr           = EXCLUDED.max_hr,
             coach_id         = EXCLUDED.coach_id,
+            obiettivo        = EXCLUDED.obiettivo,
             updated_at       = now()
     `;
     return res.json({ ok: true });

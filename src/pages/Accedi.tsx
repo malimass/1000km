@@ -10,9 +10,9 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Heart, LogIn, Loader2, User, Mail, Lock, Eye, EyeOff, Footprints, Dumbbell } from "lucide-react";
+import { Heart, LogIn, Loader2, User, Mail, Lock, Eye, EyeOff, Footprints, Dumbbell, Target, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
-import { signInUser, signUpUser, getCurrentUser, signOutUser } from "@/lib/auth";
+import { signInUser, signUpUser, getCurrentUser, signOutUser, listCoaches, saveAthleteProfile } from "@/lib/auth";
 
 // ─── Redirect per ruolo ────────────────────────────────────────────────────────
 
@@ -29,6 +29,9 @@ export default function Accedi() {
   const [tab, setTab] = useState<"login" | "register">("login");
   const [role, setRole] = useState<"athlete" | "coach">("athlete");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [coaches, setCoaches] = useState<{ id: string; displayName: string }[]>([]);
+  const [selectedCoach, setSelectedCoach] = useState("");
+  const [selectedGoal, setSelectedGoal] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -36,6 +39,13 @@ export default function Accedi() {
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
+
+  // ── Carica coach disponibili per il form registrazione ──
+  useEffect(() => {
+    if (tab === "register" && role === "athlete") {
+      listCoaches().then(setCoaches);
+    }
+  }, [tab, role]);
 
   // ── Se già loggato, mostra info e opzione di proseguire ──
   const [existingUser, setExistingUser] = useState<{ role?: string } | null>(null);
@@ -90,10 +100,30 @@ export default function Accedi() {
       return;
     }
 
+    // Se atleta, salva coach e obiettivo scelti
+    if (user.role === "athlete" && (selectedCoach || selectedGoal)) {
+      try {
+        await saveAthleteProfile(user.id, {
+          coachId: selectedCoach || undefined,
+          obiettivo: selectedGoal || undefined,
+        });
+      } catch { /* noop */ }
+    }
+
     // Imposta flag localStorage per le route protette
     if (user.role === "coach") localStorage.setItem("gp_coach_auth", "1");
     navigate(redirectForRole(user.role), { replace: true });
   }
+
+  const OBIETTIVI = [
+    { value: "pellegrinaggio", label: "Completare il pellegrinaggio 1000km" },
+    { value: "maratona", label: "Preparare una maratona" },
+    { value: "mezza", label: "Preparare una mezza maratona" },
+    { value: "trail", label: "Preparare un trail/ultra" },
+    { value: "forma", label: "Migliorare la forma fisica" },
+    { value: "peso", label: "Perdere peso camminando/correndo" },
+    { value: "benessere", label: "Benessere e salute generale" },
+  ];
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-12 pt-safe">
@@ -250,6 +280,44 @@ export default function Accedi() {
                 </button>
               </div>
             </div>
+          )}
+
+          {/* Coach + Obiettivo (solo registrazione atleta) */}
+          {tab === "register" && role === "athlete" && (
+            <>
+              {coaches.length > 0 && (
+                <label className="block">
+                  <span className="text-xs font-semibold text-foreground block mb-1">Scegli il tuo coach <span className="font-normal text-muted-foreground">(opzionale)</span></span>
+                  <div className="relative">
+                    <Dumbbell className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <select
+                      value={selectedCoach}
+                      onChange={e => setSelectedCoach(e.target.value)}
+                      className="w-full pl-9 pr-8 py-2.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-dona/40 appearance-none"
+                    >
+                      <option value="">— Nessun coach —</option>
+                      {coaches.map(c => <option key={c.id} value={c.id}>{c.displayName}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                </label>
+              )}
+              <label className="block">
+                <span className="text-xs font-semibold text-foreground block mb-1">Il mio obiettivo</span>
+                <div className="relative">
+                  <Target className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <select
+                    value={selectedGoal}
+                    onChange={e => setSelectedGoal(e.target.value)}
+                    className="w-full pl-9 pr-8 py-2.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-dona/40 appearance-none"
+                  >
+                    <option value="">— Scegli un obiettivo —</option>
+                    {OBIETTIVI.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                </div>
+              </label>
+            </>
           )}
 
           {/* Errori / Info */}
