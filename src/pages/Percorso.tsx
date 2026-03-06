@@ -473,7 +473,7 @@ export default function Percorso() {
             {savedTappe ? (
               /* Tappe calcolate dall'admin via PercorsoBuilder */
               savedTappe.filter(t => t.tappaNum > 0).map((t, i) => {
-                const isSelected = selectedWaypoint === i;
+                const isSelected = selectedWaypoint === t.tappaNum;
                 const numIscritti = iscritti[t.tappaNum] ?? 0;
                 return (
                   <AnimatedSection key={`${t.tappaNum}-${t.lat}`} delay={i * 0.05}>
@@ -486,7 +486,7 @@ export default function Percorso() {
                     >
                       <button
                         type="button"
-                        onClick={() => handleTappaClick(i)}
+                        onClick={() => handleTappaClick(t.tappaNum)}
                         className="flex items-start gap-3 flex-1 text-left min-w-0"
                       >
                         <div className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center font-heading font-bold text-base transition-colors
