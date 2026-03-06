@@ -67,7 +67,11 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   if (!getAuthToken()) return null;
   try {
     const res = await apiFetch("/api/auth/me");
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Token scaduto o non valido → rimuovilo
+      if (res.status === 401) clearAuthToken();
+      return null;
+    }
     return await res.json() as AuthUser;
   } catch {
     return null;

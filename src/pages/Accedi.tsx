@@ -12,7 +12,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Heart, LogIn, Loader2, User, Mail, Lock, Eye, EyeOff, Footprints, Dumbbell } from "lucide-react";
 import { motion } from "framer-motion";
-import { signInUser, signUpUser, getCurrentUser } from "@/lib/auth";
+import { signInUser, signUpUser, getCurrentUser, signOutUser } from "@/lib/auth";
 
 // ─── Redirect per ruolo ────────────────────────────────────────────────────────
 
@@ -122,12 +122,20 @@ export default function Accedi() {
             <p className="font-body text-sm text-green-800 font-medium">
               Sei già connesso.
             </p>
-            <button
-              onClick={() => navigate(redirectForRole(existingUser.role))}
-              className="inline-block bg-dona text-white font-semibold text-sm rounded-lg px-4 py-2 hover:bg-dona/90 transition-colors"
-            >
-              Vai al tuo profilo
-            </button>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => navigate(redirectForRole(existingUser.role))}
+                className="inline-block bg-dona text-white font-semibold text-sm rounded-lg px-4 py-2 hover:bg-dona/90 transition-colors"
+              >
+                Vai al tuo profilo
+              </button>
+              <button
+                onClick={async () => { await signOutUser(); setExistingUser(null); }}
+                className="inline-block bg-muted text-foreground font-semibold text-sm rounded-lg px-4 py-2 hover:bg-muted/70 transition-colors"
+              >
+                Esci
+              </button>
+            </div>
           </div>
         )}
 
