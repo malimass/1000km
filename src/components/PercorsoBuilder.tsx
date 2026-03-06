@@ -290,6 +290,36 @@ async function walkSegmentNew(
 }
 
 /**
+ * Ottieni una rotta WALKING come "scheletro" per sapere dove passa il percorso pedonale.
+ * Usa DirectionsService legacy che gestisce meglio distanze lunghe per WALKING.
+ */
+function getWalkingSkeleton(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  G: any,
+  origin: [number, number],
+  destination: [number, number],
+): Promise<RouteResult | null> {
+  return new Promise((resolve) => {
+    const service = new G.DirectionsService();
+    service.route(
+      {
+        origin:      new G.LatLng(origin[0], origin[1]),
+        destination: new G.LatLng(destination[0], destination[1]),
+        travelMode:  G.TravelMode.WALKING,
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (response: any, status: string) => {
+        if (status === "OK") {
+          resolve(extractDirectionsResult(response));
+        } else {
+          resolve(null);
+        }
+      },
+    );
+  });
+}
+
+/**
  * Ottieni una rotta DRIVING come "scheletro" per sapere dove passano le strade.
  * Usa computeRoutes (nuova API), con fallback a DirectionsService legacy.
  */
@@ -496,11 +526,11 @@ function walkSegmentLegacy(
 }
 
 /**
- * Calcola percorso pedonale sicuro.
- * 1. Usa la nuova Route.computeRoutes (travelMode WALK)
- * 2. Per distanze > MAX_SEGMENT_KM spezza in segmenti
- * 3. Waypoint intermedi snappati a città reali (reverse geocoding)
- * 4. Fallback a DirectionsService (legacy) per segmenti falliti
+ * Calcola percorso pedonale.
+ * Strategia:
+ *  1. Prova una singola richiesta WALKING per l'intero percorso
+ *  2. Se fallisce, spezza usando waypoint da scheletro WALKING (non DRIVING!)
+ *  3. Solo se WALKING skeleton non disponibile, usa DRIVING come fallback
  */
 async function googleDirections(
   start: [number, number],
@@ -512,7 +542,6 @@ async function googleDirections(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const G = (window as any).google.maps;
 
-    // Tenta di caricare la nuova Routes library
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let RouteClass: any = null;
     try {
@@ -522,13 +551,37 @@ async function googleDirections(
       console.warn("[PercorsoBuilder] Routes library non disponibile, uso DirectionsService legacy");
     }
 
-    // Risolvi un singolo segmento, con split ricorsivo se fallisce (max depth 3)
+    onProgress?.(5);
+
+    // ── 1. Prova l'intero percorso in una singola chiamata WALKING ──
+    console.info("[PercorsoBuilder] Tentativo singola chiamata WALKING...");
+    let fullRoute: RouteResult | null = null;
+
+    if (RouteClass) {
+      fullRoute = await walkSegmentNew(RouteClass, start, end, preferShortest);
+    }
+    if (!fullRoute) {
+      fullRoute = await walkSegmentLegacy(G, start, end, preferShortest);
+    }
+
+    if (fullRoute) {
+      console.info(`[PercorsoBuilder] Percorso completo ottenuto: ${(fullRoute.distanceM / 1000).toFixed(1)} km`);
+      onProgress?.(100);
+      return fullRoute;
+    }
+
+    // ── 2. Singola chiamata fallita → spezza in segmenti ──
+    console.warn("[PercorsoBuilder] Singola chiamata fallita, spezzamento in segmenti...");
+
+    const straightKm = haversineM(start, end) / 1000;
+    const nSegments = Math.max(2, Math.ceil(straightKm / MAX_SEGMENT_KM));
+
+    // Risolvi un singolo segmento, con split ricorsivo se fallisce
     async function resolveSegment(
       origin: [number, number],
       dest: [number, number],
       depth = 0,
     ): Promise<RouteResult | null> {
-      // Prova: 1) computeRoutes WALK, 2) DirectionsService WALKING+DRIVING
       let seg: RouteResult | null = null;
       if (RouteClass) {
         seg = await walkSegmentNew(RouteClass, origin, dest, preferShortest);
@@ -538,7 +591,6 @@ async function googleDirections(
       }
       if (seg) return seg;
 
-      // Se fallisce e possiamo ancora splittare, dividi a metà con snap a città
       if (depth >= 3) {
         console.error(`[PercorsoBuilder] segmento irrisolvibile dopo ${depth} split`);
         return null;
@@ -565,42 +617,42 @@ async function googleDirections(
       };
     }
 
-    // Calcola distanza in linea d'aria
-    const straightKm = haversineM(start, end) / 1000;
-
-    // Determina quanti segmenti servono
-    const nSegments = Math.max(1, Math.ceil(straightKm / MAX_SEGMENT_KM));
-
-    // Genera waypoint intermedi lungo strade reali (non su linea retta!)
+    // Prova a ottenere uno scheletro WALKING per i waypoint
+    // Così i waypoint seguono il percorso pedonale, non l'autostrada
     let waypoints: [number, number][] = [];
-    if (nSegments > 1) {
-      onProgress?.(0);
 
-      // 1. Ottieni "scheletro" DRIVING per avere punti su strade reali
-      const skeleton = await getDrivingSkeleton(G, start, end, RouteClass);
+    // 2a. Scheletro WALKING via legacy DirectionsService (supporta meglio distanze lunghe)
+    console.info("[PercorsoBuilder] Ottengo scheletro WALKING per waypoint...");
+    const walkSkeleton = await getWalkingSkeleton(G, start, end);
 
-      if (skeleton && skeleton.coords.length > 2) {
-        // Estrai waypoint equidistanti lungo la rotta DRIVING reale
-        const rawWaypoints = extractWaypointsFromRoute(skeleton.coords, nSegments - 1);
-        // Snap a città per avere waypoint più significativi
+    if (walkSkeleton && walkSkeleton.coords.length > 2) {
+      const rawWaypoints = extractWaypointsFromRoute(walkSkeleton.coords, nSegments - 1);
+      waypoints = await Promise.all(rawWaypoints.map(snapToCity));
+      console.info(`[PercorsoBuilder] ${waypoints.length} waypoint da scheletro WALKING`);
+    } else {
+      // 2b. Fallback: scheletro DRIVING
+      console.warn("[PercorsoBuilder] Scheletro WALKING non disponibile, provo DRIVING...");
+      const driveSkeleton = await getDrivingSkeleton(G, start, end, RouteClass);
+
+      if (driveSkeleton && driveSkeleton.coords.length > 2) {
+        const rawWaypoints = extractWaypointsFromRoute(driveSkeleton.coords, nSegments - 1);
         waypoints = await Promise.all(rawWaypoints.map(snapToCity));
-        console.info(`[PercorsoBuilder] ${waypoints.length} waypoint estratti da scheletro DRIVING`);
+        console.info(`[PercorsoBuilder] ${waypoints.length} waypoint da scheletro DRIVING`);
       } else {
-        // Fallback: interpolazione lineare + snap (può fallire per percorsi via mare)
-        console.warn("[PercorsoBuilder] scheletro DRIVING non disponibile, uso interpolazione lineare");
+        // 2c. Ultimo fallback: interpolazione lineare
+        console.warn("[PercorsoBuilder] Nessuno scheletro disponibile, interpolazione lineare");
         const rawWaypoints = interpolatePoints(start, end, nSegments - 1);
         waypoints = await Promise.all(rawWaypoints.map(snapToCity));
       }
     }
 
-    // Costruisci la lista di coppie [origin, destination]
+    // Costruisci segmenti e calcola
     const allPoints = [start, ...waypoints, end];
     const segments: [number, number][][] = [];
     for (let i = 0; i < allPoints.length - 1; i++) {
       segments.push([allPoints[i], allPoints[i + 1]]);
     }
 
-    // Esegui le richieste in sequenza
     const allCoords: [number, number][] = [];
     let totalDistanceM = 0;
 
@@ -616,7 +668,6 @@ async function googleDirections(
       allCoords.push(...seg.coords);
       totalDistanceM += seg.distanceM;
 
-      // Pausa tra richieste per evitare rate limit
       if (i < segments.length - 1) {
         await new Promise(r => setTimeout(r, 300));
       }
