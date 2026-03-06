@@ -22,6 +22,7 @@ import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
   Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video, LogOut,
   MapPin, Youtube, Navigation, Users, Upload, Share2, Map, Bell, TrendingUp,
+  Globe, Search, Plus,
 } from "lucide-react";
 
 const RouteMap = lazy(() => import("@/components/RouteMap"));
@@ -319,6 +320,10 @@ export default function AdminLive() {
   const [sosteniUploading, setSosteniUploading] = useState<string | null>(null);
   const sosteniLogoInputRef    = useRef<HTMLInputElement>(null);
   const sosteniUploadTargetRef = useRef<string | null>(null);
+  const [scrapeUrl,      setScrapeUrl]      = useState("");
+  const [scrapeLoading,  setScrapeLoading]  = useState(false);
+  const [scrapeError,    setScrapeError]    = useState("");
+  const [scrapePreview,  setScrapePreview]  = useState<Sostenitore | null>(null);
 
   // ─ Notizie ─
   const [notiziaTitolo,   setNotiziaTitolo]   = useState("");
@@ -569,6 +574,54 @@ export default function AdminLive() {
 
   function updateSostenitore(id: string, field: keyof Sostenitore, value: string) {
     setSosteniItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it));
+  }
+
+  async function handleScrapeUrl() {
+    const url = scrapeUrl.trim();
+    if (!url) return;
+    setScrapeLoading(true);
+    setScrapeError("");
+    setScrapePreview(null);
+    try {
+      const resp = await fetch("/api/scrape-site", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("gp_jwt") ?? ""}`,
+        },
+        body: JSON.stringify({ url }),
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({ error: "Errore sconosciuto" }));
+        setScrapeError(data.error || `Errore ${resp.status}`);
+        return;
+      }
+      const data = await resp.json();
+      setScrapePreview({
+        id:      crypto.randomUUID(),
+        nome:    data.nome || "",
+        testo:   data.testo || "",
+        logoUrl: data.logoUrl || "",
+        siteUrl: data.siteUrl || url,
+      });
+    } catch {
+      setScrapeError("Impossibile raggiungere il sito");
+    } finally {
+      setScrapeLoading(false);
+    }
+  }
+
+  function confirmScrapePreview() {
+    if (!scrapePreview) return;
+    setSosteniItems(prev => [...prev, scrapePreview]);
+    setScrapePreview(null);
+    setScrapeUrl("");
+    setScrapeError("");
+  }
+
+  function cancelScrapePreview() {
+    setScrapePreview(null);
+    setScrapeError("");
   }
 
   function openLogoUpload(itemId: string) {
@@ -1793,6 +1846,97 @@ export default function AdminLive() {
                   </div>
                 </div>
 
+                {/* Aggiungi da URL */}
+                <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3">
+                  <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                    <Globe className="w-4 h-4" /> Aggiungi da sito web
+                  </h3>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={scrapeUrl}
+                      onChange={e => { setScrapeUrl(e.target.value); setScrapeError(""); }}
+                      onKeyDown={e => e.key === "Enter" && handleScrapeUrl()}
+                      placeholder="Incolla URL del sostenitore (es. https://azienda.it)"
+                      className="flex-1 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+                    />
+                    <button
+                      onClick={handleScrapeUrl}
+                      disabled={scrapeLoading || !scrapeUrl.trim()}
+                      className="flex items-center gap-1.5 border border-border rounded-lg px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors disabled:opacity-50"
+                    >
+                      {scrapeLoading
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Analizzo…</>
+                        : <><Search className="w-4 h-4" /> Analizza</>
+                      }
+                    </button>
+                  </div>
+
+                  {scrapeError && (
+                    <p className="text-xs text-red-500">{scrapeError}</p>
+                  )}
+
+                  {/* Anteprima card dal sito */}
+                  {scrapePreview && (
+                    <div className="border-2 border-dona/40 rounded-xl p-4 bg-dona/5 space-y-3">
+                      <p className="text-xs font-bold text-dona uppercase tracking-wide">Anteprima sostenitore</p>
+                      <div className="flex items-start gap-4">
+                        {scrapePreview.logoUrl ? (
+                          <img
+                            src={scrapePreview.logoUrl}
+                            alt={scrapePreview.nome}
+                            className="h-16 w-16 object-contain rounded border border-border bg-white flex-shrink-0"
+                            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          />
+                        ) : (
+                          <div className="h-16 w-16 rounded border-2 border-dashed border-border flex items-center justify-center bg-muted/30 flex-shrink-0">
+                            <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <div>
+                            <label className="block text-xs font-semibold text-foreground mb-0.5">Nome</label>
+                            <input
+                              type="text"
+                              value={scrapePreview.nome}
+                              onChange={e => setScrapePreview(prev => prev ? { ...prev, nome: e.target.value } : null)}
+                              className="w-full border border-border rounded-lg px-3 py-1.5 text-sm bg-background text-foreground"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-foreground mb-0.5">Descrizione</label>
+                            <textarea
+                              rows={2}
+                              value={scrapePreview.testo}
+                              onChange={e => setScrapePreview(prev => prev ? { ...prev, testo: e.target.value } : null)}
+                              className="w-full border border-border rounded-lg px-3 py-1.5 text-sm bg-background text-foreground resize-none"
+                            />
+                          </div>
+                          {scrapePreview.siteUrl && (
+                            <p className="text-[11px] text-muted-foreground truncate">
+                              <Globe className="w-3 h-3 inline mr-1" />{scrapePreview.siteUrl}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={confirmScrapePreview}
+                          className="flex-1 flex items-center justify-center gap-1.5 bg-dona text-white rounded-lg py-2 text-sm font-semibold hover:opacity-90 transition-opacity"
+                        >
+                          <Plus className="w-4 h-4" /> Conferma e aggiungi
+                        </button>
+                        <button
+                          onClick={cancelScrapePreview}
+                          className="flex items-center justify-center gap-1.5 border border-border rounded-lg px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
+                        >
+                          <X className="w-4 h-4" /> Annulla
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Lista sostenitori */}
                 {sosteniItems.map((item, idx) => (
                   <div key={item.id} className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3">
@@ -1862,6 +2006,18 @@ export default function AdminLive() {
                         onChange={e => updateSostenitore(item.id, "testo", e.target.value)}
                         placeholder="Breve descrizione del sostenitore…"
                         className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground resize-none"
+                      />
+                    </div>
+
+                    {/* Sito web */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1">Sito web</label>
+                      <input
+                        type="url"
+                        value={item.siteUrl ?? ""}
+                        onChange={e => updateSostenitore(item.id, "siteUrl", e.target.value)}
+                        placeholder="https://www.azienda.it"
+                        className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
                       />
                     </div>
                   </div>
