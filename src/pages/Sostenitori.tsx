@@ -39,55 +39,48 @@ export default function Sostenitori() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
               {page.items.map((item, i) => (
                 <AnimatedSection key={item.id} delay={i * 0.1}>
-                  {(() => {
-                    const Wrapper = item.siteUrl
-                      ? (props: { children: React.ReactNode }) => (
-                          <a href={item.siteUrl} target="_blank" rel="noopener noreferrer" className="block h-full">
-                            {props.children}
-                          </a>
-                        )
-                      : (props: { children: React.ReactNode }) => <>{props.children}</>;
-                    return (
-                      <Wrapper>
-                        <div className={`bg-card rounded-xl border border-border shadow-sm hover:shadow-md transition-shadow p-6 flex flex-col items-center text-center gap-4 h-full${item.siteUrl ? " cursor-pointer" : ""}`}>
-                          {/* Logo o iniziale */}
-                          {item.logoUrl ? (
-                            <div className="h-24 flex items-center justify-center">
-                              <img
-                                src={item.logoUrl}
-                                alt={item.nome}
-                                className="max-h-24 max-w-[180px] w-auto object-contain"
-                              />
-                            </div>
-                          ) : (
-                            <div className="h-24 w-24 rounded-full bg-dona/10 flex items-center justify-center">
-                              <span className="text-3xl font-heading font-bold text-dona">
-                                {item.nome.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Nome e testo */}
-                          <div className="flex-1">
-                            <h3 className="font-heading text-lg font-bold text-foreground mb-2">
-                              {item.nome}
-                            </h3>
-                            {item.testo && (
-                              <p className="font-body text-sm text-muted-foreground leading-relaxed">
-                                {item.testo}
-                              </p>
-                            )}
-                          </div>
-
-                          {item.siteUrl && (
-                            <span className="text-xs text-dona font-medium flex items-center gap-1 mt-auto">
-                              Visita il sito →
-                            </span>
-                          )}
+                  <div className="bg-muted/40 rounded-2xl shadow-sm hover:shadow-md transition-shadow flex flex-col h-full overflow-hidden">
+                    {/* Logo area */}
+                    <div className="bg-card border-b border-border mx-5 mt-5 rounded-xl flex items-center justify-center p-6 min-h-[160px]">
+                      {item.logoUrl ? (
+                        <img
+                          src={item.logoUrl}
+                          alt={item.nome}
+                          className="max-h-32 max-w-full w-auto object-contain"
+                        />
+                      ) : (
+                        <div className="h-24 w-24 rounded-full bg-dona/10 flex items-center justify-center">
+                          <span className="text-4xl font-heading font-bold text-dona">
+                            {item.nome.charAt(0).toUpperCase()}
+                          </span>
                         </div>
-                      </Wrapper>
-                    );
-                  })()}
+                      )}
+                    </div>
+
+                    {/* Testo: nome in grassetto inline + descrizione */}
+                    <div className="flex-1 px-5 pt-5 pb-3 text-center">
+                      <p className="font-body text-sm text-muted-foreground leading-relaxed">
+                        <strong className="text-foreground">{item.nome}</strong>
+                        {item.testo ? ` ${item.testo}` : ""}
+                      </p>
+                    </div>
+
+                    {/* Bottone "Scopri di più" */}
+                    {item.siteUrl ? (
+                      <div className="px-5 pb-5 pt-2 mt-auto">
+                        <a
+                          href={item.siteUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block w-full text-center bg-foreground/80 hover:bg-foreground text-background font-semibold text-sm py-3 rounded-full transition-colors"
+                        >
+                          Scopri di più
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="pb-5" />
+                    )}
+                  </div>
                 </AnimatedSection>
               ))}
             </div>
