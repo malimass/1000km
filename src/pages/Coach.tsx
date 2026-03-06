@@ -34,6 +34,7 @@ import {
 } from "@/lib/coachAnalysis";
 import { getCurrentUser, loadCoachAthletes, CoachAthlete } from "@/lib/auth";
 import { clearAuthToken, apiFetch } from "@/lib/api";
+import ProiezionePercorso from "@/components/ProiezionePercorso";
 
 // ─── COSTANTI COLORI ─────────────────────────────────────────────────────────
 
@@ -962,6 +963,14 @@ export default function Coach() {
         </section>
 
         {/* Upload rimosso: solo l'atleta carica i propri allenamenti */}
+
+        {/* ── PROIEZIONE PERCORSO ───────────────────── */}
+        {sessions.length > 0 && (
+          <ProiezionePercorso
+            sessions={allSessions}
+            weightKg={activeProfile?.weightKg}
+          />
+        )}
 
         {/* ── LISTA SESSIONI ───────────────────────── */}
         {sessions.length > 0 && (
