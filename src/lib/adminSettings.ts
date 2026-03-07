@@ -22,6 +22,7 @@ export type AdminSettings = {
   shareSocialTag: string;
   shareHashtags:  string;
   shareUrl:       string;
+  autoPostOnStart: string; // "true" | "false"
 };
 
 const EMPTY: AdminSettings = {
@@ -39,6 +40,7 @@ const EMPTY: AdminSettings = {
   shareSocialTag: "",
   shareHashtags:  "",
   shareUrl:       "",
+  autoPostOnStart: "false",
 };
 
 // ─── localStorage ─────────────────────────────────────────────────────────────
@@ -57,6 +59,7 @@ const LS: Record<keyof AdminSettings, string> = {
   shareSocialTag: "gp_share_social_tag",
   shareHashtags:  "gp_share_hashtags",
   shareUrl:       "gp_share_url",
+  autoPostOnStart: "gp_auto_post_on_start",
 };
 
 function lsGet(k: string) {
