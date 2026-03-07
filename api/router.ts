@@ -35,6 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/saved-percorsi") return await savedPercorsi(req, res);
     if (path === "/elevation") return await elevation(req, res);
     if (path === "/scrape-site") return await scrapeSite(req, res);
+    if (path === "/traccar-position") return await traccarPosition(req, res);
     return res.status(404).json({ error: "Not found" });
   } catch (err: any) {
     console.error(err);
@@ -966,4 +967,114 @@ async function elevation(req: VercelRequest, res: VercelResponse) {
     console.error("[elevation]", err);
     return res.status(502).json({ error: "Errore chiamata Google Elevation API" });
   }
+}
+
+// ─── TRACCAR POSITION (OsmAnd protocol) ─────────────────────────────────────
+
+async function traccarPosition(req: VercelRequest, res: VercelResponse) {
+  // Traccar Client sends GET (OsmAnd protocol) or POST
+  if (req.method !== "GET" && req.method !== "POST") return res.status(405).end();
+
+  const params = req.method === "GET" ? req.query : { ...req.query, ...(req.body ?? {}) };
+  const { id, lat, lon, timestamp, speed, accuracy, bearing, hdop } = params;
+
+  if (!id || !lat || !lon)
+    return res.status(400).json({ error: "id, lat, lon richiesti" });
+
+  const deviceId  = String(id);
+  const latitude  = Number(lat);
+  const longitude = Number(lon);
+  // Traccar Client (Android/iOS) sends speed in m/s via OsmAnd protocol
+  const spd = speed != null ? Number(speed) : null;
+  const acc = accuracy != null ? Number(accuracy) : (hdop != null ? Number(hdop) * 5 : null);
+  const hdg = bearing != null ? Number(bearing) : null;
+  const sessionId = new Date().toISOString().slice(0, 10);
+
+  if (isNaN(latitude) || isNaN(longitude))
+    return res.status(400).json({ error: "lat/lon non validi" });
+
+  // Ensure traccar_devices table exists
+  await sql`
+    CREATE TABLE IF NOT EXISTS traccar_devices (
+      device_id     text        PRIMARY KEY,
+      display_name  text        NOT NULL DEFAULT 'Corridore',
+      activity_type text        NOT NULL DEFAULT 'cammino',
+      runner_id     smallint,
+      user_id       uuid        REFERENCES users(id) ON DELETE SET NULL,
+      created_at    timestamptz DEFAULT now()
+    )
+  `;
+
+  // Lookup or auto-register device
+  let rows = await sql`SELECT * FROM traccar_devices WHERE device_id = ${deviceId} LIMIT 1`;
+  let device = rows[0] as any;
+
+  if (!device) {
+    // Auto-register: create a local user + profile for this device
+    const email = `traccar-${deviceId.replace(/[^a-zA-Z0-9_-]/g, "")}@traccar.local`;
+    const displayName = deviceId.replace(/[_-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    const userRows = await sql`
+      INSERT INTO users (email, password_hash, display_name, role)
+      VALUES (${email}, 'traccar-device', ${displayName}, 'athlete')
+      ON CONFLICT (email) DO UPDATE SET display_name = EXCLUDED.display_name
+      RETURNING id
+    `;
+    const userId = (userRows[0] as any).id;
+
+    await sql`
+      INSERT INTO profiles (id, display_name, activity_type)
+      VALUES (${userId}, ${displayName}, 'cammino')
+      ON CONFLICT (id) DO NOTHING
+    `;
+    await sql`
+      INSERT INTO traccar_devices (device_id, display_name, user_id)
+      VALUES (${deviceId}, ${displayName}, ${userId})
+    `;
+    device = { device_id: deviceId, display_name: displayName, activity_type: "cammino", runner_id: null, user_id: userId };
+  }
+
+  // Save to appropriate tables
+  if (device.runner_id) {
+    // Admin runner mode → live_position + route_positions
+    await sql`
+      INSERT INTO live_position (id, lat, lng, speed, accuracy, heading, is_active, updated_at)
+      VALUES (${device.runner_id}, ${latitude}, ${longitude}, ${spd}, ${acc}, ${hdg}, true, now())
+      ON CONFLICT (id) DO UPDATE
+        SET lat = EXCLUDED.lat, lng = EXCLUDED.lng, speed = EXCLUDED.speed,
+            accuracy = EXCLUDED.accuracy, heading = EXCLUDED.heading,
+            is_active = true, updated_at = now()
+    `;
+    await sql`
+      INSERT INTO route_positions (lat, lng, speed, accuracy, heading, session_id, runner_id, recorded_at)
+      VALUES (${latitude}, ${longitude}, ${spd}, ${acc}, ${hdg}, ${sessionId}, ${device.runner_id}, now())
+    `;
+  } else if (device.user_id) {
+    // Community mode → community_live_position + community_route_positions
+    await sql`
+      INSERT INTO community_live_position
+        (user_id, display_name, activity_type, lat, lng, speed, accuracy, heading, is_active, updated_at)
+      VALUES
+        (${device.user_id}, ${device.display_name}, ${device.activity_type},
+         ${latitude}, ${longitude}, ${spd}, ${acc}, ${hdg}, true, now())
+      ON CONFLICT (user_id) DO UPDATE
+        SET display_name  = EXCLUDED.display_name,
+            activity_type = EXCLUDED.activity_type,
+            lat           = EXCLUDED.lat,
+            lng           = EXCLUDED.lng,
+            speed         = EXCLUDED.speed,
+            accuracy      = EXCLUDED.accuracy,
+            heading       = EXCLUDED.heading,
+            is_active     = true,
+            updated_at    = now()
+    `;
+    await sql`
+      INSERT INTO community_route_positions
+        (user_id, display_name, activity_type, lat, lng, speed, accuracy, heading, session_id, recorded_at)
+      VALUES
+        (${device.user_id}, ${device.display_name}, ${device.activity_type},
+         ${latitude}, ${longitude}, ${spd}, ${acc}, ${hdg}, ${sessionId}, now())
+    `;
+  }
+
+  return res.json({ ok: true });
 }
