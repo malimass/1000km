@@ -54,6 +54,7 @@ const Coach = lazyWithRetry(() => import("./pages/Coach"));
 const AtletaAuth = lazyWithRetry(() => import("./pages/AtletaAuth"));
 const AtletaDashboard = lazyWithRetry(() => import("./pages/AtletaDashboard"));
 const GuidaMetriche = lazyWithRetry(() => import("./pages/GuidaMetriche"));
+const GuidaTraccar = lazyWithRetry(() => import("./pages/GuidaTraccar"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -88,6 +89,7 @@ const App = () => (
           <Route path="/atleta/accedi" element={<Navigate to="/accedi" replace />} />
           <Route path="/atleta" element={<AtletaDashboard />} />
           <Route path="/guida-metriche" element={<GuidaMetriche />} />
+          <Route path="/guida-traccar" element={<GuidaTraccar />} />
           <Route path="/coach" element={
             <ProtectedCoachRoute>
               <Coach />

@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart, Play, Square, LogOut, MapPin, Loader2, Navigation } from "lucide-react";
+import { Heart, Play, Square, LogOut, MapPin, Loader2, Navigation, Smartphone } from "lucide-react";
 import { motion } from "framer-motion";
 import NativeLayout from "@/components/NativeLayout";
 import ShareCard from "@/components/ShareCard";
@@ -389,6 +389,19 @@ export default function IlMioPercorso() {
               con il tuo nome e la tua attività. Gli altri potranno seguirti in diretta!
             </p>
           </div>
+
+          {/* Traccar Client link */}
+          <button
+            onClick={() => navigate("/guida-traccar")}
+            className="w-full bg-card border border-border rounded-xl px-4 py-3 flex items-center gap-3 text-left hover:bg-muted/50 transition-colors"
+          >
+            <Smartphone className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-body font-semibold text-foreground">GPS in background con Traccar</p>
+              <p className="text-xs font-body text-muted-foreground">Tracciamento affidabile anche a schermo spento</p>
+            </div>
+            <span className="text-xs text-muted-foreground">&rarr;</span>
+          </button>
         </motion.div>
       </section>
     </NativeLayout>
