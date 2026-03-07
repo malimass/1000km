@@ -312,6 +312,10 @@ export default function AdminLive() {
   const [shareUrl,       setShareUrl]       = useState("");
   const [shareSaved,     setShareSaved]     = useState(false);
 
+  // ─ Auto-post sui social all'avvio GPS ─
+  const [autoPostOnStart, setAutoPostOnStart] = useState(false);
+  const autoPostDoneRef = useRef(false);
+
   // ─ Sostenitori ─
   const [sosteniTitle,    setSosteniTitle]    = useState("I Sostenitori del Cammino");
   const [sosteniIntro,    setSosteniIntro]    = useState("");
@@ -395,6 +399,7 @@ export default function AdminLive() {
       setYtCn3(s.ytCn3); setYtCn3Title(s.ytCn3Title); setYtCn3Desc(s.ytCn3Desc);
       setShareTitle(s.shareTitle); setShareBody(s.shareBody); setShareSocialTag(s.shareSocialTag);
       setShareHashtags(s.shareHashtags); setShareUrl(s.shareUrl);
+      setAutoPostOnStart(s.autoPostOnStart === "true");
       setSettingsLoading(false);
     });
     loadSosteniPage().then(p => {
@@ -654,10 +659,39 @@ export default function AdminLive() {
     reader.readAsDataURL(file);
   }
 
+  // ─ Auto-post sui social quando si avvia il GPS ─
+  async function autoPostToSocial() {
+    if (!autoPostOnStart || autoPostDoneRef.current) return;
+    autoPostDoneRef.current = true;
+    const postMessage = buildMessage(getLtwUrl() || "", isTraining);
+    const ok: string[] = [];
+    const err: string[] = [];
+    // Facebook
+    if (fbPageId && fbToken) {
+      try {
+        const res = await fbTextPost(fbPageId, fbToken, postMessage);
+        if (res.error) err.push(`Facebook: ${res.error.message}`);
+        else ok.push("Facebook ✓");
+      } catch (e) { err.push(`Facebook: ${String(e)}`); }
+    }
+    // Instagram (serve immagine — usa igImageUrl fallback se presente)
+    if (igUserId && fbToken && igImageUrl) {
+      try {
+        const res = await igPhotoPost(igUserId, fbToken, igImageUrl, postMessage);
+        if (res.error) err.push(`Instagram: ${res.error.message}`);
+        else ok.push("Instagram ✓");
+      } catch (e) { err.push(`Instagram: ${String(e)}`); }
+    }
+    if (ok.length > 0 || err.length > 0) {
+      setPostResult({ ok, err });
+    }
+  }
+
   // ─ GPS tracking ─
   async function startGpsTracking() {
     setGpsError("");
     setDbError("");
+    autoPostDoneRef.current = false;
     sessionIdRef.current      = todaySessionId();
     lastRoutePointRef.current = null;
     lastRouteTimeRef.current  = 0;
@@ -673,10 +707,11 @@ export default function AdminLive() {
 
     await startGeoTracking(
       async ({ latitude: lat, longitude: lng, speed, accuracy, heading }) => {
-        // Prima posizione valida: attiva lo stato tracking
+        // Prima posizione valida: attiva lo stato tracking + auto-post
         if (!gotFirstFix) {
           gotFirstFix = true;
           setIsTracking(true);
+          autoPostToSocial();
         }
         setGpsPos({ lat, lng, speed, accuracy });
 
@@ -1201,6 +1236,24 @@ export default function AdminLive() {
                         </button>
                       </div>
                     </div>
+                    {/* Toggle auto-post social */}
+                    <label className="flex items-center gap-2 mb-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={autoPostOnStart}
+                        onChange={e => {
+                          setAutoPostOnStart(e.target.checked);
+                          // Salva la preferenza
+                          loadSettings().then(s => saveSettingsDB({ ...s, autoPostOnStart: e.target.checked ? "true" : "false" }));
+                        }}
+                        className="w-4 h-4 accent-blue-600 rounded"
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        <Send className="w-3 h-3 inline mr-1" />
+                        Pubblica automaticamente sui social all'avvio
+                      </span>
+                    </label>
+
                     <button
                       onClick={startGpsTracking}
                       className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-lg py-3 text-sm font-semibold hover:bg-blue-700 transition-colors"
