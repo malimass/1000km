@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Heart, Check, Loader2, CreditCard, Landmark, Copy, ArrowLeft, Handshake } from "lucide-react";
+import { Heart, Check, Loader2, CreditCard, ArrowLeft, Handshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -22,28 +22,6 @@ function useSumUpSdk() {
     document.head.appendChild(s);
   }, []);
   return ready;
-}
-
-function BonificoField({ label, value, copyable }: { label: string; value: string; copyable?: boolean }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
-    navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  return (
-    <div className="space-y-1">
-      <span className="font-body text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
-      <div className="flex items-center gap-2">
-        <span className="font-body text-sm text-foreground font-medium select-all">{value}</span>
-        {copyable && (
-          <button type="button" onClick={handleCopy} className="p-1 rounded hover:bg-muted transition-colors" title="Copia">
-            {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
-          </button>
-        )}
-      </div>
-    </div>
-  );
 }
 
 const PROGETTO_SPONSOR = "Sponsor Sostenitori del Cammino";
@@ -341,29 +319,6 @@ export default function Sostenitori() {
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Torna ai dati
                   </Button>
-                </div>
-
-                {/* Alternativa bonifico */}
-                <div className="bg-card rounded-xl p-6 border border-border/50 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Landmark className="w-5 h-5 text-dona" />
-                    <h3 className="font-heading text-base font-bold text-foreground">Oppure tramite bonifico</h3>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <BonificoField label="Intestatario" value="Think Pink Italy ETS" />
-                    <BonificoField label="Banca" value="Banca Sella — Agenzia Roma 10" />
-                    <BonificoField label="IBAN" value="IT17G0326803210052966541910" copyable />
-                    <BonificoField label="Codice SWIFT" value="SELBIT2BXXX" copyable />
-                  </div>
-                  <div className="bg-dona/5 border border-dona/20 rounded-lg p-3 mt-3">
-                    <p className="font-body text-sm text-foreground">
-                      <span className="font-semibold">Causale:</span>{" "}
-                      <span className="text-dona font-medium">Sponsor Sostenitori del Cammino — Komen Italia Comitato Emilia Romagna</span>
-                    </p>
-                  </div>
-                  <p className="font-body text-xs text-muted-foreground/70 text-center mt-3">
-                    Banca Sella — Via G. Paisiello 35 C, 00198 Roma
-                  </p>
                 </div>
               </div>
             )}
