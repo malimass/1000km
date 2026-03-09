@@ -16,12 +16,7 @@ const donationTiers = [
   { value: 100, label: "Un abbraccio", desc: "Un contributo significativo alla ricerca" },
 ];
 
-const projects = [
-  "Sostieni Komen Italia",
-  "Carovana della Prevenzione",
-  "Progetto donne al centro",
-  "Centro di terapie integrate",
-];
+const PROGETTO = "1000km Di Gratitudine";
 
 const trustBadges = [
   { icon: <Shield className="w-5 h-5" />, text: "100% trasparente" },
@@ -52,7 +47,7 @@ export default function Dona() {
   const [step, setStep]           = useState<Step>("importo");
   const [selected, setSelected]   = useState<number | null>(null);
   const [customAmt, setCustomAmt] = useState("");
-  const [progetto, setProgetto]   = useState(projects[0]);
+  const progetto = PROGETTO;
   const [nome, setNome]           = useState("");
   const [cognome, setCognome]     = useState("");
   const [email, setEmail]         = useState("");
@@ -236,29 +231,6 @@ export default function Dona() {
                       onChange={e => { setCustomAmt(e.target.value); setSelected(null); }}
                       className="w-full pl-8 pr-3 py-2.5 rounded-lg border border-border bg-background text-foreground font-body text-sm focus:border-dona focus:ring-1 focus:ring-dona outline-none"
                     />
-                  </div>
-                </div>
-
-                {/* Scegli progetto */}
-                <div className="mb-8">
-                  <label className="block font-body text-sm font-semibold text-foreground mb-2">
-                    Scegli il progetto da sostenere
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {projects.map(p => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setProgetto(p)}
-                        className={`text-left rounded-lg border px-3 py-2.5 font-body text-sm transition-colors ${
-                          progetto === p
-                            ? "border-dona bg-dona/10 text-dona font-semibold"
-                            : "border-border text-muted-foreground hover:border-dona/50"
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
                   </div>
                 </div>
 
