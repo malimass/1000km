@@ -339,31 +339,33 @@ export default function Dona() {
                 </p>
 
                 {/* Tiers */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                   {donationTiers.map((tier) => (
                     <motion.button
                       key={tier.value}
                       type="button"
                       onClick={() => { setSelected(tier.value); setCustomAmt(""); }}
-                      whileHover={{ scale: 1.04 }}
+                      whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.97 }}
-                      className={`rounded-xl border-2 p-4 text-left transition-colors ${
+                      className={`rounded-xl border-2 p-5 text-left transition-colors flex items-start gap-4 ${
                         selected === tier.value
                           ? "border-dona bg-dona/10 ring-2 ring-dona/30"
                           : "border-border hover:border-dona bg-card hover:bg-dona/5"
                       }`}
                     >
-                      <span className={`font-heading text-2xl font-bold block mb-1 transition-colors ${
+                      <span className={`font-heading text-2xl font-bold shrink-0 transition-colors ${
                         selected === tier.value ? "text-dona" : "text-foreground"
                       }`}>
-                        € {tier.value}
+                        €{tier.value}
                       </span>
-                      <span className="font-body text-xs font-semibold uppercase tracking-wider text-dona block mb-1">
-                        {tier.label}
-                      </span>
-                      <span className="font-body text-xs text-muted-foreground leading-snug block">
-                        {tier.desc}
-                      </span>
+                      <div className="min-w-0">
+                        <span className="font-body text-xs font-semibold uppercase tracking-wider text-dona block mb-1">
+                          {tier.label}
+                        </span>
+                        <span className="font-body text-sm text-muted-foreground leading-relaxed block">
+                          {tier.desc}
+                        </span>
+                      </div>
                     </motion.button>
                   ))}
                 </div>
