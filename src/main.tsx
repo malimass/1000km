@@ -37,4 +37,20 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 });
 
+// ── Reload automatico quando il Service Worker si aggiorna ──────────────────
+// Evita il flash di contenuto vecchio: quando un nuovo SW prende il controllo,
+// ricarica la pagina così il browser scarica subito le risorse aggiornate.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!sessionStorage.getItem("sw_reloaded")) {
+      sessionStorage.setItem("sw_reloaded", "1");
+      window.location.reload();
+    }
+  });
+  // Reset del flag al prossimo caricamento normale
+  navigator.serviceWorker.ready.then(() => {
+    sessionStorage.removeItem("sw_reloaded");
+  });
+}
+
 createRoot(document.getElementById("root")!).render(<App />);
