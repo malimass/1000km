@@ -224,12 +224,17 @@ export default function RouteMap({
     : defaultDates;
   // Per la polyline: se ci sono coords pubblicate usale, altrimenti unisci waypoints
   const routeLine: [number, number][] = publishedCoords ?? waypoints;
+  // Considera un corridore "live" solo se is_active E aggiornato negli ultimi 5 min
+  const STALE_MS = 5 * 60 * 1000;
+  const isRecent = (pos: LivePosition | null | undefined) =>
+    pos?.is_active && pos.updated_at && (Date.now() - new Date(pos.updated_at).getTime()) < STALE_MS;
+
   const liveLatlng1: [number, number] | null =
-    livePos?.is_active && livePos.lat != null && livePos.lng != null
-      ? [livePos.lat, livePos.lng] : null;
+    isRecent(livePos) && livePos!.lat != null && livePos!.lng != null
+      ? [livePos!.lat, livePos!.lng] : null;
   const liveLatlng2: [number, number] | null =
-    livePos2?.is_active && livePos2.lat != null && livePos2.lng != null
-      ? [livePos2.lat, livePos2.lng] : null;
+    isRecent(livePos2) && livePos2!.lat != null && livePos2!.lng != null
+      ? [livePos2!.lat, livePos2!.lng] : null;
 
   // Vola verso il corridore più avanti (o il primo attivo)
   const liveLatlng = liveLatlng1 ?? liveLatlng2;
