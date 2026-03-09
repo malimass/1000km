@@ -524,6 +524,29 @@ export default function Dona() {
                   Torna ai dati
                 </Button>
               </div>
+
+              {/* Alternativa bonifico */}
+              <div className="mt-6 bg-card rounded-xl p-6 border border-border/50 shadow-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <Landmark className="w-5 h-5 text-dona" />
+                  <h3 className="font-heading text-base font-bold text-foreground">Oppure dona tramite bonifico</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <BonificoField label="Intestatario" value="Think Pink Italy ETS" />
+                  <BonificoField label="Banca" value="Banca Sella — Agenzia Roma 10" />
+                  <BonificoField label="IBAN" value="IT17G0326803210052966541910" copyable />
+                  <BonificoField label="Codice SWIFT" value="SELBIT2BXXX" copyable />
+                </div>
+                <div className="bg-dona/5 border border-dona/20 rounded-lg p-3 mt-3">
+                  <p className="font-body text-sm text-foreground">
+                    <span className="font-semibold">Causale:</span>{" "}
+                    <span className="text-dona font-medium">Donazione Komen Italia Comitato Emilia Romagna</span>
+                  </p>
+                </div>
+                <p className="font-body text-xs text-muted-foreground/70 text-center mt-3">
+                  Banca Sella — Via G. Paisiello 35 C, 00198 Roma
+                </p>
+              </div>
             </AnimatedSection>
           )}
 
