@@ -36,6 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/elevation") return await elevation(req, res);
     if (path === "/scrape-site") return await scrapeSite(req, res);
     if (path === "/traccar-position") return await traccarPosition(req, res);
+    if (path === "/donazioni") return await donazioni(req, res);
     return res.status(404).json({ error: "Not found" });
   } catch (err: any) {
     console.error(err);
@@ -393,6 +394,60 @@ async function raccoltaFondi(req: VercelRequest, res: VercelResponse) {
       WHERE id = 1
     `;
     return res.json({ ok: true });
+  }
+  return res.status(405).end();
+}
+
+// ─── DONAZIONI ───────────────────────────────────────────────────────────────
+
+async function donazioni(req: VercelRequest, res: VercelResponse) {
+  if (req.method === "POST") {
+    const { nome, cognome, email, importo_euro, progetto } = req.body ?? {};
+    if (!nome || !email || !importo_euro)
+      return res.status(400).json({ error: "nome, email e importo_euro richiesti" });
+    const importo = Number(importo_euro);
+    if (isNaN(importo) || importo <= 0)
+      return res.status(400).json({ error: "importo non valido" });
+
+    // Ensure table exists
+    await sql`
+      CREATE TABLE IF NOT EXISTS donazioni (
+        id            bigserial        PRIMARY KEY,
+        nome          text             NOT NULL,
+        cognome       text             NOT NULL DEFAULT '',
+        email         text             NOT NULL,
+        importo_euro  numeric(10,2)    NOT NULL,
+        progetto      text             NOT NULL DEFAULT 'Sostieni Komen Italia',
+        stato         text             NOT NULL DEFAULT 'intento',
+        created_at    timestamptz      DEFAULT now()
+      )
+    `;
+
+    // Save donation
+    await sql`
+      INSERT INTO donazioni (nome, cognome, email, importo_euro, progetto)
+      VALUES (${nome}, ${cognome ?? ""}, ${email}, ${importo}, ${progetto ?? "Sostieni Komen Italia"})
+    `;
+
+    // Update raccolta_fondi counter
+    await sql`
+      UPDATE raccolta_fondi
+      SET importo_euro = importo_euro + ${importo},
+          donatori     = donatori + 1,
+          updated_at   = now()
+      WHERE id = 1
+    `;
+
+    return res.status(201).json({ ok: true });
+  }
+  if (req.method === "GET") {
+    const auth = await requireAuth(req);
+    if (!auth) return res.status(401).json({ error: "Non autenticato" });
+    const rows = await sql`
+      SELECT id, nome, cognome, email, importo_euro, progetto, stato, created_at
+      FROM donazioni ORDER BY created_at DESC LIMIT 200
+    `;
+    return res.json(rows);
   }
   return res.status(405).end();
 }
