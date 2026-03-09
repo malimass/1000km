@@ -263,7 +263,7 @@ export default function Accedi() {
                 >
                   <Footprints className="w-6 h-6" />
                   <span className="text-sm font-semibold">Atleta</span>
-                  <span className="text-[10px] leading-tight opacity-70">Traccia i tuoi allenamenti</span>
+                  <span className="text-xs leading-tight opacity-70">Traccia i tuoi allenamenti</span>
                 </button>
                 <button
                   type="button"
@@ -276,7 +276,7 @@ export default function Accedi() {
                 >
                   <Dumbbell className="w-6 h-6" />
                   <span className="text-sm font-semibold">Coach</span>
-                  <span className="text-[10px] leading-tight opacity-70">Gestisci i tuoi atleti</span>
+                  <span className="text-xs leading-tight opacity-70">Gestisci i tuoi atleti</span>
                 </button>
               </div>
             </div>

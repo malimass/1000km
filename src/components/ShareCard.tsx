@@ -144,14 +144,14 @@ export default function ShareCard({
               <p className="text-lg font-heading font-bold text-foreground">
                 {kmTracked.toFixed(1)}
               </p>
-              <p className="text-[10px] font-body text-muted-foreground uppercase">km</p>
+              <p className="text-xs font-body text-muted-foreground uppercase">km</p>
             </div>
             {elapsed != null && elapsed > 0 && (
               <div className="bg-white/80 rounded-xl px-4 py-2 shadow-sm">
                 <p className="text-lg font-heading font-bold text-foreground">
                   {formatTime(elapsed)}
                 </p>
-                <p className="text-[10px] font-body text-muted-foreground uppercase">tempo</p>
+                <p className="text-xs font-body text-muted-foreground uppercase">tempo</p>
               </div>
             )}
           </div>
@@ -168,7 +168,7 @@ export default function ShareCard({
           <span className="font-heading text-xs font-bold text-foreground/60">
             1000<span style={{ color }}>KM</span>DIGRATITUDINE
           </span>
-          <span className="flex items-center gap-1 text-[10px] font-body text-muted-foreground">
+          <span className="flex items-center gap-1 text-xs font-body text-muted-foreground">
             <ExternalLink className="w-2.5 h-2.5" />
             1000kmdigratitudine.it
           </span>

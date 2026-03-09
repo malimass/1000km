@@ -229,7 +229,7 @@ export default function Partecipa() {
               <motion.div key={t.giorno} variants={fadeUp}>
                 <Link
                   to={`/iscriviti?tappa=${t.giorno}`}
-                  className="flex items-center justify-between bg-card border border-border rounded-xl px-5 py-4 hover:border-dona/50 hover:shadow-sm transition-all group"
+                  className="flex items-center justify-between bg-card border border-border rounded-xl px-5 py-4 hover:border-dona/50 active:border-dona/50 hover:shadow-sm active:shadow-sm transition-all group"
                 >
                   <div className="flex items-center gap-4">
                     <span className="font-heading text-sm font-bold text-dona/70 w-7 shrink-0">
@@ -244,7 +244,7 @@ export default function Partecipa() {
                       </p>
                     </div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-dona transition-colors shrink-0" />
+                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-dona group-active:text-dona transition-colors shrink-0" />
                 </Link>
               </motion.div>
             ))}

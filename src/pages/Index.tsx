@@ -273,13 +273,13 @@ const Index = () => {
                 <motion.div
                   whileHover={{ y: -4 }}
                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                  className="group rounded-lg overflow-hidden shadow-sm hover:shadow-xl transition-shadow bg-card h-full border border-border/50"
+                  className="group rounded-lg overflow-hidden shadow-sm hover:shadow-xl active:shadow-xl transition-shadow bg-card h-full border border-border/50"
                 >
                   <div className="aspect-[16/10] overflow-hidden relative">
                     <img
                       src={s.img}
                       alt={s.alt}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      className="w-full h-full object-cover group-hover:scale-105 group-active:scale-105 transition-transform duration-700"
                       loading="lazy"
                     />
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-foreground/60 to-transparent p-4">

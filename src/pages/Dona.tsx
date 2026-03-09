@@ -39,7 +39,7 @@ function BonificoField({ label, value, copyable }: { label: string; value: strin
   };
   return (
     <div className="space-y-1">
-      <span className="font-body text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="font-body text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
       <div className="flex items-center gap-2">
         <span className="font-body text-sm text-foreground font-medium select-all">{value}</span>
         {copyable && (
@@ -82,8 +82,8 @@ export default function Dona() {
     return subscribeRaccoltaFondi(r => setRaccolta(r));
   }, []);
 
-  const importo  = raccolta?.importo_euro ?? 2500;
-  const donatori = raccolta?.donatori     ?? 42;
+  const importo  = raccolta?.importo_euro ?? 0;
+  const donatori = raccolta?.donatori     ?? 0;
 
   // ── Flusso donazione ──
   const [step, setStep]           = useState<Step>("importo");
@@ -274,17 +274,26 @@ export default function Dona() {
               {/* Body */}
               <div className="bg-primary p-6 md:p-8">
                 <div className="text-center mb-4">
-                  <motion.span
-                    className="font-heading text-4xl md:text-5xl font-bold text-dona block"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6 }}
-                  >
-                    {formatEuro(importo)}
-                  </motion.span>
-                  <span className="font-body text-primary-foreground/60 text-sm mt-1 block">
-                    raccolti grazie a <span className="text-accent font-semibold">{donatori}</span> {donatori === 1 ? "donatore" : "donatori"}
-                  </span>
+                  {raccolta ? (
+                    <>
+                      <motion.span
+                        className="font-heading text-4xl md:text-5xl font-bold text-dona block"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6 }}
+                      >
+                        {formatEuro(importo)}
+                      </motion.span>
+                      <span className="font-body text-primary-foreground/60 text-sm mt-1 block">
+                        raccolti grazie a <span className="text-accent font-semibold">{donatori}</span> {donatori === 1 ? "donatore" : "donatori"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="inline-block h-10 md:h-12 w-40 rounded-lg bg-primary-foreground/10 animate-pulse mb-1" />
+                      <span className="inline-block h-4 w-48 rounded bg-primary-foreground/10 animate-pulse mt-1" />
+                    </>
+                  )}
                 </div>
                 <div className="border-t border-primary-foreground/10 pt-4 mt-2 text-center">
                   <p className="font-body text-primary-foreground/50 text-xs leading-relaxed">
@@ -293,7 +302,7 @@ export default function Dona() {
                   <p className="font-heading text-primary-foreground font-bold text-sm mt-1">
                     Komen Italia — Comitato Emilia Romagna
                   </p>
-                  <p className="font-body text-primary-foreground/40 text-[11px] mt-1">
+                  <p className="font-body text-primary-foreground/40 text-xs mt-1">
                     Per la ricerca e la prevenzione dei tumori al seno
                   </p>
                 </div>

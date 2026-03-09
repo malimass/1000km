@@ -38,7 +38,7 @@ export default function Countdown({ targetDate, className }: CountdownProps) {
             <span className="font-heading text-2xl md:text-3xl font-bold text-accent tabular-nums">
               {String(u.value).padStart(2, "0")}
             </span>
-            <span className="font-body text-[10px] uppercase tracking-wider text-primary-foreground/40">
+            <span className="font-body text-xs uppercase tracking-wider text-primary-foreground/40">
               {u.label}
             </span>
           </motion.div>
