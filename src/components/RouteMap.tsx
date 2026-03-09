@@ -5,6 +5,31 @@ import "leaflet/dist/leaflet.css";
 import type { LivePosition } from "@/lib/liveTracking";
 import type { CommunityLivePosition } from "@/lib/communityTracking";
 import { ACTIVITY_EMOJI, ACTIVITY_COLOR, COMMUNITY_STALE_MS, type ActivityType } from "@/lib/communityTracking";
+import { distanceMeters } from "@/lib/liveTracking";
+
+/** Max gap (meters) between consecutive route points before splitting the polyline */
+const MAX_GAP_M = 5_000;
+
+/**
+ * Split a route into contiguous segments: whenever two consecutive points are
+ * farther than MAX_GAP_M apart the polyline is broken so we don't draw long
+ * straight lines across the map from stale / test data.
+ */
+function splitRoute(pts: [number, number][]): [number, number][][] {
+  if (pts.length < 2) return pts.length ? [pts] : [];
+  const segments: [number, number][][] = [];
+  let seg: [number, number][] = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    if (distanceMeters(pts[i - 1], pts[i]) > MAX_GAP_M) {
+      if (seg.length > 1) segments.push(seg);
+      seg = [pts[i]];
+    } else {
+      seg.push(pts[i]);
+    }
+  }
+  if (seg.length > 1) segments.push(seg);
+  return segments;
+}
 
 // Coordinate default delle 15 tappe (Bologna → Terranova)
 const defaultWaypoints: [number, number][] = [
@@ -277,33 +302,36 @@ export default function RouteMap({
           }}
         />
 
-        {/* Traccia corridore 1 (verde) */}
-        {traveledRoute.length > 1 && (
+        {/* Traccia corridore 1 (verde) — spezzata se ci sono salti > 5 km */}
+        {splitRoute(traveledRoute).map((seg, i) => (
           <Polyline
-            positions={traveledRoute}
+            key={`r1-${i}`}
+            positions={seg}
             pathOptions={{ color: "#16a34a", weight: 5, opacity: 0.95, lineCap: "round", lineJoin: "round" }}
           />
-        )}
+        ))}
 
-        {/* Traccia corridore 2 (arancione) */}
-        {traveledRoute2.length > 1 && (
+        {/* Traccia corridore 2 (arancione) — spezzata se ci sono salti > 5 km */}
+        {splitRoute(traveledRoute2).map((seg, i) => (
           <Polyline
-            positions={traveledRoute2}
+            key={`r2-${i}`}
+            positions={seg}
             pathOptions={{ color: "#f97316", weight: 5, opacity: 0.95, lineCap: "round", lineJoin: "round" }}
           />
-        )}
+        ))}
 
         {/* Tracce community — una polyline per utente, colore per attività */}
         {Object.entries(communityRoutes).map(([userId, { points, activityType }]) => {
-          if (points.length < 2) return null;
+          const segs = splitRoute(points);
+          if (!segs.length) return null;
           const color = ACTIVITY_COLOR[activityType] ?? "#8b5cf6";
-          return (
+          return segs.map((seg, i) => (
             <Polyline
-              key={`cr-${userId}`}
-              positions={points}
+              key={`cr-${userId}-${i}`}
+              positions={seg}
               pathOptions={{ color, weight: 3, opacity: 0.75, lineCap: "round", lineJoin: "round" }}
             />
-          );
+          ));
         })}
 
         {/* Marker corridore 1 — 🏃‍♂️ */}
