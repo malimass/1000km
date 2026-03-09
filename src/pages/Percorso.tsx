@@ -46,8 +46,11 @@ function LiveTrackingSection({
   const isLive   = now >= CAMMINO_START && now <= CAMMINO_END;
   const isFuture = now < CAMMINO_START;
 
-  // GPS attivo ha priorità su LocaToWeb
-  const gpsActive = livePos1?.is_active === true || livePos2?.is_active === true;
+  // GPS attivo ha priorità su LocaToWeb — solo se aggiornato negli ultimi 5 min
+  const STALE_MS = 5 * 60 * 1000;
+  const isRecent = (pos: LivePosition | null) =>
+    pos?.is_active === true && pos.updated_at && (Date.now() - new Date(pos.updated_at).getTime()) < STALE_MS;
+  const gpsActive = isRecent(livePos1) || isRecent(livePos2);
 
   // Se GPS è attivo mostra sempre la live, anche fuori dalle date dell'evento
   const showLiveContent = isLive || gpsActive;
