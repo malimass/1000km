@@ -12,6 +12,10 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { loadRaccoltaFondi, subscribeRaccoltaFondi, type RaccoltaFondi } from "@/lib/notizie";
 
+function formatEuro(n: number): string {
+  return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+}
+
 const Index = () => {
   const heroRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
@@ -214,35 +218,60 @@ const Index = () => {
             ))}
           </div>
 
-          {/* Progress bar */}
+          {/* Raccolta fondi box */}
           <AnimatedSection delay={0.3}>
-            <div className="mt-16 max-w-xl mx-auto">
-              <div className="flex justify-between text-sm font-body mb-3">
-                <span className="text-primary-foreground/70">Raccolta fondi</span>
-                <span className="text-accent font-bold">
-                  € {(raccolta?.importo_euro ?? 0).toLocaleString("it-IT")} / € {(raccolta?.target_euro ?? 50000).toLocaleString("it-IT")}
+            <div className="mt-16 max-w-xl mx-auto rounded-2xl overflow-hidden border border-dona/20 shadow-lg">
+              {/* Header gradient */}
+              <div className="bg-gradient-to-r from-dona/90 to-dona/70 px-6 py-4 flex items-center gap-2">
+                <Heart className="w-5 h-5 text-white" />
+                <span className="font-heading text-sm uppercase tracking-widest text-white/90 font-bold">
+                  Raccolta fondi
                 </span>
               </div>
-              <div className="w-full h-4 bg-primary-foreground/10 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{
-                    background: "linear-gradient(90deg, hsl(340 82% 52%), hsl(29 87% 67%))",
-                  }}
-                  initial={{ width: 0 }}
-                  whileInView={{ width: `${Math.min(((raccolta?.importo_euro ?? 0) / (raccolta?.target_euro ?? 50000)) * 100, 100)}%` }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1.5, delay: 0.5, ease: "easeOut" }}
-                />
+              {/* Body */}
+              <div className="bg-primary p-6 md:p-8">
+                <div className="text-center mb-4">
+                  {raccolta ? (
+                    <>
+                      <motion.span
+                        className="font-heading text-4xl md:text-5xl font-bold text-dona block"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6 }}
+                      >
+                        {formatEuro(raccolta.importo_euro ?? 0)}
+                      </motion.span>
+                      <span className="font-body text-primary-foreground/60 text-sm mt-1 block">
+                        raccolti grazie a <span className="text-accent font-semibold">{raccolta.donatori ?? 0}</span> {(raccolta.donatori ?? 0) === 1 ? "donatore" : "donatori"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="inline-block h-10 md:h-12 w-40 rounded-lg bg-primary-foreground/10 animate-pulse mb-1" />
+                      <span className="inline-block h-4 w-48 rounded bg-primary-foreground/10 animate-pulse mt-1" />
+                    </>
+                  )}
+                </div>
+                <div className="border-t border-primary-foreground/10 pt-4 mt-2 text-center">
+                  <p className="font-body text-primary-foreground/50 text-xs leading-relaxed">
+                    Tutte le donazioni vengono devolute interamente a
+                  </p>
+                  <p className="font-heading text-primary-foreground font-bold text-sm mt-1">
+                    Komen Italia — Comitato Emilia Romagna
+                  </p>
+                  <p className="font-body text-primary-foreground/40 text-xs mt-1">
+                    Per la ricerca e la prevenzione dei tumori al seno
+                  </p>
+                </div>
+                <p className="text-center mt-4">
+                  <Button asChild variant="dona" size="lg" className="shadow-[0_0_30px_hsl(340_82%_52%/0.25)]">
+                    <Link to="/dona">
+                      <Heart className="w-4 h-4 mr-2" />
+                      Contribuisci ora
+                    </Link>
+                  </Button>
+                </p>
               </div>
-              <p className="text-center mt-4">
-                <Button asChild variant="dona" size="lg" className="shadow-[0_0_30px_hsl(340_82%_52%/0.25)]">
-                  <Link to="/dona">
-                    <Heart className="w-4 h-4 mr-2" />
-                    Contribuisci ora
-                  </Link>
-                </Button>
-              </p>
             </div>
           </AnimatedSection>
         </div>
