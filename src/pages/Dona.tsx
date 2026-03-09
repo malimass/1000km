@@ -301,38 +301,6 @@ export default function Dona() {
             </div>
           </AnimatedSection>
 
-          {/* Bonifico bancario */}
-          <AnimatedSection>
-            <div className="mb-10 bg-card rounded-2xl border border-border/50 shadow-md overflow-hidden">
-              <div className="bg-muted/50 px-6 py-4 flex items-center gap-3 border-b border-border/50">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-dona/10">
-                  <Landmark className="w-5 h-5 text-dona" />
-                </div>
-                <div>
-                  <h3 className="font-heading text-base font-bold text-foreground">Dona tramite bonifico bancario</h3>
-                  <p className="font-body text-xs text-muted-foreground">Effettua un bonifico diretto a Komen Italia</p>
-                </div>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <BonificoField label="Intestatario" value="Think Pink Italy ETS" />
-                  <BonificoField label="Banca" value="Banca Sella — Agenzia Roma 10" />
-                  <BonificoField label="IBAN" value="IT17G0326803210052966541910" copyable />
-                  <BonificoField label="Codice SWIFT" value="SELBIT2BXXX" copyable />
-                </div>
-                <div className="bg-dona/5 border border-dona/20 rounded-xl p-4">
-                  <p className="font-body text-sm text-foreground">
-                    <span className="font-semibold">Causale:</span>{" "}
-                    <span className="text-dona font-medium">Donazione Komen Italia Comitato Emilia Romagna</span>
-                  </p>
-                </div>
-                <p className="font-body text-xs text-muted-foreground/70 text-center">
-                  Banca Sella — Via G. Paisiello 35 C, 00198 Roma
-                </p>
-              </div>
-            </div>
-          </AnimatedSection>
-
           {/* ══ STEP 1: Scegli importo ══ */}
           {step === "importo" && (
             <AnimatedSection>
