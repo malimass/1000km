@@ -130,9 +130,15 @@ CREATE TABLE IF NOT EXISTS donazioni (
   email         text             NOT NULL,
   importo_euro  numeric(10,2)    NOT NULL,
   progetto      text             NOT NULL DEFAULT 'Sostieni Komen Italia',
-  stato         text             NOT NULL DEFAULT 'intento',  -- intento | completata
+  stato         text             NOT NULL DEFAULT 'pendente',  -- pendente | completata
+  checkout_ref  text,
   created_at    timestamptz      DEFAULT now()
 );
+
+-- Migrazione: aggiungi checkout_ref se non esiste
+ALTER TABLE donazioni ADD COLUMN IF NOT EXISTS checkout_ref text;
+-- Migrazione: aggiorna default stato
+ALTER TABLE donazioni ALTER COLUMN stato SET DEFAULT 'pendente';
 
 
 -- ─────────────────────────────────────────────────────────────────────────────

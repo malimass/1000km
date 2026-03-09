@@ -56,9 +56,7 @@ export default function Dona() {
   }, []);
 
   const importo  = raccolta?.importo_euro ?? 2500;
-  const target   = raccolta?.target_euro  ?? 50000;
   const donatori = raccolta?.donatori     ?? 42;
-  const pct      = Math.min(100, (importo / target) * 100);
 
   // ── Flusso donazione ──
   const [step, setStep]           = useState<Step>("importo");
@@ -74,24 +72,9 @@ export default function Dona() {
 
   const finalAmount = selected ?? (customAmt ? Number(customAmt) : 0);
 
-  // ── Salva donazione nel DB come "intento" ──
-  const saveDonation = useCallback(async () => {
-    const res = await fetch("/api/donazioni", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        nome: nome.trim(),
-        cognome: cognome.trim(),
-        email: email.trim(),
-        importo_euro: finalAmount,
-        progetto,
-      }),
-    });
-    if (!res.ok) {
-      const d = await res.json();
-      throw new Error(d.error ?? "Errore nel salvataggio");
-    }
-  }, [nome, cognome, email, finalAmount, progetto]);
+  // Refs to keep checkout info across steps
+  const checkoutIdRef = useRef<string>("");
+  const checkoutRefRef = useRef<string>("");
 
   // ── Crea checkout SumUp e monta widget ──
   async function handlePay(e: React.FormEvent) {
@@ -101,8 +84,23 @@ export default function Dona() {
     setError("");
 
     try {
-      // 1. Salva donazione nel nostro DB
-      await saveDonation();
+      // 1. Salva donazione nel nostro DB come "pendente"
+      const donRes = await fetch("/api/donazioni", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome: nome.trim(),
+          cognome: cognome.trim(),
+          email: email.trim(),
+          importo_euro: finalAmount,
+          progetto,
+        }),
+      });
+      if (!donRes.ok) {
+        const d = await donRes.json();
+        throw new Error(d.error ?? "Errore nel salvataggio");
+      }
+      const { donazione_id } = await donRes.json();
 
       // 2. Crea checkout SumUp
       const resp = await fetch("/api/sumup-checkout", {
@@ -114,6 +112,7 @@ export default function Dona() {
           cognome: cognome.trim(),
           email: email.trim(),
           progetto,
+          donazione_id,
         }),
       });
 
@@ -122,7 +121,9 @@ export default function Dona() {
         throw new Error(d.error ?? "Errore creazione pagamento");
       }
 
-      const { id: checkoutId } = await resp.json();
+      const { id: checkoutId, checkout_reference } = await resp.json();
+      checkoutIdRef.current = checkoutId;
+      checkoutRefRef.current = checkout_reference;
 
       // 3. Vai allo step pagamento
       setStep("pagamento");
@@ -139,14 +140,29 @@ export default function Dona() {
           checkoutId,
           email: email.trim(),
           locale: "it-IT",
-          onResponse: (type: string, body: any) => {
+          onResponse: async (type: string, body: any) => {
             if (type === "success") {
-              // Aggiorna contatore locale
-              setRaccolta(prev => prev ? {
-                ...prev,
-                importo_euro: prev.importo_euro + finalAmount,
-                donatori: prev.donatori + 1,
-              } : prev);
+              // Conferma pagamento server-side (verifica con SumUp + aggiorna contatore)
+              try {
+                const confirmRes = await fetch("/api/sumup-confirm", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    checkout_id: checkoutIdRef.current,
+                    checkout_reference: checkoutRefRef.current,
+                  }),
+                });
+                if (confirmRes.ok) {
+                  // Aggiorna contatore locale solo dopo conferma server
+                  setRaccolta(prev => prev ? {
+                    ...prev,
+                    importo_euro: prev.importo_euro + finalAmount,
+                    donatori: prev.donatori + 1,
+                  } : prev);
+                }
+              } catch {
+                // Conferma fallita, ma il pagamento è ok — verrà riconciliato
+              }
               setStep("completato");
             } else if (type === "error") {
               setError(body?.message ?? "Pagamento non riuscito. Riprova.");
@@ -227,30 +243,16 @@ export default function Dona() {
                   Raccolta fondi in tempo reale
                 </span>
               </div>
-              <div className="flex justify-between items-end mb-3">
-                <div>
-                  <span className="font-heading text-3xl font-bold text-primary-foreground">
-                    {formatEuro(importo)}
-                  </span>
-                  <span className="font-body text-primary-foreground/50 text-sm ml-2">
-                    raccolti su {formatEuro(target)}
-                  </span>
-                </div>
-                <span className="font-heading text-accent font-bold text-lg">
-                  {pct.toFixed(1)}%
+              <div className="text-center mb-3">
+                <span className="font-heading text-3xl font-bold text-primary-foreground">
+                  {formatEuro(importo)}
+                </span>
+                <span className="font-body text-primary-foreground/50 text-sm ml-2">
+                  raccolti
                 </span>
               </div>
-              <div className="w-full h-4 bg-primary-foreground/10 rounded-full overflow-hidden mb-3">
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{ background: "linear-gradient(90deg, hsl(340 82% 52%), hsl(29 87% 67%))" }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
-                  transition={{ duration: 1.5, ease: "easeOut" }}
-                />
-              </div>
               <p className="font-body text-primary-foreground/50 text-xs text-center">
-                <span className="text-accent font-semibold">{donatori} donatori</span> hanno già contribuito · Obiettivo: {formatEuro(target)} per la ricerca
+                <span className="text-accent font-semibold">{donatori} donatori</span> hanno già contribuito
               </p>
             </div>
           </AnimatedSection>

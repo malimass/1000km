@@ -108,7 +108,7 @@ export default function Partecipa() {
               <Ribbon className="w-8 h-8 text-dona" />
             </div>
             <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-3">
-              Obiettivo: €50.000 per Komen Italia
+              Sostieni Komen Italia
             </h2>
             <p className="font-body text-muted-foreground text-base leading-relaxed max-w-xl mx-auto mb-6">
               Komen Italia è l'organizzazione più importante in Italia nella lotta al cancro al seno.
