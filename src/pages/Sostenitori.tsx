@@ -212,7 +212,6 @@ export default function Sostenitori() {
                 </h3>
                 <p className="font-body text-muted-foreground text-sm mb-6 max-w-md mx-auto">
                   Con un contributo libero aiuti a rendere possibile questa impresa.
-                  Il tuo sostegno sarà contrassegnato come <strong className="text-foreground">Sponsor Sostenitori del Cammino</strong>.
                 </p>
                 <Button
                   variant="dona"
