@@ -145,7 +145,29 @@ export async function loadSiteYtVideos(): Promise<[YtVideoData, YtVideoData, YtV
   } catch { return null; }
 }
 
-// ─── Condivisione social (site_settings id=2, lettura pubblica) ────────────────
+// ─── Google Analytics + Search Console (site_settings id=3, lettura pubblica) ─
+
+export type GoogleSettings = {
+  gaId: string;              // es. G-XXXXXXXXXX
+  gscVerification: string;   // meta tag content di verifica Search Console
+};
+
+const GOOGLE_DEFAULTS: GoogleSettings = { gaId: "", gscVerification: "" };
+
+export async function saveGoogleSettings(s: GoogleSettings): Promise<void> {
+  if (!getAuthToken()) return;
+  await apiFetch("/api/site-settings?id=3", { method: "POST", body: JSON.stringify(s) });
+}
+
+export async function loadGoogleSettings(): Promise<GoogleSettings> {
+  try {
+    const res = await fetch("/api/site-settings?id=3");
+    if (!res.ok) return GOOGLE_DEFAULTS;
+    const data = await res.json();
+    if (!data || Object.keys(data).length === 0) return GOOGLE_DEFAULTS;
+    return { ...GOOGLE_DEFAULTS, ...(data as Partial<GoogleSettings>) };
+  } catch { return GOOGLE_DEFAULTS; }
+}
 
 export type ShareSettings = {
   shareTitle:     string;

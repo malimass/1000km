@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { clearAuthToken } from "@/lib/api";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import { tappe } from "@/lib/tappe";
-import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, saveSiteShareSettings, SHARE_DEFAULTS, type AdminSettings } from "@/lib/adminSettings";
+import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, saveSiteShareSettings, SHARE_DEFAULTS, loadGoogleSettings, saveGoogleSettings, type AdminSettings } from "@/lib/adminSettings";
 import { loadSosteniPage, saveSosteniPage, type Sostenitore, type SosteniPage } from "@/lib/sostenitori";
 import {
   upsertLivePosition, appendRoutePoint, clearRoutePositions, distanceMeters, todaySessionId,
@@ -312,6 +312,11 @@ export default function AdminLive() {
   const [shareUrl,       setShareUrl]       = useState("");
   const [shareSaved,     setShareSaved]     = useState(false);
 
+  // ─ Google Analytics / Search Console ─
+  const [gaId,             setGaId]             = useState("");
+  const [gscVerification,  setGscVerification]  = useState("");
+  const [googleSaved,      setGoogleSaved]      = useState(false);
+
   // ─ Auto-post sui social all'avvio GPS ─
   const [autoPostOnStart, setAutoPostOnStart] = useState(false);
   const autoPostDoneRef = useRef(false);
@@ -401,6 +406,10 @@ export default function AdminLive() {
       setShareHashtags(s.shareHashtags); setShareUrl(s.shareUrl);
       setAutoPostOnStart(s.autoPostOnStart === "true");
       setSettingsLoading(false);
+    });
+    loadGoogleSettings().then(g => {
+      setGaId(g.gaId);
+      setGscVerification(g.gscVerification);
     });
     loadSosteniPage().then(p => {
       setSosteniTitle(p.title);
@@ -506,6 +515,13 @@ export default function AdminLive() {
   // ─ Impostazioni social ─
   async function handleSaveSettings() {
     await saveSettingsDB(buildAdminSettings());
+  }
+
+  // ─ Google Analytics / Search Console ─
+  async function handleSaveGoogleSettings() {
+    await saveGoogleSettings({ gaId: gaId.trim(), gscVerification: gscVerification.trim() });
+    setGoogleSaved(true);
+    setTimeout(() => setGoogleSaved(false), 2500);
   }
 
   // ─ Video YouTube ─
@@ -2196,6 +2212,57 @@ export default function AdminLive() {
                 <h2 className="font-semibold text-foreground text-sm uppercase tracking-wide">
                   ⚙️ Impostazioni social
                 </h2>
+
+                {/* Google Analytics + Search Console */}
+                <div className="border border-border rounded-lg p-4 space-y-3 bg-background">
+                  <p className="text-xs font-bold text-foreground">Google Analytics + Search Console</p>
+                  <Field
+                    label="Google Analytics ID"
+                    value={gaId}
+                    onChange={setGaId}
+                    placeholder="G-XXXXXXXXXX"
+                    hint="Lo trovi su analytics.google.com → Amministrazione → Stream dati → ID misurazione"
+                  />
+                  <Field
+                    label="Google Search Console — codice di verifica"
+                    value={gscVerification}
+                    onChange={setGscVerification}
+                    placeholder="abc123def456…"
+                    hint="Search Console → Impostazioni → Verifica proprietà → Tag HTML → copia solo il valore content"
+                  />
+                  <button
+                    onClick={handleSaveGoogleSettings}
+                    className="w-full bg-dona text-white rounded-lg py-2 text-sm font-semibold hover:bg-dona/90 transition-opacity"
+                  >
+                    {googleSaved ? "✓ Salvato!" : "Salva Google Settings"}
+                  </button>
+                  <details className="mt-2">
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                      Come configurare Google Analytics →
+                    </summary>
+                    <ol className="mt-2 text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                      <li>Vai su <a href="https://analytics.google.com" target="_blank" rel="noreferrer" className="underline text-dona">analytics.google.com</a></li>
+                      <li><strong>Amministrazione</strong> (ingranaggio) → <strong>Crea proprietà</strong></li>
+                      <li>Nome: "1000km di Gratitudine", fuso orario Italia, EUR</li>
+                      <li><strong>Stream dati → Web</strong> → inserisci l'URL del sito</li>
+                      <li>Copia l'<strong>ID misurazione</strong> (inizia con <code className="bg-muted px-1 rounded">G-</code>)</li>
+                    </ol>
+                  </details>
+                  <details>
+                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                      Come configurare Search Console →
+                    </summary>
+                    <ol className="mt-2 text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                      <li>Vai su <a href="https://search.google.com/search-console" target="_blank" rel="noreferrer" className="underline text-dona">search.google.com/search-console</a></li>
+                      <li>Aggiungi proprietà → <strong>Prefisso URL</strong> → inserisci l'URL del sito</li>
+                      <li>Metodo di verifica: <strong>Tag HTML</strong></li>
+                      <li>Copia solo il valore dell'attributo <code className="bg-muted px-1 rounded">content="…"</code></li>
+                      <li>Incollalo qui e salva — poi clicca <strong>Verifica</strong> in Search Console</li>
+                    </ol>
+                  </details>
+                </div>
+
+                <div className="border-t border-border pt-4" />
 
                 {/* Meta */}
                 <p className="text-xs font-bold text-foreground">Meta (Facebook / Instagram)</p>
