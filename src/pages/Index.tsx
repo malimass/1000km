@@ -65,11 +65,19 @@ const Index = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.5 }}
-            className="font-body text-lg md:text-2xl text-primary-foreground/85 mb-10 max-w-2xl mx-auto leading-relaxed font-light"
+            className="font-body text-lg md:text-2xl text-primary-foreground/85 mb-4 max-w-2xl mx-auto leading-relaxed font-light"
           >
-            Un cammino di fede da Bologna alla Calabria.
+            1000 km di fede, gratitudine e speranza.
             <br className="hidden sm:block" />
-            Un gesto concreto per la ricerca.
+            Un cammino da Bologna alla Calabria per sostenere la prevenzione e la ricerca contro il tumore al seno.
+          </motion.p>
+          <motion.p
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.65 }}
+            className="font-body text-sm md:text-base text-primary-foreground/65 mb-10 max-w-xl mx-auto"
+          >
+            Tutte le donazioni sostengono i progetti di Komen Italia – Comitato Emilia-Romagna.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -138,17 +146,17 @@ const Index = () => {
               {
                 icon: <Cross className="w-10 h-10" />,
                 title: "Fede",
-                text: "Un percorso spirituale che unisce due santuari millenari, da nord a sud, in un abbraccio di devozione.",
+                text: "Un pellegrinaggio che unisce due luoghi simbolo della devozione: dal Santuario della Madonna di San Luca a Bologna al Santuario del SS Crocifisso Nero di Terranova Sappo Minulio.",
               },
               {
                 icon: <Heart className="w-10 h-10" />,
                 title: "Gratitudine",
-                text: "Ogni chilometro è un ringraziamento alla vita, alla salute, alle persone che rendono possibile il cambiamento.",
+                text: "Questo cammino nasce da un gesto personale di riconoscenza. Mille chilometri per trasformare la gratitudine in un aiuto concreto per gli altri.",
               },
               {
                 icon: <FlaskConical className="w-10 h-10" />,
                 title: "Ricerca",
-                text: "I fondi raccolti sostengono la lotta contro i tumori al seno. Un gesto concreto per chi combatte.",
+                text: "Ogni contributo sostiene i programmi di prevenzione e ricerca contro il tumore al seno promossi da Komen Italia.",
               },
             ].map((item, i) => (
               <AnimatedSection key={item.title} delay={i * 0.15}>
@@ -176,8 +184,7 @@ const Index = () => {
             <blockquote className="text-center max-w-3xl mx-auto">
               <span className="text-accent text-6xl md:text-8xl font-heading leading-none block mb-4">"</span>
               <p className="font-heading text-xl md:text-2xl lg:text-3xl text-foreground leading-relaxed italic -mt-8">
-                Non si cammina solo con i piedi, si cammina con il cuore. Ogni passo è una preghiera,
-                ogni chilometro una promessa.
+                Non si cammina solo con i piedi. Si cammina con il cuore. Ogni passo è una preghiera. Ogni chilometro una promessa di speranza.
               </p>
               <footer className="mt-6 font-body text-sm text-muted-foreground">
                 — Lo spirito di 1000kmdigratitudine
@@ -198,21 +205,27 @@ const Index = () => {
               Un'impresa straordinaria che unisce sport, fede e solidarietà
             </p>
           </AnimatedSection>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
             {[
               { value: 1000, suffix: "", label: "Chilometri" },
               { value: 16, suffix: "", label: "Giorni" },
               { value: 2, suffix: "", label: "Santuari" },
               { value: 1, suffix: "", label: "Grande causa" },
+              { value: 1, suffix: "", label: "Causa", desc: "Sostenere la prevenzione e la ricerca contro il tumore al seno." },
             ].map((kpi, i) => (
-              <AnimatedSection key={kpi.label} delay={i * 0.1}>
-                <div className="text-center p-6 rounded-lg bg-primary-foreground/5 border border-primary-foreground/10 backdrop-blur-sm">
+              <AnimatedSection key={kpi.label + i} delay={i * 0.1}>
+                <div className="text-center p-6 rounded-lg bg-primary-foreground/5 border border-primary-foreground/10 backdrop-blur-sm h-full">
                   <div className="font-heading text-4xl md:text-5xl font-bold text-accent mb-2">
                     <CountUp end={kpi.value} suffix={kpi.suffix} />
                   </div>
                   <div className="font-body text-sm text-primary-foreground/70 uppercase tracking-wider">
                     {kpi.label}
                   </div>
+                  {"desc" in kpi && kpi.desc && (
+                    <p className="font-body text-xs text-primary-foreground/50 mt-2 leading-relaxed normal-case tracking-normal">
+                      {kpi.desc}
+                    </p>
+                  )}
                 </div>
               </AnimatedSection>
             ))}
@@ -285,7 +298,7 @@ const Index = () => {
               I due Santuari
             </h2>
             <p className="text-center text-muted-foreground font-body mb-12 max-w-2xl mx-auto">
-              Due luoghi sacri uniti da un cammino di fede e solidarietà
+              Due luoghi simbolo della fede che segnano l'inizio e la meta del cammino di gratitudine.
             </p>
           </AnimatedSection>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -360,7 +373,7 @@ const Index = () => {
               {
                 icon: <Heart className="w-8 h-8" />,
                 title: "Dona",
-                text: "Ogni contributo, grande o piccolo, diventa speranza concreta per la ricerca.",
+                text: "Trasforma un passo in speranza. Sostieni la prevenzione e la ricerca contro il tumore al seno.",
                 cta: "Dona ora",
                 to: "/dona",
                 highlight: true,
@@ -368,14 +381,14 @@ const Index = () => {
               {
                 icon: <Users className="w-8 h-8" />,
                 title: "Sostenitori del cammino",
-                text: "Scopri le aziende e le persone che sostengono i 1000 km di gratitudine.",
+                text: "Scopri le persone e le aziende che stanno sostenendo questo cammino di solidarietà.",
                 cta: "Scopri i sostenitori",
                 to: "/sostenitori",
               },
               {
                 icon: <Share2 className="w-8 h-8" />,
                 title: "Condividi",
-                text: "Diffondi il messaggio. Ogni condivisione avvicina qualcuno alla causa.",
+                text: "Diffondi il messaggio. Ogni condivisione può portare nuova speranza.",
                 cta: "Condividi il progetto",
                 to: "#",
               },
@@ -405,14 +418,26 @@ const Index = () => {
             ))}
           </div>
 
+          {/* Chi siamo */}
+          <AnimatedSection delay={0.2}>
+            <div className="bg-card rounded-lg p-8 md:p-10 border border-border/50 shadow-sm mb-12 max-w-2xl mx-auto text-center">
+              <h3 className="font-heading text-xl md:text-2xl font-bold text-foreground mb-4">
+                Chi siamo
+              </h3>
+              <p className="font-body text-muted-foreground text-sm md:text-base leading-relaxed">
+                I fratelli Annunziato e Massimo intraprenderanno un cammino di 1000 km da Bologna alla Calabria per trasformare un gesto personale di gratitudine in una raccolta fondi a favore della prevenzione e della ricerca contro il tumore al seno.
+              </p>
+            </div>
+          </AnimatedSection>
+
           {/* CTA finale */}
           <AnimatedSection delay={0.3}>
             <div className="text-center bg-primary rounded-lg p-10 md:p-14">
               <h3 className="font-heading text-2xl md:text-3xl font-bold text-primary-foreground mb-4">
-                Trasforma un passo in speranza
+                Trasforma i nostri 1000 km in speranza per molte donne
               </h3>
               <p className="font-body text-primary-foreground/70 mb-8 max-w-lg mx-auto">
-                Ogni donazione sostiene la ricerca contro i tumori al seno. Insieme possiamo fare la differenza.
+                Ogni donazione sostiene la prevenzione e la ricerca contro il tumore al seno. Insieme possiamo fare la differenza.
               </p>
               <Button asChild variant="dona" size="lg" className="text-base px-12 py-6 shadow-[0_0_30px_hsl(340_82%_52%/0.3)]">
                 <Link to="/dona">
