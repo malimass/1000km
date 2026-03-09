@@ -12,10 +12,10 @@ declare global {
 }
 
 const donationTiers = [
-  { value: 10,  label: "Un passo",     desc: "Sostieni un chilometro del cammino" },
-  { value: 25,  label: "Un tratto",    desc: "Copri una tappa della giornata" },
-  { value: 50,  label: "Una giornata", desc: "Sostieni un'intera giornata di cammino" },
-  { value: 100, label: "Un abbraccio", desc: "Un contributo significativo alla ricerca" },
+  { value: 10,  label: "Cammina con noi",      desc: "Un piccolo contributo che trasforma un tratto del nostro cammino in sostegno alla prevenzione del tumore al seno." },
+  { value: 25,  label: "Sostieni il cammino",   desc: "Il tuo contributo aiuta a trasformare il cammino dei 1000 km in un aiuto concreto per la prevenzione." },
+  { value: 50,  label: "Sostieni la speranza",  desc: "Ogni passo diventa un messaggio di solidarietà e supporto alla ricerca contro il tumore al seno." },
+  { value: 100, label: "Sostieni la ricerca",   desc: "Un contributo importante per i programmi di prevenzione e ricerca promossi da Komen Italia." },
 ];
 
 const PROGETTO = "1000km Di Gratitudine";
@@ -239,9 +239,17 @@ export default function Dona() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="font-body text-primary-foreground/80 max-w-md mx-auto"
+            className="font-body text-primary-foreground/80 max-w-lg mx-auto leading-relaxed"
           >
-            Ogni contributo conta. Sostieni la ricerca contro i tumori al seno.
+            Noi camminiamo 1000 km di gratitudine. Tu puoi trasformare ogni passo in sostegno alla prevenzione e alla ricerca contro il tumore al seno.
+          </motion.p>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+            className="font-body text-primary-foreground/50 text-sm mt-3"
+          >
+            Tutte le donazioni sono destinate a Komen Italia — Comitato Emilia-Romagna.
           </motion.p>
         </div>
       </section>
@@ -310,6 +318,15 @@ export default function Dona() {
             </div>
           </AnimatedSection>
 
+          {/* Tagline forte */}
+          {step === "importo" && (
+            <AnimatedSection>
+              <p className="font-heading text-lg md:text-xl font-bold text-foreground text-center mb-10 max-w-2xl mx-auto leading-relaxed">
+                1000 km di cammino. Un unico obiettivo: sostenere la prevenzione e la ricerca contro il tumore al seno.
+              </p>
+            </AnimatedSection>
+          )}
+
           {/* ══ STEP 1: Scegli importo ══ */}
           {step === "importo" && (
             <AnimatedSection>
@@ -318,7 +335,7 @@ export default function Dona() {
                   1. Scegli il tuo contributo
                 </h2>
                 <p className="text-muted-foreground font-body leading-relaxed mb-8 text-center max-w-lg mx-auto">
-                  La raccolta fondi è interamente destinata alla lotta contro i tumori al seno tramite Komen Italia.
+                  Tutte le donazioni sono destinate a Komen Italia — Comitato Emilia-Romagna.
                 </p>
 
                 {/* Tiers */}
