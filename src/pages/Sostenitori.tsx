@@ -184,21 +184,20 @@ export default function Sostenitori() {
               <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-4">
                 Perché sostenere il cammino?
               </h2>
-              <div className="font-body text-muted-foreground leading-relaxed space-y-4 text-left max-w-2xl mx-auto">
+              <div className="font-body text-muted-foreground text-base md:text-lg leading-relaxed space-y-5 text-left max-w-2xl mx-auto">
                 <p>
                   <strong className="text-foreground">1000 km di Gratitudine</strong> è molto più di un cammino: è un
                   movimento di solidarietà che unisce sport, fede e impegno sociale nella lotta contro i tumori al seno.
                 </p>
                 <p>
-                  Sostenere questo progetto significa dare visibilità alla propria azienda o attività associandola a
-                  valori autentici: <strong className="text-foreground">coraggio, resilienza e generosità</strong>.
-                  Il tuo contributo serve a coprire le <strong className="text-foreground">spese sostenute durante il cammino</strong>:
-                  vitto, alloggio, trasporti, attrezzatura e logistica — permettendo che
-                  <strong className="text-dona"> il 100% delle donazioni dei privati vada interamente a Komen Italia</strong>.
+                  Sostenere questo progetto significa dare <strong className="text-foreground">visibilità alla propria azienda</strong> o
+                  attività associandola a valori autentici: <strong className="text-foreground">coraggio, resilienza e generosità</strong>.
+                  Il tuo contributo serve a coprire le <strong className="text-foreground">spese sostenute durante il cammino</strong>.
                 </p>
                 <p>
-                  In cambio, il tuo nome e logo appariranno tra i sostenitori ufficiali del progetto,
-                  con visibilità su questo sito, sui canali social e sul camper durante tutto il cammino.
+                  In cambio, la tua azienda e logo appariranno tra i <strong className="text-foreground">sostenitori ufficiali</strong> del progetto,
+                  con visibilità su questo <strong className="text-foreground">sito</strong>, sui <strong className="text-foreground">canali social</strong> e
+                  sul <strong className="text-foreground">camper</strong> durante tutto il cammino.
                 </p>
               </div>
             </div>
