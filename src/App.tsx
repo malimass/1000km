@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import ScrollToTop from "./components/ScrollToTop";
+import GoogleHead from "./components/GoogleHead";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import ProtectedCoachRoute from "./components/ProtectedCoachRoute";
 import NativeRedirect from "./components/NativeRedirect";
@@ -66,6 +67,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ScrollToTop />
+        <GoogleHead />
         <Suspense fallback={<div className="min-h-screen bg-background" />}>
         <Routes>
           <Route path="/" element={<NativeRedirect><Index /></NativeRedirect>} />
