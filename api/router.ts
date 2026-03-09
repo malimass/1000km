@@ -37,6 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/scrape-site") return await scrapeSite(req, res);
     if (path === "/traccar-position") return await traccarPosition(req, res);
     if (path === "/donazioni") return await donazioni(req, res);
+    if (path === "/sumup-checkout") return await sumupCheckout(req, res);
     return res.status(404).json({ error: "Not found" });
   } catch (err: any) {
     console.error(err);
@@ -450,6 +451,45 @@ async function donazioni(req: VercelRequest, res: VercelResponse) {
     return res.json(rows);
   }
   return res.status(405).end();
+}
+
+// ─── SUMUP CHECKOUT ──────────────────────────────────────────────────────────
+
+async function sumupCheckout(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") return res.status(405).end();
+
+  const { amount, nome, cognome, email, progetto, donazione_id } = req.body ?? {};
+  if (!amount || !email) return res.status(400).json({ error: "amount e email richiesti" });
+
+  const apiKey = process.env.SUMUP_API_KEY;
+  const merchantCode = process.env.SUMUP_MERCHANT_CODE;
+  if (!apiKey || !merchantCode) return res.status(500).json({ error: "SumUp non configurato" });
+
+  const checkoutRef = `don-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const resp = await fetch("https://api.sumup.com/v0.1/checkouts", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      checkout_reference: checkoutRef,
+      amount: Number(amount),
+      currency: "EUR",
+      merchant_code: merchantCode,
+      description: `Donazione ${progetto ?? "1000km Di Gratitudine"} - ${nome ?? ""} ${cognome ?? ""}`.trim(),
+    }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    console.error("SumUp checkout error:", err);
+    return res.status(502).json({ error: "Errore creazione checkout SumUp" });
+  }
+
+  const checkout = await resp.json();
+  return res.status(201).json({ id: checkout.id, checkout_reference: checkoutRef });
 }
 
 // ─── ADMIN SETTINGS ──────────────────────────────────────────────────────────
