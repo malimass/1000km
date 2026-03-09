@@ -205,13 +205,12 @@ const Index = () => {
               Un'impresa straordinaria che unisce sport, fede e solidarietà
             </p>
           </AnimatedSection>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
               { value: 1000, suffix: "", label: "Chilometri" },
               { value: 16, suffix: "", label: "Giorni" },
               { value: 2, suffix: "", label: "Santuari" },
-              { value: 1, suffix: "", label: "Grande causa" },
-              { value: 1, suffix: "", label: "Causa", desc: "Sostenere la prevenzione e la ricerca contro il tumore al seno." },
+              { value: 1, suffix: "", label: "Grande causa", desc: "Sostenere la prevenzione e la ricerca contro il tumore al seno." },
             ].map((kpi, i) => (
               <AnimatedSection key={kpi.label + i} delay={i * 0.1}>
                 <div className="text-center p-6 rounded-lg bg-primary-foreground/5 border border-primary-foreground/10 backdrop-blur-sm h-full">
