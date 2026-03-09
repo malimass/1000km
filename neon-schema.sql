@@ -120,6 +120,22 @@ ON CONFLICT (id) DO NOTHING;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- 6b. DONAZIONI  (ogni singola donazione, aggiorna raccolta_fondi)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS donazioni (
+  id            bigserial        PRIMARY KEY,
+  nome          text             NOT NULL,
+  cognome       text             NOT NULL DEFAULT '',
+  email         text             NOT NULL,
+  importo_euro  numeric(10,2)    NOT NULL,
+  progetto      text             NOT NULL DEFAULT 'Sostieni Komen Italia',
+  stato         text             NOT NULL DEFAULT 'intento',  -- intento | completata
+  created_at    timestamptz      DEFAULT now()
+);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- 7. SERVIZI PAGE  (info pratiche, gestibili da admin)
 -- ─────────────────────────────────────────────────────────────────────────────
 
