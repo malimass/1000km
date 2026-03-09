@@ -295,21 +295,6 @@ export default function Dona() {
                       <span className="font-body text-primary-foreground/60 text-sm mt-1 block">
                         raccolti grazie a <span className="text-accent font-semibold">{donatori}</span> {donatori === 1 ? "donatore" : "donatori"}
                       </span>
-                      {/* Progress bar + obiettivo */}
-                      <div className="mt-4 max-w-xs mx-auto">
-                        <div className="w-full h-3 bg-primary-foreground/10 rounded-full overflow-hidden">
-                          <motion.div
-                            className="h-full rounded-full"
-                            style={{ background: "linear-gradient(90deg, hsl(340 82% 52%), hsl(29 87% 67%))" }}
-                            initial={{ width: 0 }}
-                            animate={{ width: `${Math.min((importo / (raccolta.target_euro || 50000)) * 100, 100)}%` }}
-                            transition={{ duration: 1.2, ease: "easeOut" }}
-                          />
-                        </div>
-                        <span className="font-body text-primary-foreground/50 text-xs mt-2 block">
-                          Obiettivo: <span className="text-accent font-semibold">{formatEuro(raccolta.target_euro || 50000)}</span>
-                        </span>
-                      </div>
                     </>
                   ) : (
                     <>
