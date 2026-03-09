@@ -9,7 +9,8 @@ import heroBg from "@/assets/hero-cammino.jpg";
 import sanLucaImg from "@/assets/san-luca.jpg";
 import crocifissoImg from "@/assets/crocifisso-nero.jpg";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { loadRaccoltaFondi, subscribeRaccoltaFondi, type RaccoltaFondi } from "@/lib/notizie";
 
 const Index = () => {
   const heroRef = useRef<HTMLElement>(null);
@@ -18,6 +19,12 @@ const Index = () => {
     offset: ["start start", "end start"],
   });
   const heroY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
+
+  const [raccolta, setRaccolta] = useState<RaccoltaFondi | null>(null);
+  useEffect(() => {
+    loadRaccoltaFondi().then(r => { if (r) setRaccolta(r); });
+    return subscribeRaccoltaFondi(r => setRaccolta(r));
+  }, []);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
   return (
@@ -190,7 +197,7 @@ const Index = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
               { value: 1000, suffix: "", label: "Chilometri" },
-              { value: 14, suffix: "", label: "Giorni" },
+              { value: 16, suffix: "", label: "Giorni" },
               { value: 2, suffix: "", label: "Santuari" },
               { value: 1, suffix: "", label: "Grande causa" },
             ].map((kpi, i) => (
@@ -212,7 +219,9 @@ const Index = () => {
             <div className="mt-16 max-w-xl mx-auto">
               <div className="flex justify-between text-sm font-body mb-3">
                 <span className="text-primary-foreground/70">Raccolta fondi</span>
-                <span className="text-accent font-bold">€ 2.500 / € 50.000</span>
+                <span className="text-accent font-bold">
+                  € {(raccolta?.importo_euro ?? 0).toLocaleString("it-IT")} / € {(raccolta?.target_euro ?? 50000).toLocaleString("it-IT")}
+                </span>
               </div>
               <div className="w-full h-4 bg-primary-foreground/10 rounded-full overflow-hidden">
                 <motion.div
@@ -221,7 +230,7 @@ const Index = () => {
                     background: "linear-gradient(90deg, hsl(340 82% 52%), hsl(29 87% 67%))",
                   }}
                   initial={{ width: 0 }}
-                  whileInView={{ width: "5%" }}
+                  whileInView={{ width: `${Math.min(((raccolta?.importo_euro ?? 0) / (raccolta?.target_euro ?? 50000)) * 100, 100)}%` }}
                   viewport={{ once: true }}
                   transition={{ duration: 1.5, delay: 0.5, ease: "easeOut" }}
                 />
