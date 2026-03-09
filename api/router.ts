@@ -38,6 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/traccar-position") return await traccarPosition(req, res);
     if (path === "/donazioni") return await donazioni(req, res);
     if (path === "/sumup-checkout") return await sumupCheckout(req, res);
+    if (path === "/sumup-confirm") return await sumupConfirm(req, res);
     return res.status(404).json({ error: "Not found" });
   } catch (err: any) {
     console.error(err);
@@ -419,27 +420,20 @@ async function donazioni(req: VercelRequest, res: VercelResponse) {
         email         text             NOT NULL,
         importo_euro  numeric(10,2)    NOT NULL,
         progetto      text             NOT NULL DEFAULT 'Sostieni Komen Italia',
-        stato         text             NOT NULL DEFAULT 'intento',
+        stato         text             NOT NULL DEFAULT 'pendente',
+        checkout_ref  text,
         created_at    timestamptz      DEFAULT now()
       )
     `;
 
-    // Save donation
-    await sql`
-      INSERT INTO donazioni (nome, cognome, email, importo_euro, progetto)
-      VALUES (${nome}, ${cognome ?? ""}, ${email}, ${importo}, ${progetto ?? "Sostieni Komen Italia"})
+    // Save donation as pendente (counter updates only after payment confirmation)
+    const [row] = await sql`
+      INSERT INTO donazioni (nome, cognome, email, importo_euro, progetto, stato)
+      VALUES (${nome}, ${cognome ?? ""}, ${email}, ${importo}, ${progetto ?? "Sostieni Komen Italia"}, 'pendente')
+      RETURNING id
     `;
 
-    // Update raccolta_fondi counter
-    await sql`
-      UPDATE raccolta_fondi
-      SET importo_euro = importo_euro + ${importo},
-          donatori     = donatori + 1,
-          updated_at   = now()
-      WHERE id = 1
-    `;
-
-    return res.status(201).json({ ok: true });
+    return res.status(201).json({ ok: true, donazione_id: row.id });
   }
   if (req.method === "GET") {
     const auth = await requireAuth(req);
@@ -489,7 +483,70 @@ async function sumupCheckout(req: VercelRequest, res: VercelResponse) {
   }
 
   const checkout = await resp.json();
+
+  // Link checkout to donazione
+  if (req.body.donazione_id) {
+    await sql`
+      UPDATE donazioni SET checkout_ref = ${checkoutRef} WHERE id = ${req.body.donazione_id}
+    `;
+  }
+
   return res.status(201).json({ id: checkout.id, checkout_reference: checkoutRef });
+}
+
+// ─── SUMUP CONFIRM ───────────────────────────────────────────────────────────
+
+async function sumupConfirm(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") return res.status(405).end();
+
+  const { checkout_id, checkout_reference } = req.body ?? {};
+  if (!checkout_id) return res.status(400).json({ error: "checkout_id richiesto" });
+
+  const apiKey = process.env.SUMUP_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: "SumUp non configurato" });
+
+  // Verify payment status with SumUp
+  const resp = await fetch(`https://api.sumup.com/v0.1/checkouts/${checkout_id}`, {
+    headers: { "Authorization": `Bearer ${apiKey}` },
+  });
+
+  if (!resp.ok) {
+    console.error("SumUp verify error:", await resp.text());
+    return res.status(502).json({ error: "Errore verifica pagamento" });
+  }
+
+  const checkout = await resp.json();
+
+  // Check if payment was successful
+  const txn = checkout.transactions?.find((t: any) => t.status === "SUCCESSFUL");
+  if (!txn && checkout.status !== "PAID") {
+    return res.status(400).json({ error: "Pagamento non completato", status: checkout.status });
+  }
+
+  // Update donazione stato → completata + update counter (idempotent)
+  const ref = checkout_reference || checkout.checkout_reference;
+  if (ref) {
+    const [don] = await sql`
+      UPDATE donazioni SET stato = 'completata'
+      WHERE checkout_ref = ${ref} AND stato != 'completata'
+      RETURNING importo_euro
+    `;
+    if (don) {
+      await sql`
+        UPDATE raccolta_fondi
+        SET importo_euro = importo_euro + ${don.importo_euro},
+            donatori     = donatori + 1,
+            updated_at   = now()
+        WHERE id = 1
+      `;
+    }
+  }
+
+  return res.json({
+    ok: true,
+    status: "PAID",
+    transaction_id: txn?.id ?? checkout.transaction_id,
+  });
 }
 
 // ─── ADMIN SETTINGS ──────────────────────────────────────────────────────────
