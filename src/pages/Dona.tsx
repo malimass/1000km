@@ -1,13 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Heart, ArrowLeft, Shield, Users, TrendingUp, ExternalLink, Check, Loader2 } from "lucide-react";
+import { Heart, ArrowLeft, Shield, Users, TrendingUp, Check, Loader2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
 import { motion } from "framer-motion";
 import { loadRaccoltaFondi, subscribeRaccoltaFondi, type RaccoltaFondi } from "@/lib/notizie";
 
-const KOMEN_URL = "https://komen.it/sostienici/progetti/";
+declare global {
+  interface Window { SumUpCard: any; }
+}
 
 const donationTiers = [
   { value: 10,  label: "Un passo",     desc: "Sostieni un chilometro del cammino" },
@@ -28,10 +30,25 @@ function formatEuro(n: number): string {
   return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
 }
 
-type Step = "importo" | "dati" | "completato";
+/** Load SumUp SDK script once */
+function useSumUpSdk() {
+  const [ready, setReady] = useState(!!window.SumUpCard);
+  useEffect(() => {
+    if (window.SumUpCard) { setReady(true); return; }
+    const s = document.createElement("script");
+    s.src = "https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js";
+    s.async = true;
+    s.onload = () => setReady(true);
+    document.head.appendChild(s);
+  }, []);
+  return ready;
+}
+
+type Step = "importo" | "dati" | "pagamento" | "completato";
 
 export default function Dona() {
   const [raccolta, setRaccolta] = useState<RaccoltaFondi | null>(null);
+  const sdkReady = useSumUpSdk();
 
   useEffect(() => {
     loadRaccoltaFondi().then(r => { if (r) setRaccolta(r); });
@@ -53,43 +70,104 @@ export default function Dona() {
   const [email, setEmail]         = useState("");
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
+  const widgetRef = useRef<HTMLDivElement>(null);
 
   const finalAmount = selected ?? (customAmt ? Number(customAmt) : 0);
 
-  async function handleSubmit(e: React.FormEvent) {
+  // ── Salva donazione nel DB come "intento" ──
+  const saveDonation = useCallback(async () => {
+    const res = await fetch("/api/donazioni", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: nome.trim(),
+        cognome: cognome.trim(),
+        email: email.trim(),
+        importo_euro: finalAmount,
+        progetto,
+      }),
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      throw new Error(d.error ?? "Errore nel salvataggio");
+    }
+  }, [nome, cognome, email, finalAmount, progetto]);
+
+  // ── Crea checkout SumUp e monta widget ──
+  async function handlePay(e: React.FormEvent) {
     e.preventDefault();
     if (!nome.trim() || !email.trim() || finalAmount <= 0) return;
     setSaving(true);
     setError("");
+
     try {
-      const res = await fetch("/api/donazioni", {
+      // 1. Salva donazione nel nostro DB
+      await saveDonation();
+
+      // 2. Crea checkout SumUp
+      const resp = await fetch("/api/sumup-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          amount: finalAmount,
           nome: nome.trim(),
           cognome: cognome.trim(),
           email: email.trim(),
-          importo_euro: finalAmount,
           progetto,
         }),
       });
-      if (!res.ok) {
-        const d = await res.json();
-        setError(d.error ?? "Errore nel salvataggio");
-        setSaving(false);
-        return;
+
+      if (!resp.ok) {
+        const d = await resp.json();
+        throw new Error(d.error ?? "Errore creazione pagamento");
       }
-      // Aggiorna contatore locale
-      setRaccolta(prev => prev ? {
-        ...prev,
-        importo_euro: prev.importo_euro + finalAmount,
-        donatori: prev.donatori + 1,
-      } : prev);
-      setStep("completato");
-    } catch {
-      setError("Errore di rete. Riprova.");
+
+      const { id: checkoutId } = await resp.json();
+
+      // 3. Vai allo step pagamento
+      setStep("pagamento");
+      setSaving(false);
+
+      // 4. Monta widget SumUp (dopo render)
+      setTimeout(() => {
+        if (!window.SumUpCard || !widgetRef.current) return;
+        if (window.SumUpCard.unmount) {
+          try { window.SumUpCard.unmount("sumup-card"); } catch {}
+        }
+        window.SumUpCard.mount({
+          id: "sumup-card",
+          checkoutId,
+          email: email.trim(),
+          locale: "it-IT",
+          onResponse: (type: string, body: any) => {
+            if (type === "success") {
+              // Aggiorna contatore locale
+              setRaccolta(prev => prev ? {
+                ...prev,
+                importo_euro: prev.importo_euro + finalAmount,
+                donatori: prev.donatori + 1,
+              } : prev);
+              setStep("completato");
+            } else if (type === "error") {
+              setError(body?.message ?? "Pagamento non riuscito. Riprova.");
+            }
+          },
+        });
+      }, 100);
+    } catch (err: any) {
+      setError(err.message ?? "Errore di rete. Riprova.");
+      setSaving(false);
     }
-    setSaving(false);
+  }
+
+  function resetForm() {
+    setStep("importo");
+    setSelected(null);
+    setCustomAmt("");
+    setNome("");
+    setCognome("");
+    setEmail("");
+    setError("");
   }
 
   return (
@@ -262,7 +340,7 @@ export default function Dona() {
                   Progetto: <strong className="text-foreground">{progetto}</strong>
                 </p>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handlePay} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-muted-foreground mb-1">Nome *</label>
@@ -318,14 +396,14 @@ export default function Dona() {
                       variant="dona"
                       size="lg"
                       className="flex-1 shadow-[0_0_30px_hsl(340_82%_52%/0.25)]"
-                      disabled={saving || !nome.trim() || !email.trim()}
+                      disabled={saving || !nome.trim() || !email.trim() || !sdkReady}
                     >
                       {saving ? (
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       ) : (
-                        <Heart className="w-4 h-4 mr-2" />
+                        <CreditCard className="w-4 h-4 mr-2" />
                       )}
-                      Conferma e Dona € {finalAmount}
+                      Procedi al pagamento
                     </Button>
                   </div>
                 </form>
@@ -333,7 +411,45 @@ export default function Dona() {
             </AnimatedSection>
           )}
 
-          {/* ══ STEP 3: Completato — redirect a Komen ══ */}
+          {/* ══ STEP 3: Widget SumUp ══ */}
+          {step === "pagamento" && (
+            <AnimatedSection>
+              <div className="bg-card rounded-xl p-8 md:p-12 shadow-lg border border-border/50">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="font-heading text-2xl font-bold text-foreground">
+                    3. Pagamento
+                  </h2>
+                  <span className="font-heading text-dona font-bold text-lg">€ {finalAmount}</span>
+                </div>
+                <p className="text-muted-foreground font-body text-sm mb-6">
+                  Donazione di <strong className="text-foreground">{nome} {cognome}</strong> al progetto <strong className="text-foreground">{progetto}</strong>
+                </p>
+
+                {/* SumUp Card Widget */}
+                <div
+                  id="sumup-card"
+                  ref={widgetRef}
+                  className="min-h-[300px] mb-6"
+                />
+
+                {error && (
+                  <p className="text-red-500 text-sm font-body mb-4">{error}</p>
+                )}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setStep("dati"); setError(""); }}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Torna ai dati
+                </Button>
+              </div>
+            </AnimatedSection>
+          )}
+
+          {/* ══ STEP 4: Completato ══ */}
           {step === "completato" && (
             <AnimatedSection>
               <div className="bg-card rounded-xl p-8 md:p-12 shadow-lg border border-border/50 text-center">
@@ -350,41 +466,24 @@ export default function Dona() {
                   Grazie, {nome}!
                 </h2>
                 <p className="text-muted-foreground font-body mb-2">
-                  La tua intenzione di donare <strong className="text-dona">€ {finalAmount}</strong> al progetto
-                  "<strong>{progetto}</strong>" è stata registrata.
+                  La tua donazione di <strong className="text-dona">€ {finalAmount}</strong> al progetto
+                  "<strong>{progetto}</strong>" è stata completata con successo.
                 </p>
                 <p className="text-muted-foreground font-body mb-8">
-                  Completa ora la donazione direttamente sul sito di <strong>Komen Italia</strong>.
+                  Riceverai una conferma via email a <strong>{email}</strong>.
+                  I fondi saranno interamente devoluti a <strong>Komen Italia</strong> — Comitato Emilia Romagna.
                 </p>
 
                 <div className="flex flex-col gap-3 max-w-md mx-auto">
-                  <Button
-                    variant="dona"
-                    size="lg"
-                    className="w-full shadow-[0_0_30px_hsl(340_82%_52%/0.25)]"
-                    onClick={() => window.open(KOMEN_URL, "_blank")}
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Completa la donazione su Komen Italia
-                  </Button>
-                  <p className="text-muted-foreground/60 font-body text-xs">
-                    Verrai reindirizzato su komen.it per completare il pagamento in sicurezza.
-                  </p>
                   <div className="border-t border-border pt-4 mt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setStep("importo");
-                        setSelected(null);
-                        setCustomAmt("");
-                        setNome("");
-                        setCognome("");
-                        setEmail("");
-                      }}
-                    >
-                      Fai un'altra donazione
-                    </Button>
+                    <div className="flex gap-3 justify-center">
+                      <Button variant="outline" size="sm" onClick={resetForm}>
+                        Fai un'altra donazione
+                      </Button>
+                      <Button asChild variant="outline" size="sm">
+                        <Link to="/">Torna alla home</Link>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
