@@ -194,11 +194,11 @@ export default function Sostenitori() {
                   valori autentici: <strong className="text-foreground">coraggio, resilienza e generosità</strong>.
                   Il tuo contributo serve a coprire le <strong className="text-foreground">spese sostenute durante il cammino</strong>:
                   vitto, alloggio, trasporti, attrezzatura e logistica — permettendo che
-                  <strong className="text-dona"> il 100% delle donazioni raccolte vada interamente a Komen Italia — Comitato Emilia Romagna</strong>.
+                  <strong className="text-dona"> il 100% delle donazioni dei privati vada interamente a Komen Italia</strong>.
                 </p>
                 <p>
                   In cambio, il tuo nome e logo appariranno tra i sostenitori ufficiali del progetto,
-                  con visibilità su questo sito, sui canali social e durante tutte le tappe del cammino.
+                  con visibilità su questo sito, sui canali social e sul camper durante tutto il cammino.
                 </p>
               </div>
             </div>
