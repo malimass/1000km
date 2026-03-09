@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Heart, ArrowLeft, Shield, Users, TrendingUp, Check, Loader2, CreditCard } from "lucide-react";
+import { Heart, ArrowLeft, Shield, Users, Check, Loader2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -236,24 +236,41 @@ export default function Dona() {
 
           {/* Raccolta fondi live */}
           <AnimatedSection>
-            <div className="mb-10 bg-primary rounded-xl p-6 md:p-8">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="w-5 h-5 text-dona" />
-                <span className="font-heading text-sm uppercase tracking-widest text-primary-foreground/70 font-bold">
-                  Raccolta fondi in tempo reale
+            <div className="mb-10 rounded-2xl overflow-hidden border border-dona/20 shadow-lg">
+              {/* Header gradient */}
+              <div className="bg-gradient-to-r from-dona/90 to-dona/70 px-6 py-4 flex items-center gap-2">
+                <Heart className="w-5 h-5 text-white" />
+                <span className="font-heading text-sm uppercase tracking-widest text-white/90 font-bold">
+                  Raccolta fondi
                 </span>
               </div>
-              <div className="text-center mb-3">
-                <span className="font-heading text-3xl font-bold text-primary-foreground">
-                  {formatEuro(importo)}
-                </span>
-                <span className="font-body text-primary-foreground/50 text-sm ml-2">
-                  raccolti
-                </span>
+              {/* Body */}
+              <div className="bg-primary p-6 md:p-8">
+                <div className="text-center mb-4">
+                  <motion.span
+                    className="font-heading text-4xl md:text-5xl font-bold text-dona block"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
+                  >
+                    {formatEuro(importo)}
+                  </motion.span>
+                  <span className="font-body text-primary-foreground/60 text-sm mt-1 block">
+                    raccolti grazie a <span className="text-accent font-semibold">{donatori}</span> {donatori === 1 ? "donatore" : "donatori"}
+                  </span>
+                </div>
+                <div className="border-t border-primary-foreground/10 pt-4 mt-2 text-center">
+                  <p className="font-body text-primary-foreground/50 text-xs leading-relaxed">
+                    Tutte le donazioni vengono devolute interamente a
+                  </p>
+                  <p className="font-heading text-primary-foreground font-bold text-sm mt-1">
+                    Komen Italia — Comitato Emilia Romagna
+                  </p>
+                  <p className="font-body text-primary-foreground/40 text-[11px] mt-1">
+                    Per la ricerca e la prevenzione dei tumori al seno
+                  </p>
+                </div>
               </div>
-              <p className="font-body text-primary-foreground/50 text-xs text-center">
-                <span className="text-accent font-semibold">{donatori} donatori</span> hanno già contribuito
-              </p>
             </div>
           </AnimatedSection>
 
