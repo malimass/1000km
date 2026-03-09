@@ -46,7 +46,7 @@ function BonificoField({ label, value, copyable }: { label: string; value: strin
           <button
             type="button"
             onClick={handleCopy}
-            className="p-1 rounded hover:bg-muted transition-colors"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-muted active:bg-muted transition-colors"
             title="Copia"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
@@ -216,7 +216,7 @@ export default function Dona() {
   return (
     <Layout>
       {/* Hero */}
-      <section className="relative h-[45vh] flex items-center justify-center bg-primary overflow-hidden">
+      <section className="relative min-h-[45vh] flex items-center justify-center bg-primary overflow-hidden py-16">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_hsl(340_82%_52%/0.15)_0%,_transparent_70%)]" />
         <div className="relative text-center px-4">
           <motion.div
@@ -330,8 +330,8 @@ export default function Dona() {
           {/* ══ STEP 1: Scegli importo ══ */}
           {step === "importo" && (
             <AnimatedSection>
-              <div className="bg-card rounded-xl p-8 md:p-12 shadow-lg border border-border/50">
-                <h2 className="font-heading text-2xl font-bold text-foreground mb-2 text-center">
+              <div className="bg-card rounded-xl p-6 sm:p-8 md:p-12 shadow-lg border border-border/50">
+                <h2 className="font-heading text-xl sm:text-2xl font-bold text-foreground mb-2 text-center">
                   1. Scegli il tuo contributo
                 </h2>
                 <p className="text-muted-foreground font-body leading-relaxed mb-8 text-center max-w-lg mx-auto">
@@ -339,31 +339,33 @@ export default function Dona() {
                 </p>
 
                 {/* Tiers */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                   {donationTiers.map((tier) => (
                     <motion.button
                       key={tier.value}
                       type="button"
                       onClick={() => { setSelected(tier.value); setCustomAmt(""); }}
-                      whileHover={{ scale: 1.04 }}
+                      whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.97 }}
-                      className={`rounded-xl border-2 p-4 text-left transition-colors ${
+                      className={`rounded-xl border-2 p-5 text-left transition-colors flex items-start gap-4 ${
                         selected === tier.value
                           ? "border-dona bg-dona/10 ring-2 ring-dona/30"
                           : "border-border hover:border-dona bg-card hover:bg-dona/5"
                       }`}
                     >
-                      <span className={`font-heading text-2xl font-bold block mb-1 transition-colors ${
+                      <span className={`font-heading text-2xl font-bold shrink-0 transition-colors ${
                         selected === tier.value ? "text-dona" : "text-foreground"
                       }`}>
-                        € {tier.value}
+                        €{tier.value}
                       </span>
-                      <span className="font-body text-xs font-semibold uppercase tracking-wider text-dona block mb-1">
-                        {tier.label}
-                      </span>
-                      <span className="font-body text-xs text-muted-foreground leading-snug block">
-                        {tier.desc}
-                      </span>
+                      <div className="min-w-0">
+                        <span className="font-body text-xs font-semibold uppercase tracking-wider text-dona block mb-1">
+                          {tier.label}
+                        </span>
+                        <span className="font-body text-sm text-muted-foreground leading-relaxed block">
+                          {tier.desc}
+                        </span>
+                      </div>
                     </motion.button>
                   ))}
                 </div>
@@ -401,9 +403,9 @@ export default function Dona() {
           {/* ══ STEP 2: Dati donatore ══ */}
           {step === "dati" && (
             <AnimatedSection>
-              <div className="bg-card rounded-xl p-8 md:p-12 shadow-lg border border-border/50">
+              <div className="bg-card rounded-xl p-6 sm:p-8 md:p-12 shadow-lg border border-border/50">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-heading text-2xl font-bold text-foreground">
+                  <h2 className="font-heading text-xl sm:text-2xl font-bold text-foreground">
                     2. I tuoi dati
                   </h2>
                   <span className="font-heading text-dona font-bold text-lg">€ {finalAmount}</span>
@@ -452,7 +454,7 @@ export default function Dona() {
                     <p className="text-red-500 text-sm font-body">{error}</p>
                   )}
 
-                  <div className="flex gap-3 pt-2">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <Button
                       type="button"
                       variant="outline"
@@ -486,9 +488,9 @@ export default function Dona() {
           {/* ══ STEP 3: Widget SumUp ══ */}
           {step === "pagamento" && (
             <AnimatedSection>
-              <div className="bg-card rounded-xl p-8 md:p-12 shadow-lg border border-border/50">
+              <div className="bg-card rounded-xl p-6 sm:p-8 md:p-12 shadow-lg border border-border/50">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-heading text-2xl font-bold text-foreground">
+                  <h2 className="font-heading text-xl sm:text-2xl font-bold text-foreground">
                     3. Pagamento
                   </h2>
                   <span className="font-heading text-dona font-bold text-lg">€ {finalAmount}</span>
@@ -547,7 +549,7 @@ export default function Dona() {
           {/* ══ STEP 4: Completato ══ */}
           {step === "completato" && (
             <AnimatedSection>
-              <div className="bg-card rounded-xl p-8 md:p-12 shadow-lg border border-border/50 text-center">
+              <div className="bg-card rounded-xl p-6 sm:p-8 md:p-12 shadow-lg border border-border/50 text-center">
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
