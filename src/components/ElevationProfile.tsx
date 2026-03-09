@@ -155,7 +155,7 @@ function StatCard({
     <div className="flex items-center gap-1.5 sm:gap-2 bg-card rounded-lg border border-border px-2 sm:px-3 py-2">
       <span className={`${color} shrink-0`}>{icon}</span>
       <div className="min-w-0">
-        <p className="text-[10px] text-muted-foreground font-body leading-tight">{label}</p>
+        <p className="text-xs text-muted-foreground font-body leading-tight">{label}</p>
         <p className="text-xs sm:text-sm font-semibold font-body truncate">{value}</p>
       </div>
     </div>

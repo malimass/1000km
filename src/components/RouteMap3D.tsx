@@ -176,16 +176,16 @@ export default function RouteMap3D({ coords, waypoints }: Props) {
   return (
     <div
       className={`relative w-full rounded-xl overflow-hidden shadow-lg border border-border ${isFullscreen ? "fixed inset-0 z-[9999] rounded-none" : ""}`}
-      style={isFullscreen ? { height: "100vh" } : { height: 480 }}
+      style={isFullscreen ? { height: "100vh" } : { height: "min(480px, 70vw)" }}
     >
       <button
         onClick={() => setIsFullscreen(prev => !prev)}
-        className="absolute top-3 right-3 z-[1000] bg-white/90 hover:bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-medium shadow-md transition-colors"
+        className="absolute top-3 right-3 z-[1000] bg-white/90 hover:bg-white active:bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 min-h-[44px] min-w-[44px] text-xs font-medium shadow-md transition-colors"
         title={isFullscreen ? "Esci da schermo intero" : "Schermo intero"}
       >
         {isFullscreen ? "✕ Esci" : "⛶ Schermo intero"}
       </button>
-      <div className="absolute bottom-3 left-3 z-[1000] bg-black/60 text-white text-[10px] px-2 py-1 rounded font-body">
+      <div className="absolute bottom-3 left-3 z-[1000] bg-black/60 text-white text-xs px-2 py-1 rounded font-body">
         Trascina per ruotare · Scroll per zoom · Ctrl+drag per inclinare
       </div>
       <div ref={containerRef} style={{ width: "100%", height: "100%" }} />

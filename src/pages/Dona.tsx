@@ -39,7 +39,7 @@ function BonificoField({ label, value, copyable }: { label: string; value: strin
   };
   return (
     <div className="space-y-1">
-      <span className="font-body text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="font-body text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
       <div className="flex items-center gap-2">
         <span className="font-body text-sm text-foreground font-medium select-all">{value}</span>
         {copyable && (
@@ -302,7 +302,7 @@ export default function Dona() {
                   <p className="font-heading text-primary-foreground font-bold text-sm mt-1">
                     Komen Italia — Comitato Emilia Romagna
                   </p>
-                  <p className="font-body text-primary-foreground/40 text-[11px] mt-1">
+                  <p className="font-body text-primary-foreground/40 text-xs mt-1">
                     Per la ricerca e la prevenzione dei tumori al seno
                   </p>
                 </div>
