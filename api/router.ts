@@ -380,11 +380,21 @@ async function siteSettings(req: VercelRequest, res: VercelResponse) {
 
 async function raccoltaFondi(req: VercelRequest, res: VercelResponse) {
   if (req.method === "GET") {
-    const rows = await sql`
-      SELECT importo_euro, target_euro, donatori, updated_at
-      FROM raccolta_fondi WHERE id = 1 LIMIT 1
+    // Compute totals from confirmed donations (always in sync with DB)
+    const [totals] = await sql`
+      SELECT COALESCE(SUM(importo_euro), 0) AS importo_euro,
+             COUNT(*)::int                   AS donatori
+      FROM donazioni WHERE stato = 'completata'
     `;
-    return res.json(rows[0] ?? null);
+    const [meta] = await sql`
+      SELECT target_euro FROM raccolta_fondi WHERE id = 1 LIMIT 1
+    `;
+    return res.json({
+      importo_euro: Number(totals.importo_euro),
+      donatori: totals.donatori,
+      target_euro: meta?.target_euro ?? 50000,
+      updated_at: new Date().toISOString(),
+    });
   }
   if (req.method === "PATCH") {
     const auth = await requireAuth(req);
