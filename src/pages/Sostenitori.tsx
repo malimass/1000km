@@ -192,7 +192,8 @@ export default function Sostenitori() {
                 <p>
                   Sostenere questo progetto significa dare visibilità alla propria azienda o attività associandola a
                   valori autentici: <strong className="text-foreground">coraggio, resilienza e generosità</strong>.
-                  Il tuo contributo ci aiuta a coprire i costi organizzativi e logistici del cammino, permettendo che
+                  Il tuo contributo serve a coprire le <strong className="text-foreground">spese sostenute durante il cammino</strong>:
+                  vitto, alloggio, trasporti, attrezzatura e logistica — permettendo che
                   <strong className="text-dona"> il 100% delle donazioni raccolte vada interamente a Komen Italia — Comitato Emilia Romagna</strong>.
                 </p>
                 <p>
