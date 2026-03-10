@@ -165,14 +165,16 @@ function splitByCustomKm(coords: [number, number][], kmArray: number[]): TappaPo
   for (let i = 1; i < coords.length; i++) {
     const segM   = haversineM(coords[i - 1], coords[i]);
     const segEnd = cumM + segM;
-    while (nextM < segEnd && tappaIdx < kmArray.length) {
+    while (nextM < segEnd) {
       const t   = segM > 0 ? (nextM - cumM) / segM : 0;
       const lat = coords[i - 1][0] + t * (coords[i][0] - coords[i - 1][0]);
       const lng = coords[i - 1][1] + t * (coords[i][1] - coords[i - 1][1]);
       pts.push({ tappaNum, lat, lng, kmProgr: nextM / 1000, label: `Tappa ${tappaNum}` });
       tappaIdx++;
       tappaNum++;
-      nextM += (kmArray[tappaIdx] ?? kmArray[kmArray.length - 1]) * 1000;
+      // Usa il prossimo km dall'array, o ripeti l'ultimo valore
+      const nextKm = tappaIdx < kmArray.length ? kmArray[tappaIdx] : kmArray[kmArray.length - 1];
+      nextM += nextKm * 1000;
     }
     cumM += segM;
   }
