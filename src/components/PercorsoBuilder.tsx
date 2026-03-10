@@ -25,7 +25,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   Search, Navigation, Loader2, MapPin, Route, RotateCcw, Copy, CheckCircle2,
-  AlertCircle, Save, Trash2, FolderOpen, Map as MapIcon,
+  AlertCircle, Save, Trash2, FolderOpen, Map as MapIcon, Plus, Minus,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
@@ -142,6 +142,37 @@ function splitByKm(coords: [number, number][], kmPerTappa: number): TappaPoint[]
       pts.push({ tappaNum, lat, lng, kmProgr: next / 1000, label: `Tappa ${tappaNum}` });
       next += stepM;
       tappaNum++;
+    }
+    cumM += segM;
+  }
+  const last = coords[coords.length - 1];
+  pts.push({ tappaNum, lat: last[0], lng: last[1], kmProgr: Math.round(cumM / 100) / 10, label: "Arrivo" });
+  return pts;
+}
+
+/**
+ * Split percorso usando km personalizzati per ogni tappa.
+ * kmArray = [60, 80, 50, ...] → la tappa 1 è 60 km, la tappa 2 è 80 km, ecc.
+ */
+function splitByCustomKm(coords: [number, number][], kmArray: number[]): TappaPoint[] {
+  if (coords.length < 2 || !kmArray.length) return [];
+  const pts: TappaPoint[] = [];
+  pts.push({ tappaNum: 0, lat: coords[0][0], lng: coords[0][1], kmProgr: 0, label: "Partenza" });
+
+  let cumM = 0, tappaIdx = 0, tappaNum = 1;
+  let nextM = (kmArray[0] ?? 70) * 1000;
+
+  for (let i = 1; i < coords.length; i++) {
+    const segM   = haversineM(coords[i - 1], coords[i]);
+    const segEnd = cumM + segM;
+    while (nextM < segEnd && tappaIdx < kmArray.length) {
+      const t   = segM > 0 ? (nextM - cumM) / segM : 0;
+      const lat = coords[i - 1][0] + t * (coords[i][0] - coords[i - 1][0]);
+      const lng = coords[i - 1][1] + t * (coords[i][1] - coords[i - 1][1]);
+      pts.push({ tappaNum, lat, lng, kmProgr: nextM / 1000, label: `Tappa ${tappaNum}` });
+      tappaIdx++;
+      tappaNum++;
+      nextM += (kmArray[tappaIdx] ?? kmArray[kmArray.length - 1]) * 1000;
     }
     cumM += segM;
   }
@@ -792,6 +823,8 @@ export default function PercorsoBuilder() {
   const [mode,       setMode]       = useState<TravelMode>("walking");
   const [routePref,  setRoutePref]  = useState<RoutePreference>("default");
   const [kmPerTappa, setKmPerTappa] = useState(70);
+  const [tappaMode, setTappaMode] = useState<"equal" | "custom">("equal");
+  const [customKmList, setCustomKmList] = useState<number[]>([70]);
 
   const [loading,  setLoading]  = useState(false);
   const [progress, setProgress] = useState(0);
@@ -892,7 +925,9 @@ export default function PercorsoBuilder() {
     if (!result) { setError("Google non ha trovato un percorso pedonale. Prova indirizzi più precisi."); setLoading(false); return; }
 
     setRoute(result);
-    const rawTappe = splitByKm(result.coords, kmPerTappa);
+    const rawTappe = tappaMode === "custom"
+      ? splitByCustomKm(result.coords, customKmList)
+      : splitByKm(result.coords, kmPerTappa);
     setTappe(rawTappe);
     setLoading(false);
 
@@ -911,16 +946,18 @@ export default function PercorsoBuilder() {
       .then(data => { if (data?.points) setElevationData(data); })
       .catch(() => {})
       .finally(() => setElevLoading(false));
-  }, [partenza, arrivo, kmPerTappa, routePref, noKey, mapsReady]);
+  }, [partenza, arrivo, kmPerTappa, tappaMode, customKmList, routePref, noKey, mapsReady]);
 
-  // ── Ricalcola tappe al cambio di kmPerTappa ───────────────────────────────
+  // ── Ricalcola tappe al cambio di kmPerTappa o customKmList ────────────────
   useEffect(() => {
     if (route) {
-      const rawTappe = splitByKm(route.coords, kmPerTappa);
+      const rawTappe = tappaMode === "custom"
+        ? splitByCustomKm(route.coords, customKmList)
+        : splitByKm(route.coords, kmPerTappa);
       setTappe(rawTappe);
       enrichTappeWithNames(rawTappe).then(setTappe);
     }
-  }, [kmPerTappa, route]);
+  }, [kmPerTappa, tappaMode, customKmList, route]);
 
   // ── Copia tappe negli appunti ─────────────────────────────────────────────
   async function copyTappe() {
@@ -1012,7 +1049,9 @@ export default function PercorsoBuilder() {
   }
 
   const totalKm = route ? Math.round(route.distanceM / 100) / 10 : null;
-  const nTappe  = totalKm && kmPerTappa ? Math.ceil(totalKm / kmPerTappa) : null;
+  const nTappe  = tappaMode === "custom"
+    ? (tappe.length > 2 ? tappe.length - 2 : tappe.length > 0 ? tappe.length - 1 : null)
+    : (totalKm && kmPerTappa ? Math.ceil(totalKm / kmPerTappa) : null);
 
   // ── Dropdown suggerimenti ─────────────────────────────────────────────────
   function SuggDropdown({ suggestions, onSelect }: { suggestions: Suggestion[]; onSelect: (d: string) => void }) {
@@ -1176,19 +1215,82 @@ export default function PercorsoBuilder() {
           </div>
         </div>
 
-        {/* Km per tappa */}
+        {/* Modalità tappe */}
         <div>
-          <label className="block text-xs font-semibold text-foreground mb-1">
-            Km per tappa — <span className="text-dona font-bold">{kmPerTappa} km</span>
-          </label>
-          <input type="range" min={10} max={150} step={5} value={kmPerTappa}
-            onChange={e => setKmPerTappa(Number(e.target.value))}
-            className="w-full accent-dona" />
-          <p className="text-[10px] text-muted-foreground mt-0.5">
-            {totalKm
-              ? `≈ ${nTappe} tappe su ${totalKm} km totali`
-              : "Calcola il percorso per vedere il numero di tappe"}
-          </p>
+          <label className="block text-xs font-semibold text-foreground mb-2">Suddivisione tappe</label>
+          <div className="flex gap-2 mb-3">
+            {([
+              { key: "equal" as const, label: "Tappe uguali" },
+              { key: "custom" as const, label: "Km personalizzati" },
+            ]).map(({ key, label }) => (
+              <button key={key} onClick={() => setTappaMode(key)}
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-colors ${
+                  tappaMode === key
+                    ? "bg-dona text-white border-dona"
+                    : "border-border text-muted-foreground hover:border-dona/50"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {tappaMode === "equal" ? (
+            <>
+              <label className="block text-xs font-semibold text-foreground mb-1">
+                Km per tappa — <span className="text-dona font-bold">{kmPerTappa} km</span>
+              </label>
+              <input type="range" min={10} max={150} step={5} value={kmPerTappa}
+                onChange={e => setKmPerTappa(Number(e.target.value))}
+                className="w-full accent-dona" />
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {totalKm
+                  ? `≈ ${nTappe} tappe su ${totalKm} km totali`
+                  : "Calcola il percorso per vedere il numero di tappe"}
+              </p>
+            </>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-[10px] text-muted-foreground">
+                Inserisci i km per ogni tappa. L'ultima tappa arriva comunque al traguardo.
+                {totalKm && ` Totale percorso: ${totalKm} km · Somma tappe: ${customKmList.reduce((a, b) => a + b, 0)} km`}
+              </p>
+              <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                {customKmList.map((km, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-muted-foreground w-14 shrink-0">Tappa {i + 1}</span>
+                    <input
+                      type="number"
+                      min={5}
+                      max={200}
+                      step={5}
+                      value={km}
+                      onChange={e => {
+                        const v = Math.max(5, Number(e.target.value) || 5);
+                        setCustomKmList(prev => prev.map((old, j) => j === i ? v : old));
+                      }}
+                      className="flex-1 px-2 py-1.5 text-xs border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-dona/40 text-center"
+                    />
+                    <span className="text-[10px] text-muted-foreground w-6">km</span>
+                    {customKmList.length > 1 && (
+                      <button
+                        onClick={() => setCustomKmList(prev => prev.filter((_, j) => j !== i))}
+                        className="text-destructive hover:opacity-70 transition-opacity"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setCustomKmList(prev => [...prev, prev[prev.length - 1] ?? 70])}
+                className="flex items-center gap-1.5 text-xs font-semibold text-dona hover:opacity-80 transition-opacity mt-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> Aggiungi tappa
+              </button>
+            </div>
+          )}
         </div>
 
         {error && (
@@ -1212,7 +1314,7 @@ export default function PercorsoBuilder() {
             {[
               { val: `${totalKm} km`, lbl: "Distanza totale" },
               { val: `${nTappe}`,     lbl: "Numero tappe" },
-              { val: `${kmPerTappa} km`, lbl: "Lunghezza tappa" },
+              { val: tappaMode === "custom" ? "Personalizzati" : `${kmPerTappa} km`, lbl: tappaMode === "custom" ? "Km per tappa" : "Lunghezza tappa" },
             ].map(({ val, lbl }) => (
               <div key={lbl} className="bg-card border border-border rounded-xl p-3 text-center">
                 <p className="font-heading text-lg font-bold text-dona">{val}</p>
