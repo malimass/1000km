@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Shirt, Heart, Users, Loader2, AlertCircle, CheckCircle2, Check, Footprints, MapPin } from "lucide-react";
-import { motion } from "framer-motion";
+import { ArrowLeft, Shirt, Heart, Users, Loader2, AlertCircle, CheckCircle2, Check, Footprints, MapPin, X, ArrowRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -20,8 +20,86 @@ const stagger = {
   show: { transition: { staggerChildren: 0.1 } },
 };
 
+function TappeModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  // Blocca scroll body quando aperto
+  useEffect(() => {
+    if (open) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Overlay */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          {/* Modal — bottom sheet su mobile, centrato su desktop */}
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 300 }}
+            className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] md:max-h-[70vh] md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-lg md:rounded-2xl rounded-t-2xl bg-card border border-border shadow-2xl flex flex-col overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+              <div>
+                <h3 className="font-heading text-lg font-bold text-foreground">Scegli la tua tappa</h3>
+                <p className="font-body text-xs text-muted-foreground mt-0.5">Seleziona la tappa a cui vuoi partecipare</p>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+              >
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+            {/* Drag handle mobile */}
+            <div className="md:hidden flex justify-center pt-0 pb-2 shrink-0">
+              <div className="w-10 h-1 rounded-full bg-border" />
+            </div>
+            {/* Lista tappe scrollabile */}
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-6 space-y-2">
+              {tappe.map(t => (
+                <Link
+                  key={t.giorno}
+                  to={`/iscriviti?tappa=${t.giorno}`}
+                  onClick={onClose}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-background p-4 hover:border-dona/50 active:border-dona active:bg-dona/5 transition-all group"
+                >
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-dona/10 text-dona flex items-center justify-center font-heading font-bold text-sm">
+                    {String(t.giorno).padStart(2, "0")}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-body text-sm font-semibold text-foreground truncate">
+                      {t.da} → {t.a}
+                    </p>
+                    <p className="font-body text-xs text-muted-foreground mt-0.5">
+                      {t.data} · {t.km} km
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-dona group-active:text-dona transition-colors shrink-0" />
+                </Link>
+              ))}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function LandingPage() {
   const [totaleIscritti, setTotaleIscritti] = useState<number | null>(null);
+  const [showTappe, setShowTappe] = useState(false);
 
   useEffect(() => {
     fetch("/api/iscrizioni-count")
@@ -69,11 +147,14 @@ function LandingPage() {
               ))}
             </div>
 
-            <Button asChild variant="dona" size="lg" className="text-base px-10 py-6 shadow-[0_0_30px_hsl(340_82%_52%/0.3)]">
-              <a href="#scegli-tappa">
-                <Footprints className="w-5 h-5 mr-2" />
-                Scegli la tappa a cui partecipare
-              </a>
+            <Button
+              variant="dona"
+              size="lg"
+              className="text-base px-10 py-6 shadow-[0_0_30px_hsl(340_82%_52%/0.3)]"
+              onClick={() => setShowTappe(true)}
+            >
+              <Footprints className="w-5 h-5 mr-2" />
+              Scegli la tappa a cui partecipare
             </Button>
 
             {/* Contatore iscritti */}
@@ -190,11 +271,14 @@ function LandingPage() {
               Il cammino attraverserà diverse città e territori.
               Se ti trovi lungo il percorso puoi camminare con noi per qualche chilometro.
             </p>
-            <Button asChild variant="dona" size="lg" className="text-base px-10 py-6 shadow-[0_0_30px_hsl(340_82%_52%/0.3)]">
-              <Link to="/il-percorso#tappe">
-                <MapPin className="w-5 h-5 mr-2" />
-                Scegli la tua tappa
-              </Link>
+            <Button
+              variant="dona"
+              size="lg"
+              className="text-base px-10 py-6 shadow-[0_0_30px_hsl(340_82%_52%/0.3)]"
+              onClick={() => setShowTappe(true)}
+            >
+              <MapPin className="w-5 h-5 mr-2" />
+              Scegli la tua tappa
             </Button>
           </AnimatedSection>
         </div>
@@ -215,6 +299,9 @@ function LandingPage() {
       </section>
 
       <div className="h-16 lg:hidden" />
+
+      {/* Modal scelta tappa */}
+      <TappeModal open={showTappe} onClose={() => setShowTappe(false)} />
     </Layout>
   );
 }
