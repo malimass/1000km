@@ -1,14 +1,223 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Shirt, Heart, Users, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Shirt, Heart, Users, Loader2, AlertCircle, CheckCircle2, Check, Footprints, MapPin } from "lucide-react";
 import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
+import AnimatedSection from "@/components/AnimatedSection";
 import { apiFetch } from "@/lib/api";
 import { tappe } from "@/lib/tappe";
 
 const TAGLIE = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 type Taglia = (typeof TAGLIE)[number];
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 28 },
+  show:   { opacity: 1, y: 0,  transition: { duration: 0.55 } },
+};
+
+const stagger = {
+  show: { transition: { staggerChildren: 0.1 } },
+};
+
+function LandingPage() {
+  const [totaleIscritti, setTotaleIscritti] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/iscrizioni-count")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.total) setTotaleIscritti(d.total); })
+      .catch(() => {});
+  }, []);
+
+  return (
+    <Layout>
+      {/* HERO */}
+      <section className="bg-primary text-primary-foreground py-20 md:py-28 px-4">
+        <div className="container-narrow text-center max-w-2xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <span className="inline-block font-body text-xs uppercase tracking-widest text-accent font-bold mb-4">
+              Partecipa ai 1000 km di Gratitudine
+            </span>
+            <h1 className="font-heading text-4xl md:text-5xl font-bold leading-tight mb-5">
+              Cammina con noi nei{" "}
+              <span className="text-accent">1000 km di Gratitudine</span>
+            </h1>
+            <p className="font-body text-primary-foreground/80 text-lg leading-relaxed mb-4">
+              Dal <strong className="text-primary-foreground">15 aprile</strong> al <strong className="text-primary-foreground">1 maggio 2026</strong> attraverseremo l'Italia da Bologna alla Calabria.
+              Puoi unirti anche tu per uno o più chilometri lungo il percorso.
+            </p>
+            <p className="font-body text-primary-foreground/60 text-base mb-8">
+              Un cammino di fede, gratitudine e solidarietà per sostenere la prevenzione e la ricerca contro il tumore al seno.
+            </p>
+
+            {/* Micro badge */}
+            <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
+              {[
+                "Partecipazione gratuita",
+                "Puoi camminare anche solo pochi km",
+                "Aperto a tutti",
+              ].map(badge => (
+                <span key={badge} className="inline-flex items-center gap-1.5 bg-primary-foreground/10 border border-primary-foreground/20 text-primary-foreground/80 text-xs font-body px-3 py-1.5 rounded-full">
+                  <Check className="w-3.5 h-3.5 text-accent" />
+                  {badge}
+                </span>
+              ))}
+            </div>
+
+            <Button asChild variant="dona" size="lg" className="text-base px-10 py-6 shadow-[0_0_30px_hsl(340_82%_52%/0.3)]">
+              <a href="#scegli-tappa">
+                <Footprints className="w-5 h-5 mr-2" />
+                Scegli la tappa a cui partecipare
+              </a>
+            </Button>
+
+            {/* Contatore iscritti */}
+            {totaleIscritti != null && totaleIscritti > 0 && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.8 }}
+                className="mt-6 text-primary-foreground/50 text-sm font-body flex items-center justify-center gap-2"
+              >
+                <Users className="w-4 h-4" />
+                <span className="text-accent font-semibold">{totaleIscritti}</span>{" "}
+                {totaleIscritti === 1 ? "persona sta già camminando" : "persone stanno già camminando"} con noi
+              </motion.p>
+            )}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* NON È SOLO UNA CAMMINATA */}
+      <section className="section-padding bg-background px-4">
+        <div className="container-narrow max-w-2xl mx-auto text-center">
+          <AnimatedSection>
+            <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-6">
+              Non è solo una camminata
+            </h2>
+            <div className="font-body text-muted-foreground text-base leading-relaxed space-y-4">
+              <p>Il cammino dei 1000 km di Gratitudine è molto più di una sfida sportiva.</p>
+              <p>È un viaggio fatto di fatica, incontri e chilometri condivisi.</p>
+              <p>Chiunque si trovi lungo il percorso può unirsi per qualche tratto, camminare insieme a noi e vivere da vicino lo spirito di questo progetto.</p>
+              <p className="font-semibold text-foreground">Anche pochi chilometri possono diventare un gesto di solidarietà.</p>
+            </div>
+          </AnimatedSection>
+        </div>
+      </section>
+
+      {/* COME PARTECIPARE */}
+      <section className="section-padding bg-secondary px-4">
+        <div className="container-narrow max-w-3xl mx-auto">
+          <AnimatedSection>
+            <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-10 text-center">
+              Come partecipare
+            </h2>
+          </AnimatedSection>
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-3 gap-6"
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            variants={stagger}
+          >
+            {[
+              {
+                num: "1",
+                titolo: "Scegli una tappa",
+                testo: "Consulta il percorso e seleziona la tappa più vicina a te.",
+              },
+              {
+                num: "2",
+                titolo: "Iscriviti gratuitamente",
+                testo: "Registrati per camminare con noi lungo quel tratto.",
+              },
+              {
+                num: "3",
+                titolo: "Cammina insieme a noi",
+                testo: "Puoi partecipare anche solo per pochi chilometri.",
+              },
+            ].map(step => (
+              <motion.div key={step.num} variants={fadeUp} className="bg-card border border-border rounded-xl p-6 text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-dona/10 text-dona font-heading font-bold text-lg mb-4">
+                  {step.num}
+                </div>
+                <h3 className="font-heading text-base font-bold text-foreground mb-2">{step.titolo}</h3>
+                <p className="font-body text-sm text-muted-foreground leading-relaxed">{step.testo}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* APERTO A TUTTI */}
+      <section className="section-padding bg-background px-4">
+        <div className="container-narrow max-w-2xl mx-auto text-center">
+          <AnimatedSection>
+            <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-6">
+              Un cammino aperto a tutti
+            </h2>
+            <p className="font-body text-muted-foreground text-base leading-relaxed mb-6">
+              Non serve essere atleti. Puoi partecipare:
+            </p>
+            <div className="flex flex-wrap justify-center gap-3 mb-6">
+              {["Camminando", "Correndo", "Anche solo per qualche chilometro"].map(item => (
+                <span key={item} className="inline-flex items-center gap-2 bg-dona/5 border border-dona/20 text-foreground text-sm font-body px-4 py-2 rounded-full">
+                  <Check className="w-4 h-4 text-dona" />
+                  {item}
+                </span>
+              ))}
+            </div>
+            <p className="font-body text-foreground font-semibold text-base">
+              L'importante è condividere il cammino.
+            </p>
+          </AnimatedSection>
+        </div>
+      </section>
+
+      {/* CTA - SCEGLI LA TAPPA */}
+      <section id="scegli-tappa" className="section-padding bg-primary text-primary-foreground px-4">
+        <div className="container-narrow max-w-2xl mx-auto text-center">
+          <AnimatedSection>
+            <h2 className="font-heading text-2xl md:text-3xl font-bold mb-4">
+              Scegli la tappa a cui unirti
+            </h2>
+            <p className="font-body text-primary-foreground/70 text-base leading-relaxed mb-8 max-w-lg mx-auto">
+              Il cammino attraverserà diverse città e territori.
+              Se ti trovi lungo il percorso puoi camminare con noi per qualche chilometro.
+            </p>
+            <Button asChild variant="dona" size="lg" className="text-base px-10 py-6 shadow-[0_0_30px_hsl(340_82%_52%/0.3)]">
+              <Link to="/il-percorso#tappe">
+                <MapPin className="w-5 h-5 mr-2" />
+                Scegli la tua tappa
+              </Link>
+            </Button>
+          </AnimatedSection>
+        </div>
+      </section>
+
+      {/* FRASE EMOTIVA FINALE */}
+      <section className="py-16 bg-background px-4">
+        <div className="container-narrow text-center">
+          <AnimatedSection>
+            <blockquote className="max-w-2xl mx-auto">
+              <span className="text-accent text-5xl md:text-6xl font-heading leading-none block mb-4">"</span>
+              <p className="font-heading text-lg md:text-xl text-foreground leading-relaxed italic -mt-6">
+                1000 km di cammino. Un solo obiettivo: trasformare ogni passo in speranza.
+              </p>
+            </blockquote>
+          </AnimatedSection>
+        </div>
+      </section>
+
+      <div className="h-16 lg:hidden" />
+    </Layout>
+  );
+}
 
 
 export default function Iscriviti() {
@@ -29,29 +238,9 @@ export default function Iscriviti() {
   const [loading, setLoading] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
 
-  // Tappa non valida: mostra selettore
+  // Tappa non valida: mostra landing page
   if (!tappa) {
-    return (
-      <Layout>
-        <section className="section-padding bg-background min-h-[60vh] flex items-center">
-          <div className="container-narrow text-center">
-            <Users className="w-12 h-12 text-dona mx-auto mb-4" />
-            <h1 className="font-heading text-2xl font-bold text-foreground mb-4">
-              Scegli la tappa a cui iscriverti
-            </h1>
-            <p className="text-muted-foreground font-body mb-8">
-              Seleziona la tappa dalla pagina del percorso.
-            </p>
-            <Button asChild variant="outline">
-              <Link to="/il-percorso">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Vai al Percorso
-              </Link>
-            </Button>
-          </div>
-        </section>
-      </Layout>
-    );
+    return <LandingPage />;
   }
 
   function validate(): string | null {
@@ -163,11 +352,11 @@ export default function Iscriviti() {
       <section className="bg-primary text-primary-foreground py-10 px-4">
         <div className="container-narrow">
           <Link
-            to="/il-percorso"
+            to="/iscriviti"
             className="inline-flex items-center gap-1.5 text-primary-foreground/60 hover:text-primary-foreground text-sm font-body mb-6 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Torna al Percorso
+            Torna a Cammina con noi
           </Link>
           <motion.div
             initial={{ opacity: 0, y: 16 }}

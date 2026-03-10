@@ -26,6 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/athlete-profiles") return await athleteProfiles(req, res);
     if (path === "/coach-sessions") return await coachSessions(req, res);
     if (path === "/iscrizioni") return await iscrizioni(req, res);
+    if (path === "/iscrizioni-count") return await iscrizioniCount(req, res);
     if (path === "/create-payment") return await createPayment(req, res);
     if (path === "/live-position") return await livePosition(req, res);
     if (path === "/route-positions") return await routePositions(req, res);
@@ -764,6 +765,13 @@ async function iscrizioni(req: VercelRequest, res: VercelResponse) {
     return res.json({ ok: true });
   }
   return res.status(405).end();
+}
+
+// ─── ISCRIZIONI COUNT (public) ───────────────────────────────────────────────
+
+async function iscrizioniCount(_req: VercelRequest, res: VercelResponse) {
+  const rows = await sql`SELECT COUNT(*)::int AS total FROM iscrizioni`;
+  return res.json({ total: rows[0]?.total ?? 0 });
 }
 
 // ─── CREATE PAYMENT ──────────────────────────────────────────────────────────
