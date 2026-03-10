@@ -150,11 +150,12 @@ function LandingPage() {
             <Button
               variant="dona"
               size="lg"
-              className="text-base px-10 py-6 shadow-[0_0_30px_hsl(340_82%_52%/0.3)]"
+              className="text-sm sm:text-base px-6 sm:px-10 py-5 sm:py-6 shadow-[0_0_30px_hsl(340_82%_52%/0.3)]"
               onClick={() => setShowTappe(true)}
             >
               <Footprints className="w-5 h-5 mr-2" />
-              Scegli la tappa a cui partecipare
+              <span className="sm:hidden">Scegli la tua tappa</span>
+              <span className="hidden sm:inline">Scegli la tappa a cui partecipare</span>
             </Button>
 
             {/* Contatore iscritti */}
@@ -274,7 +275,7 @@ function LandingPage() {
             <Button
               variant="dona"
               size="lg"
-              className="text-base px-10 py-6 shadow-[0_0_30px_hsl(340_82%_52%/0.3)]"
+              className="text-sm sm:text-base px-6 sm:px-10 py-5 sm:py-6 shadow-[0_0_30px_hsl(340_82%_52%/0.3)]"
               onClick={() => setShowTappe(true)}
             >
               <MapPin className="w-5 h-5 mr-2" />
