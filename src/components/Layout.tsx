@@ -15,6 +15,7 @@ const navLinks = [
     ],
   },
   { label: "Sostenitori", to: "/sostenitori" },
+  { label: "Patrocini", to: "/patrocini" },
   { label: "Contatti", to: "/contatti" },
 ];
 
@@ -191,6 +192,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   { to: "/notizie",      label: "Notizie" },
                   { to: "/servizi",      label: "Servizi" },
                   { to: "/sostenitori",  label: "Sostenitori del cammino" },
+                  { to: "/patrocini",    label: "Patrocini istituzionali" },
                   { to: "/contatti",     label: "Contatti" },
                 ] as const).map(({ to, label }) => (
                   <Link
