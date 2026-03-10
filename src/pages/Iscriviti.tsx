@@ -28,8 +28,8 @@ function useSumUpSdk() {
 
 const DONAZIONE_TIERS = [
   { importo: 30, label: "Sostieni una tappa del cammino" },
-  { importo: 50, label: "Diventi sostenitore del progetto" },
-  { importo: 100, label: "Sostieni il cammino e la ricerca" },
+  { importo: 50, label: "Aiuti concretamente la raccolta fondi per la ricerca" },
+  { importo: 100, label: "Diventi sostenitore del cammino 1000km di Gratitudine" },
 ] as const;
 
 const fadeUp = {
@@ -690,9 +690,13 @@ export default function Iscriviti() {
                   transition={{ duration: 0.25 }}
                   className="mt-4 bg-card border border-border rounded-xl p-5 space-y-4 overflow-hidden"
                 >
+                  <h3 className="font-heading text-base font-bold text-foreground">
+                    Sostieni la ricerca mentre cammini con noi
+                  </h3>
                   <p className="text-sm font-body text-muted-foreground leading-relaxed">
                     Con una donazione aiuti la raccolta fondi per{" "}
-                    <strong className="text-foreground">Komen Italia &ndash; Comitato Emilia-Romagna</strong>.
+                    <strong className="text-foreground">Komen Italia &ndash; Comitato Emilia-Romagna</strong>{" "}
+                    a favore della prevenzione e della ricerca sul tumore al seno.
                   </p>
                   <div className="space-y-2">
                     {DONAZIONE_TIERS.map((tier) => (
@@ -727,6 +731,12 @@ export default function Iscriviti() {
                       onChange={(e) => setDonazione(Math.max(5, parseInt(e.target.value) || 5))}
                       className="w-32 rounded-md border border-border bg-background px-3 py-2 text-sm font-body text-foreground focus:outline-none focus:ring-2 focus:ring-dona/40"
                     />
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Heart className="w-4 h-4 text-dona flex-shrink-0" />
+                    <span className="text-xs font-body text-muted-foreground leading-relaxed">
+                      Il 100% delle donazioni sarà destinato a <strong className="text-foreground">Komen Italia – Comitato Emilia-Romagna</strong>
+                    </span>
                   </div>
                 </motion.div>
               )}
