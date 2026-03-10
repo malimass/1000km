@@ -135,6 +135,8 @@ export default function CrocifissoNero() {
             <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-6 mt-12">Le Celebrazioni</h2>
             <div className="font-body text-muted-foreground leading-relaxed space-y-4">
               <p>La devozione al SS Crocifisso Nero trova la sua espressione più intensa nelle celebrazioni religiose che si svolgono ogni anno nei primi giorni di maggio a Terranova Sappo Minulio.</p>
+              <h3 className="font-heading text-lg font-bold text-foreground pt-4">1 maggio – La Messa in Contrada Solì</h3>
+              <p>Secondo la tradizione locale, la sera del primo maggio viene celebrata una messa in Contrada Solì, a Terranova Sappo Minulio, nel luogo in cui, secondo la leggenda, fu ritrovato il Santissimo Crocifisso Nero.</p>
               <h3 className="font-heading text-lg font-bold text-foreground pt-4">2 maggio – L'esposizione del Crocifisso</h3>
               <p>Nel giorno che precede la festa liturgica, intorno a mezzogiorno, il simulacro del Crocifisso Nero viene rimosso dalla pala che lo custodisce all'interno del santuario e viene esposto alla venerazione dei fedeli davanti all'altare.</p>
               <p>Durante il pomeriggio e la sera numerosi fedeli si recano in pellegrinaggio per pregare e rendere omaggio al Crocifisso.</p>
