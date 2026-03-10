@@ -1,13 +1,59 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Heart } from "lucide-react";
+import { Heart, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
 import sanLucaImg from "@/assets/san-luca.jpg";
 import { motion } from "framer-motion";
+import { loadSiteYtSanLucaVideos, type YtVideoData } from "@/lib/adminSettings";
+
+// ── Metadati video (titoli e descrizioni) ─────────────────────────────────────
+const VIDEO_META = [
+  {
+    titolo: "Il Santuario della Madonna di San Luca",
+    descrizione:
+      "La storia secolare del Santuario sul Colle della Guardia e il portico più lungo del mondo che lo collega a Bologna.",
+  },
+  {
+    titolo: "La Devozione e le Tradizioni",
+    descrizione:
+      "Le processioni, i pellegrinaggi e i riti che da secoli accompagnano la devozione alla Madonna di San Luca.",
+  },
+  {
+    titolo: "I Miracoli e le Grazie",
+    descrizione:
+      "Le testimonianze dei fedeli e i prodigi legati all'icona della Vergine con il Bambino.",
+  },
+];
+
+function VideoEmbed({ videoId, titolo }: { videoId: string; titolo: string }) {
+  return (
+    <div className="relative w-full aspect-video rounded-xl overflow-hidden shadow-lg bg-primary/10">
+      {videoId.startsWith("YOUTUBE_ID") ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-primary/5 border-2 border-dashed border-border">
+          <Play className="w-12 h-12 text-muted-foreground/40" />
+          <p className="text-muted-foreground/50 text-sm font-body text-center px-4">
+            Video da inserire · sostituisci <code className="bg-muted px-1 rounded text-xs">{videoId}</code> nel codice
+          </p>
+        </div>
+      ) : (
+        <iframe
+          src={`https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`}
+          title={titolo}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="absolute inset-0 w-full h-full"
+        />
+      )}
+    </div>
+  );
+}
 
 export default function SanLuca() {
+  const [videos, setVideos] = useState<YtVideoData[]>(() =>
+    VIDEO_META.map((meta, i) => ({ id: `YOUTUBE_ID_${i + 1}`, ...meta })),
+  );
   useEffect(() => {
     document.title = "Santuario della Madonna di San Luca Bologna | Storia, Miracoli e Cammino dei 1000 km";
     const meta = document.querySelector('meta[name="description"]');
@@ -20,6 +66,19 @@ export default function SanLuca() {
         meta.setAttribute("content", "1000 km di gratitudine: un cammino di fede da Bologna a Terranova Sappo Minulio. Un pellegrinaggio solidale per la ricerca contro i tumori al seno.");
       }
     };
+  }, []);
+
+  useEffect(() => {
+    loadSiteYtSanLucaVideos().then(source => {
+      if (!source) return;
+      setVideos(
+        VIDEO_META.map((meta, i) => ({
+          id:          source[i].id          || `YOUTUBE_ID_${i + 1}`,
+          titolo:      source[i].titolo      || meta.titolo,
+          descrizione: source[i].descrizione || meta.descrizione,
+        })),
+      );
+    });
   }, []);
 
   return (
@@ -47,6 +106,28 @@ export default function SanLuca() {
               <p>Questo percorso, formato da 666 archi, rappresenta un simbolo unico di fede e tradizione nel patrimonio culturale italiano.</p>
             </div>
           </AnimatedSection>
+
+          {/* ── Sezione Video ─────────────────────────────────────────────── */}
+          <AnimatedSection>
+            <div className="mt-12 mb-6">
+              <p className="font-body text-muted-foreground leading-relaxed italic">
+                Il Santuario della Madonna di San Luca raccontato attraverso immagini e testimonianze.
+              </p>
+            </div>
+          </AnimatedSection>
+          {videos.map((video, i) => (
+            <AnimatedSection key={video.id} delay={i * 0.1}>
+              <div className="mt-8">
+                <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-3">
+                  {video.titolo}
+                </h2>
+                <p className="font-body text-muted-foreground leading-relaxed mb-5">
+                  {video.descrizione}
+                </p>
+                <VideoEmbed videoId={video.id} titolo={video.titolo} />
+              </div>
+            </AnimatedSection>
+          ))}
 
           {/* L'ICONA */}
           <AnimatedSection>
