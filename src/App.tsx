@@ -56,6 +56,7 @@ const AtletaAuth = lazyWithRetry(() => import("./pages/AtletaAuth"));
 const AtletaDashboard = lazyWithRetry(() => import("./pages/AtletaDashboard"));
 const GuidaMetriche = lazyWithRetry(() => import("./pages/GuidaMetriche"));
 const GuidaTraccar = lazyWithRetry(() => import("./pages/GuidaTraccar"));
+const Patrocini = lazyWithRetry(() => import("./pages/Patrocini"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -83,6 +84,7 @@ const App = () => (
           <Route path="/iscriviti" element={<Iscriviti />} />
           <Route path="/iscrizione-successo" element={<IscrizioneSuccesso />} />
           <Route path="/partecipa" element={<Partecipa />} />
+          <Route path="/patrocini" element={<Patrocini />} />
           <Route path="/accedi" element={<Accedi />} />
           <Route path="/il-mio-percorso" element={<IlMioPercorso />} />
           <Route path="/admin-login" element={<AdminLogin />} />

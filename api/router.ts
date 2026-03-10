@@ -18,6 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/auth/me") return await authMe(req, res);
     if (path === "/notizie") return await notizie(req, res);
     if (path === "/sostenitori") return await sostenitori(req, res);
+    if (path === "/patrocini") return await patrociniHandler(req, res);
     if (path === "/servizi") return await servizi(req, res);
     if (path === "/site-settings") return await siteSettings(req, res);
     if (path === "/raccolta-fondi") return await raccoltaFondi(req, res);
@@ -333,6 +334,26 @@ async function scrapeSite(req: VercelRequest, res: VercelResponse) {
     if (err.name === "AbortError") return res.status(504).json({ error: "Timeout: il sito non risponde" });
     return res.status(502).json({ error: `Impossibile raggiungere il sito: ${err.message}` });
   }
+}
+
+// ─── PATROCINI ───────────────────────────────────────────────────────────────
+
+async function patrociniHandler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === "GET") {
+    const rows = await sql`SELECT data FROM patrocini_page WHERE id = 1 LIMIT 1`;
+    return res.json(rows[0]?.data ?? { title: "Patrocini istituzionali", intro: "", items: [] });
+  }
+  if (req.method === "POST") {
+    const auth = await requireAuth(req);
+    if (!auth) return res.status(401).json({ error: "Non autenticato" });
+    await sql`
+      INSERT INTO patrocini_page (id, data, updated_at)
+      VALUES (1, ${JSON.stringify(req.body)}, now())
+      ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()
+    `;
+    return res.json({ ok: true });
+  }
+  return res.status(405).end();
 }
 
 // ─── SERVIZI ─────────────────────────────────────────────────────────────────
