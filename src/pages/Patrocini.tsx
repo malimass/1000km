@@ -1,21 +1,15 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
 import { motion } from "framer-motion";
-
-// ── Patrocini: aggiungi qui i loghi e i link degli enti ──────────────────────
-const patrocini: { nome: string; logo?: string; url?: string }[] = [
-  { nome: "Comune di Bologna", url: "https://www.comune.bologna.it" },
-  { nome: "Comune di Terranova Sappo Minulio" },
-  // Aggiungi altri enti qui:
-  // { nome: "Regione Emilia-Romagna", logo: "/loghi/regione-er.png", url: "https://..." },
-  // { nome: "Città Metropolitana di Bologna", logo: "/loghi/citta-met.png", url: "https://..." },
-];
+import { loadPatrociniPage, type Patrocinio } from "@/lib/patrocini";
 
 export default function Patrocini() {
+  const [items, setItems] = useState<Patrocinio[]>([]);
+
   useEffect(() => {
     document.title = "Patrocini istituzionali | 1000 km di Gratitudine";
     const meta = document.querySelector('meta[name="description"]');
@@ -28,6 +22,10 @@ export default function Patrocini() {
         meta.setAttribute("content", "1000 km di gratitudine: un cammino di fede da Bologna a Terranova Sappo Minulio. Un pellegrinaggio solidale per la ricerca contro i tumori al seno.");
       }
     };
+  }, []);
+
+  useEffect(() => {
+    loadPatrociniPage().then(p => setItems(p.items));
   }, []);
 
   return (
@@ -63,61 +61,63 @@ export default function Patrocini() {
       </section>
 
       {/* LOGHI PATROCINI */}
-      <section className="section-padding bg-secondary px-4">
-        <div className="container-narrow max-w-4xl mx-auto">
-          <AnimatedSection>
-            <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-10 text-center">
-              Enti che hanno concesso il patrocinio morale
-            </h2>
-          </AnimatedSection>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
-            {patrocini.map((ente, i) => {
-              const content = (
-                <div className="bg-card border border-border rounded-xl p-6 flex flex-col items-center justify-center text-center h-full min-h-[140px] hover:shadow-md hover:border-dona/30 transition-all">
-                  {ente.logo ? (
-                    <img
-                      src={ente.logo}
-                      alt={`Logo ${ente.nome}`}
-                      className="max-h-16 w-auto object-contain mb-3"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 rounded-full bg-dona/10 flex items-center justify-center mb-3">
-                      <span className="font-heading text-dona text-xl font-bold">
-                        {ente.nome.charAt(0)}
-                      </span>
-                    </div>
-                  )}
-                  <p className="font-body text-sm font-medium text-foreground leading-snug">{ente.nome}</p>
-                </div>
-              );
+      {items.length > 0 && (
+        <section className="section-padding bg-secondary px-4">
+          <div className="container-narrow max-w-4xl mx-auto">
+            <AnimatedSection>
+              <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-10 text-center">
+                Enti che hanno concesso il patrocinio morale
+              </h2>
+            </AnimatedSection>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
+              {items.map((ente, i) => {
+                const content = (
+                  <div className="bg-card border border-border rounded-xl p-6 flex flex-col items-center justify-center text-center h-full min-h-[140px] hover:shadow-md hover:border-dona/30 transition-all">
+                    {ente.logoUrl ? (
+                      <img
+                        src={ente.logoUrl}
+                        alt={`Logo ${ente.nome}`}
+                        className="max-h-16 w-auto object-contain mb-3"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-dona/10 flex items-center justify-center mb-3">
+                        <span className="font-heading text-dona text-xl font-bold">
+                          {ente.nome.charAt(0)}
+                        </span>
+                      </div>
+                    )}
+                    <p className="font-body text-sm font-medium text-foreground leading-snug">{ente.nome}</p>
+                  </div>
+                );
 
-              return (
-                <AnimatedSection key={ente.nome} delay={i * 0.1}>
-                  {ente.url ? (
-                    <a href={ente.url} target="_blank" rel="noopener noreferrer" className="block h-full">
-                      {content}
-                    </a>
-                  ) : (
-                    content
-                  )}
-                </AnimatedSection>
-              );
-            })}
-          </div>
-
-          {/* Testo istituzionale */}
-          <AnimatedSection>
-            <div className="font-body text-muted-foreground text-sm md:text-base leading-relaxed space-y-3 text-center max-w-2xl mx-auto">
-              <p>Il patrocinio morale rappresenta un importante riconoscimento istituzionale del valore sociale e solidale del cammino.</p>
-              <p>La loro adesione rafforza il messaggio di sensibilizzazione sulla prevenzione e sulla ricerca contro il tumore al seno.</p>
+                return (
+                  <AnimatedSection key={ente.id} delay={i * 0.1}>
+                    {ente.siteUrl ? (
+                      <a href={ente.siteUrl} target="_blank" rel="noopener noreferrer" className="block h-full">
+                        {content}
+                      </a>
+                    ) : (
+                      content
+                    )}
+                  </AnimatedSection>
+                );
+              })}
             </div>
-            <p className="text-center text-muted-foreground/60 text-xs font-body mt-6">
-              I loghi sono utilizzati esclusivamente per indicare il patrocinio morale concesso al progetto.
-            </p>
-          </AnimatedSection>
-        </div>
-      </section>
+
+            {/* Testo istituzionale */}
+            <AnimatedSection>
+              <div className="font-body text-muted-foreground text-sm md:text-base leading-relaxed space-y-3 text-center max-w-2xl mx-auto">
+                <p>Il patrocinio morale rappresenta un importante riconoscimento istituzionale del valore sociale e solidale del cammino.</p>
+                <p>La loro adesione rafforza il messaggio di sensibilizzazione sulla prevenzione e sulla ricerca contro il tumore al seno.</p>
+              </div>
+              <p className="text-center text-muted-foreground/60 text-xs font-body mt-6">
+                I loghi sono utilizzati esclusivamente per indicare il patrocinio morale concesso al progetto.
+              </p>
+            </AnimatedSection>
+          </div>
+        </section>
+      )}
 
       {/* RINGRAZIAMENTO */}
       <section className="py-16 bg-background px-4">

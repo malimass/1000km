@@ -5,6 +5,7 @@ import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import { tappe } from "@/lib/tappe";
 import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, saveSiteShareSettings, SHARE_DEFAULTS, loadGoogleSettings, saveGoogleSettings, type AdminSettings } from "@/lib/adminSettings";
 import { loadSosteniPage, saveSosteniPage, type Sostenitore, type SosteniPage } from "@/lib/sostenitori";
+import { loadPatrociniPage, savePatrociniPage, type Patrocinio, type PatrociniPage } from "@/lib/patrocini";
 import {
   upsertLivePosition, appendRoutePoint, clearRoutePositions, distanceMeters, todaySessionId,
   loadAllLivePositions, type LivePosition,
@@ -22,7 +23,7 @@ import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
   Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video, LogOut,
   MapPin, Youtube, Navigation, Users, Upload, Share2, Map, Bell, TrendingUp,
-  Globe, Search, Plus,
+  Globe, Search, Plus, Shield,
 } from "lucide-react";
 
 const RouteMap = lazy(() => import("@/components/RouteMap"));
@@ -210,7 +211,7 @@ async function shareToTikTok(file: File, caption: string): Promise<{ ok: boolean
 }
 
 // ─── Tipi sezione ─────────────────────────────────────────────────────────────
-type Section = "live" | "social" | "notizie" | "raccolta" | "video" | "sostenitori" | "share" | "settings" | "percorso";
+type Section = "live" | "social" | "notizie" | "raccolta" | "video" | "sostenitori" | "patrocini" | "share" | "settings" | "percorso";
 
 const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
   { key: "live",        label: "Live Tracking", icon: <MapPin className="w-4 h-4" /> },
@@ -219,6 +220,7 @@ const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
   { key: "raccolta",    label: "Raccolta",       icon: <TrendingUp className="w-4 h-4" /> },
   { key: "video",       label: "Video YouTube", icon: <Youtube className="w-4 h-4" /> },
   { key: "sostenitori", label: "Sostenitori",   icon: <Users className="w-4 h-4" /> },
+  { key: "patrocini",   label: "Patrocini",     icon: <Shield className="w-4 h-4" /> },
   { key: "share",       label: "Condivisione",  icon: <Share2 className="w-4 h-4" /> },
   { key: "settings",    label: "Impostazioni",  icon: <Settings className="w-4 h-4" /> },
   { key: "percorso",    label: "Crea Percorso", icon: <Map className="w-4 h-4" /> },
@@ -334,6 +336,13 @@ export default function AdminLive() {
   const [scrapeError,    setScrapeError]    = useState("");
   const [scrapePreview,  setScrapePreview]  = useState<Sostenitore | null>(null);
 
+  // ─ Patrocini ─
+  const [patrociniItems,    setPatrociniItems]    = useState<Patrocinio[]>([]);
+  const [patrociniSaved,    setPatrociniSaved]    = useState(false);
+  const [patrociniUploading, setPatrociniUploading] = useState<string | null>(null);
+  const patrociniLogoRef    = useRef<HTMLInputElement>(null);
+  const patrociniUploadRef  = useRef<string | null>(null);
+
   // ─ Notizie ─
   const [notiziaTitolo,   setNotiziaTitolo]   = useState("");
   const [notiziaCorpo,    setNotiziaCorpo]    = useState("");
@@ -415,6 +424,9 @@ export default function AdminLive() {
       setSosteniTitle(p.title);
       setSosteniIntro(p.intro);
       setSosteniItems(p.items);
+    });
+    loadPatrociniPage().then(p => {
+      setPatrociniItems(p.items);
     });
     loadRaccoltaFondi().then(r => {
       if (r) {
@@ -672,6 +684,52 @@ export default function AdminLive() {
       });
     };
     reader.onerror = () => setSosteniUploading(null);
+    reader.readAsDataURL(file);
+  }
+
+  // ─ Patrocini handlers ─
+  async function handleSavePatrocini() {
+    const page: PatrociniPage = { title: "Patrocini istituzionali", intro: "", items: patrociniItems };
+    await savePatrociniPage(page);
+    setPatrociniSaved(true);
+    setTimeout(() => setPatrociniSaved(false), 2500);
+  }
+
+  function addPatrocinio() {
+    setPatrociniItems(prev => [...prev, {
+      id:      crypto.randomUUID(),
+      nome:    "",
+      logoUrl: "",
+    }]);
+  }
+
+  function removePatrocinio(id: string) {
+    setPatrociniItems(prev => prev.filter(it => it.id !== id));
+  }
+
+  function updatePatrocinio(id: string, field: keyof Patrocinio, value: string) {
+    setPatrociniItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it));
+  }
+
+  function openPatrociniLogoUpload(itemId: string) {
+    patrociniUploadRef.current = itemId;
+    patrociniLogoRef.current?.click();
+  }
+
+  async function handlePatrociniLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const targetId = patrociniUploadRef.current;
+    e.target.value = "";
+    if (!file || !targetId) return;
+
+    setPatrociniUploading(targetId);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      setPatrociniUploading(null);
+      updatePatrocinio(targetId, "logoUrl", dataUrl);
+    };
+    reader.onerror = () => setPatrociniUploading(null);
     reader.readAsDataURL(file);
   }
 
@@ -2120,6 +2178,128 @@ export default function AdminLive() {
                 <p className="text-[11px] text-muted-foreground text-center">
                   I dati vengono salvati su Neon e visibili sulla{" "}
                   <Link to="/sostenitori" target="_blank" className="underline text-dona">
+                    pagina pubblica
+                  </Link>.
+                </p>
+              </div>
+            )}
+
+            {/* ── SEZIONE: Patrocini ───────────────────────────────────────── */}
+            {activeSection === "patrocini" && (
+              <div className="space-y-4">
+                {/* Input logo nascosto */}
+                <input
+                  ref={patrociniLogoRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePatrociniLogoChange}
+                />
+
+                <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                  <h2 className="font-semibold text-foreground text-sm uppercase tracking-wide flex items-center gap-2 mb-3">
+                    <Shield className="w-4 h-4" /> Pagina Patrocini istituzionali
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Gestisci gli enti che hanno concesso il patrocinio morale al progetto.
+                  </p>
+                </div>
+
+                {/* Lista patrocini */}
+                {patrociniItems.map((item, idx) => (
+                  <div key={item.id} className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
+                        Patrocinio {idx + 1}
+                      </span>
+                      <button
+                        onClick={() => removePatrocinio(item.id)}
+                        className="text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Logo */}
+                    <div className="flex items-center gap-3">
+                      {item.logoUrl ? (
+                        <div className="relative">
+                          <img
+                            src={item.logoUrl}
+                            alt={item.nome}
+                            className="h-14 w-auto max-w-[120px] object-contain rounded border border-border bg-muted/30"
+                          />
+                          <button
+                            onClick={() => updatePatrocinio(item.id, "logoUrl", "")}
+                            className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="h-14 w-14 rounded border-2 border-dashed border-border flex items-center justify-center bg-muted/30">
+                          <ImageIcon className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => openPatrociniLogoUpload(item.id)}
+                        disabled={patrociniUploading === item.id}
+                        className="flex items-center gap-1.5 text-xs border border-border rounded-lg px-3 py-2 hover:bg-muted transition-colors disabled:opacity-50"
+                      >
+                        {patrociniUploading === item.id
+                          ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Caricamento…</>
+                          : <><Upload className="w-3.5 h-3.5" /> {item.logoUrl ? "Cambia logo" : "Carica logo"}</>
+                        }
+                      </button>
+                    </div>
+
+                    {/* Nome ente */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1">Nome ente</label>
+                      <input
+                        type="text"
+                        value={item.nome}
+                        onChange={e => updatePatrocinio(item.id, "nome", e.target.value)}
+                        placeholder="Es. Comune di Bologna"
+                        className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+                      />
+                    </div>
+
+                    {/* Sito web */}
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1">Sito web</label>
+                      <input
+                        type="url"
+                        value={item.siteUrl ?? ""}
+                        onChange={e => updatePatrocinio(item.id, "siteUrl", e.target.value)}
+                        placeholder="https://www.comune.bologna.it"
+                        className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-dona/40 bg-background text-foreground"
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                {/* Aggiungi + Salva */}
+                <button
+                  onClick={addPatrocinio}
+                  className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-border rounded-xl py-3 text-sm font-semibold text-muted-foreground hover:border-dona/50 hover:text-dona hover:bg-dona/5 transition-all"
+                >
+                  + Aggiungi patrocinio
+                </button>
+
+                <button
+                  onClick={handleSavePatrocini}
+                  className="w-full flex items-center justify-center gap-2 bg-foreground text-background rounded-lg py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  {patrociniSaved
+                    ? <><CheckCircle className="w-4 h-4" /> Salvato!</>
+                    : <><Shield className="w-4 h-4" /> Salva patrocini</>
+                  }
+                </button>
+
+                <p className="text-[11px] text-muted-foreground text-center">
+                  I dati vengono salvati su Neon e visibili sulla{" "}
+                  <Link to="/patrocini" target="_blank" className="underline text-dona">
                     pagina pubblica
                   </Link>.
                 </p>
