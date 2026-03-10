@@ -1,5 +1,5 @@
 import { useSearchParams, Link } from "react-router-dom";
-import { CheckCircle2, Shirt, Heart, ArrowLeft, Share2 } from "lucide-react";
+import { CheckCircle2, Heart, ArrowLeft, Share2 } from "lucide-react";
 import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ export default function IscrizioneSuccesso() {
 
   const tappaNum = parseInt(searchParams.get("tappa") ?? "0");
   const nome     = searchParams.get("nome") ?? "";
-  const tipo     = searchParams.get("tipo") ?? "gratuita"; // gratuita | maglia | bonifico
+  const tipo     = searchParams.get("tipo") ?? "gratuita"; // gratuita | donazione | bonifico
   const importo  = searchParams.get("importo") ?? "30";
 
   const tappa = tappe[tappaNum - 1] ?? null;
@@ -77,18 +77,16 @@ export default function IscrizioneSuccesso() {
             )}
 
             {/* Messaggio specifico per tipo */}
-            {tipo === "maglia" && (
+            {tipo === "donazione" && (
               <div className="bg-dona/5 border border-dona/20 rounded-xl p-5 mb-6 text-left">
                 <div className="flex items-center gap-2 mb-2">
-                  <Shirt className="w-5 h-5 text-dona" />
+                  <Heart className="w-5 h-5 text-dona" />
                   <span className="font-heading font-semibold text-foreground text-sm">
-                    Maglia ufficiale inclusa
+                    Sostenitore del Cammino
                   </span>
                 </div>
                 <p className="text-muted-foreground text-sm font-body leading-relaxed">
-                  La tua maglia dell'evento ti sarà consegnata la sera prima della
-                  partenza della tappa {tappaNum}
-                  {tappa ? ` (${tappa.da}, ${tappa.data})` : ""}.
+                  Grazie per la tua donazione di <strong className="text-foreground">€{importo}</strong>! Con il tuo contributo sostieni la raccolta fondi per Komen Italia &ndash; Comitato Emilia-Romagna.
                   Riceverai una email di conferma con tutti i dettagli.
                 </p>
               </div>
@@ -104,16 +102,15 @@ export default function IscrizioneSuccesso() {
                 </div>
                 <p className="text-muted-foreground text-sm font-body leading-relaxed mb-3">
                   La piattaforma di pagamento online sarà disponibile a breve. Nel
-                  frattempo, per ricevere la maglia effettua un bonifico di{" "}
-                  <strong className="text-foreground">€{importo}</strong> e{" "}
+                  frattempo, per completare la donazione di{" "}
+                  <strong className="text-foreground">€{importo}</strong>, effettua un bonifico e{" "}
                   <Link to="/contatti" className="underline hover:text-foreground transition-colors">
                     contattaci
                   </Link>{" "}
                   per i dati bancari.
                 </p>
                 <p className="text-muted-foreground text-xs font-body">
-                  La tua iscrizione è già registrata. La maglia sarà confermata
-                  alla ricezione del pagamento.
+                  La tua iscrizione è già registrata. Riceverai conferma alla ricezione del pagamento.
                 </p>
               </div>
             )}
