@@ -8,24 +8,13 @@ import sanLucaImg from "@/assets/san-luca.jpg";
 import { motion } from "framer-motion";
 import { loadSiteYtSanLucaVideos, type YtVideoData } from "@/lib/adminSettings";
 
-// ── Metadati video (titoli e descrizioni) ─────────────────────────────────────
-const VIDEO_META = [
-  {
-    titolo: "Il Santuario della Madonna di San Luca",
-    descrizione:
-      "La storia secolare del Santuario sul Colle della Guardia e il portico più lungo del mondo che lo collega a Bologna.",
-  },
-  {
-    titolo: "La Devozione e le Tradizioni",
-    descrizione:
-      "Le processioni, i pellegrinaggi e i riti che da secoli accompagnano la devozione alla Madonna di San Luca.",
-  },
-  {
-    titolo: "I Miracoli e le Grazie",
-    descrizione:
-      "Le testimonianze dei fedeli e i prodigi legati all'icona della Vergine con il Bambino.",
-  },
-];
+// ── Metadati video default ────────────────────────────────────────────────────
+const DEFAULT_VIDEO: YtVideoData = {
+  id: "YOUTUBE_ID_1",
+  titolo: "Il Santuario della Madonna di San Luca",
+  descrizione:
+    "La storia secolare del Santuario sul Colle della Guardia e il portico più lungo del mondo che lo collega a Bologna.",
+};
 
 function VideoEmbed({ videoId, titolo }: { videoId: string; titolo: string }) {
   return (
@@ -51,9 +40,8 @@ function VideoEmbed({ videoId, titolo }: { videoId: string; titolo: string }) {
 }
 
 export default function SanLuca() {
-  const [videos, setVideos] = useState<YtVideoData[]>(() =>
-    VIDEO_META.map((meta, i) => ({ id: `YOUTUBE_ID_${i + 1}`, ...meta })),
-  );
+  const [video, setVideo] = useState<YtVideoData>(DEFAULT_VIDEO);
+
   useEffect(() => {
     document.title = "Santuario della Madonna di San Luca Bologna | Storia, Miracoli e Cammino dei 1000 km";
     const meta = document.querySelector('meta[name="description"]');
@@ -71,13 +59,11 @@ export default function SanLuca() {
   useEffect(() => {
     loadSiteYtSanLucaVideos().then(source => {
       if (!source) return;
-      setVideos(
-        VIDEO_META.map((meta, i) => ({
-          id:          source[i].id          || `YOUTUBE_ID_${i + 1}`,
-          titolo:      source[i].titolo      || meta.titolo,
-          descrizione: source[i].descrizione || meta.descrizione,
-        })),
-      );
+      setVideo({
+        id:          source[0].id          || DEFAULT_VIDEO.id,
+        titolo:      source[0].titolo      || DEFAULT_VIDEO.titolo,
+        descrizione: source[0].descrizione || DEFAULT_VIDEO.descrizione,
+      });
     });
   }, []);
 
@@ -109,25 +95,16 @@ export default function SanLuca() {
 
           {/* ── Sezione Video ─────────────────────────────────────────────── */}
           <AnimatedSection>
-            <div className="mt-12 mb-6">
-              <p className="font-body text-muted-foreground leading-relaxed italic">
-                Il Santuario della Madonna di San Luca raccontato attraverso immagini e testimonianze.
+            <div className="mt-12">
+              <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-3">
+                {video.titolo}
+              </h2>
+              <p className="font-body text-muted-foreground leading-relaxed mb-5">
+                {video.descrizione}
               </p>
+              <VideoEmbed videoId={video.id} titolo={video.titolo} />
             </div>
           </AnimatedSection>
-          {videos.map((video, i) => (
-            <AnimatedSection key={video.id} delay={i * 0.1}>
-              <div className="mt-8">
-                <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-3">
-                  {video.titolo}
-                </h2>
-                <p className="font-body text-muted-foreground leading-relaxed mb-5">
-                  {video.descrizione}
-                </p>
-                <VideoEmbed videoId={video.id} titolo={video.titolo} />
-              </div>
-            </AnimatedSection>
-          ))}
 
           {/* L'ICONA */}
           <AnimatedSection>

@@ -305,10 +305,8 @@ export default function AdminLive() {
   const [ytCn2, setYtCn2] = useState(""); const [ytCn2Title, setYtCn2Title] = useState(""); const [ytCn2Desc, setYtCn2Desc] = useState("");
   const [ytCn3, setYtCn3] = useState(""); const [ytCn3Title, setYtCn3Title] = useState(""); const [ytCn3Desc, setYtCn3Desc] = useState("");
   const [ytSaved, setYtSaved] = useState(false);
-  // ─ Video YouTube San Luca ─
+  // ─ Video YouTube San Luca (singolo video) ─
   const [ytSl1, setYtSl1] = useState(""); const [ytSl1Title, setYtSl1Title] = useState(""); const [ytSl1Desc, setYtSl1Desc] = useState("");
-  const [ytSl2, setYtSl2] = useState(""); const [ytSl2Title, setYtSl2Title] = useState(""); const [ytSl2Desc, setYtSl2Desc] = useState("");
-  const [ytSl3, setYtSl3] = useState(""); const [ytSl3Title, setYtSl3Title] = useState(""); const [ytSl3Desc, setYtSl3Desc] = useState("");
   const [ytSlSaved, setYtSlSaved] = useState(false);
 
   // ─ Condivisione social ─
@@ -417,8 +415,6 @@ export default function AdminLive() {
       setYtCn2(s.ytCn2); setYtCn2Title(s.ytCn2Title); setYtCn2Desc(s.ytCn2Desc);
       setYtCn3(s.ytCn3); setYtCn3Title(s.ytCn3Title); setYtCn3Desc(s.ytCn3Desc);
       setYtSl1(s.ytSl1); setYtSl1Title(s.ytSl1Title); setYtSl1Desc(s.ytSl1Desc);
-      setYtSl2(s.ytSl2); setYtSl2Title(s.ytSl2Title); setYtSl2Desc(s.ytSl2Desc);
-      setYtSl3(s.ytSl3); setYtSl3Title(s.ytSl3Title); setYtSl3Desc(s.ytSl3Desc);
       setShareTitle(s.shareTitle); setShareBody(s.shareBody); setShareSocialTag(s.shareSocialTag);
       setShareHashtags(s.shareHashtags); setShareUrl(s.shareUrl);
       setAutoPostOnStart(s.autoPostOnStart === "true");
@@ -529,7 +525,7 @@ export default function AdminLive() {
 
   // ─ Costruisce oggetto AdminSettings completo ─
   function buildAdminSettings(): AdminSettings {
-    return { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset, ytCn1, ytCn1Title, ytCn1Desc, ytCn2, ytCn2Title, ytCn2Desc, ytCn3, ytCn3Title, ytCn3Desc, ytSl1, ytSl1Title, ytSl1Desc, ytSl2, ytSl2Title, ytSl2Desc, ytSl3, ytSl3Title, ytSl3Desc, shareTitle, shareBody, shareSocialTag, shareHashtags, shareUrl };
+    return { fbPageId, fbToken, igUserId, igImageUrl, cloudName, cloudPreset, ytCn1, ytCn1Title, ytCn1Desc, ytCn2, ytCn2Title, ytCn2Desc, ytCn3, ytCn3Title, ytCn3Desc, ytSl1, ytSl1Title, ytSl1Desc, ytSl2: "", ytSl2Title: "", ytSl2Desc: "", ytSl3: "", ytSl3Title: "", ytSl3Desc: "", shareTitle, shareBody, shareSocialTag, shareHashtags, shareUrl };
   }
 
   // ─ Impostazioni social ─
@@ -555,7 +551,7 @@ export default function AdminLive() {
   // ─ Video YouTube San Luca ─
   async function handleSaveYtSanLucaVideos() {
     await saveSettingsDB(buildAdminSettings());
-    await saveSiteYtSanLucaVideos({ ytSl1, ytSl1Title, ytSl1Desc, ytSl2, ytSl2Title, ytSl2Desc, ytSl3, ytSl3Title, ytSl3Desc });
+    await saveSiteYtSanLucaVideos({ ytSl1, ytSl1Title, ytSl1Desc, ytSl2: "", ytSl2Title: "", ytSl2Desc: "", ytSl3: "", ytSl3Title: "", ytSl3Desc: "" });
     setYtSlSaved(true);
     setTimeout(() => setYtSlSaved(false), 2500);
   }
@@ -1974,22 +1970,6 @@ export default function AdminLive() {
                       desc={ytSl1Desc}  onDesc={setYtSl1Desc}
                       defaultTitle="Il Santuario della Madonna di San Luca"
                       defaultDesc="La storia secolare del Santuario sul Colle della Guardia e il portico più lungo del mondo che lo collega a Bologna."
-                    />
-                    <YtVideoField
-                      num={2}
-                      ytId={ytSl2} onYtId={setYtSl2}
-                      title={ytSl2Title} onTitle={setYtSl2Title}
-                      desc={ytSl2Desc}  onDesc={setYtSl2Desc}
-                      defaultTitle="La Devozione e le Tradizioni"
-                      defaultDesc="Le processioni, i pellegrinaggi e i riti che da secoli accompagnano la devozione alla Madonna di San Luca."
-                    />
-                    <YtVideoField
-                      num={3}
-                      ytId={ytSl3} onYtId={setYtSl3}
-                      title={ytSl3Title} onTitle={setYtSl3Title}
-                      desc={ytSl3Desc}  onDesc={setYtSl3Desc}
-                      defaultTitle="I Miracoli e le Grazie"
-                      defaultDesc="Le testimonianze dei fedeli e i prodigi legati all'icona della Vergine con il Bambino."
                     />
                   </div>
 
