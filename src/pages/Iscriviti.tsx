@@ -1,12 +1,30 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Heart, Users, Loader2, AlertCircle, CheckCircle2, Check, Footprints, MapPin, X, ArrowRight } from "lucide-react";
+import { ArrowLeft, Heart, Users, Loader2, AlertCircle, CheckCircle2, Check, Footprints, MapPin, X, ArrowRight, CreditCard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import AnimatedSection from "@/components/AnimatedSection";
 import { apiFetch } from "@/lib/api";
 import { tappe } from "@/lib/tappe";
+
+declare global {
+  interface Window { SumUpCard: any; }
+}
+
+/** Load SumUp SDK script once */
+function useSumUpSdk() {
+  const [ready, setReady] = useState(!!window.SumUpCard);
+  useEffect(() => {
+    if (window.SumUpCard) { setReady(true); return; }
+    const s = document.createElement("script");
+    s.src = "https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js";
+    s.async = true;
+    s.onload = () => setReady(true);
+    document.head.appendChild(s);
+  }, []);
+  return ready;
+}
 
 const DONAZIONE_TIERS = [
   { importo: 30, label: "Sostieni una tappa del cammino" },
@@ -314,6 +332,7 @@ function LandingPage() {
 export default function Iscriviti() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const sdkReady = useSumUpSdk();
 
   const tappaNum = parseInt(searchParams.get("tappa") ?? "0");
   const tappa = tappe[tappaNum - 1] ?? null;
@@ -327,6 +346,12 @@ export default function Iscriviti() {
   const [privacy, setPrivacy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
+
+  // SumUp payment state
+  const [showPayment, setShowPayment] = useState(false);
+  const widgetRef = useRef<HTMLDivElement>(null);
+  const checkoutIdRef = useRef<string>("");
+  const checkoutRefRef = useRef<string>("");
 
   // Tappa non valida: mostra landing page
   if (!tappa) {
@@ -376,54 +401,102 @@ export default function Iscriviti() {
           `/iscrizione-successo?tappa=${tappa.giorno}&nome=${encodeURIComponent(nome.trim())}&tipo=gratuita`
         );
       } else {
-        // Iscrizione con donazione: usa Stripe via API route
-        const successUrl = `${window.location.origin}/iscrizione-successo?tappa=${tappa.giorno}&nome=${encodeURIComponent(nome.trim())}&tipo=donazione&importo=${donazione}`;
-        const cancelUrl = `${window.location.origin}/iscriviti?tappa=${tappa.giorno}`;
-
-        const res = await fetch("/api/create-payment", {
+        // 1. Salva iscrizione nel DB
+        const iscRes = await apiFetch("/api/iscrizioni", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             tappa_numero: tappa.giorno,
             nome: nome.trim(),
             cognome: cognome.trim(),
             email: email.trim().toLowerCase(),
             telefono: telefono.trim() || null,
+            vuole_maglia: false,
             donazione_euro: donazione,
-            success_url: successUrl,
-            cancel_url: cancelUrl,
+            pagamento_stato: "in_attesa",
           }),
         });
-
-        const data = await res.json();
-
-        if (!res.ok || data.error) {
-          // Fallback: iscrizione con stato "in_attesa_bonifico"
-          const fallback = await apiFetch("/api/iscrizioni", {
-            method: "POST",
-            body: JSON.stringify({
-              tappa_numero: tappa.giorno,
-              nome: nome.trim(),
-              cognome: cognome.trim(),
-              email: email.trim().toLowerCase(),
-              telefono: telefono.trim() || null,
-              vuole_maglia: false,
-              donazione_euro: donazione,
-              pagamento_stato: "in_attesa_bonifico",
-            }),
-          });
-          if (!fallback.ok) {
-            const d = await fallback.json();
-            throw new Error(d.error ?? "Errore durante l'iscrizione.");
-          }
-          navigate(
-            `/iscrizione-successo?tappa=${tappa.giorno}&nome=${encodeURIComponent(nome.trim())}&tipo=bonifico&importo=${donazione}`
-          );
-          return;
+        if (!iscRes.ok) {
+          const d = await iscRes.json();
+          throw new Error(d.error ?? "Errore durante l'iscrizione.");
         }
 
-        // Redirect a Stripe Checkout
-        window.location.href = data.url;
+        // 2. Salva donazione nel DB come "pendente"
+        const donRes = await fetch("/api/donazioni", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nome: nome.trim(),
+            cognome: cognome.trim(),
+            email: email.trim().toLowerCase(),
+            importo_euro: donazione,
+            progetto: "1000km Di Gratitudine",
+          }),
+        });
+        if (!donRes.ok) {
+          const d = await donRes.json();
+          throw new Error(d.error ?? "Errore nel salvataggio donazione.");
+        }
+        const { donazione_id } = await donRes.json();
+
+        // 3. Crea checkout SumUp
+        const resp = await fetch("/api/sumup-checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: donazione,
+            nome: nome.trim(),
+            cognome: cognome.trim(),
+            email: email.trim().toLowerCase(),
+            progetto: "1000km Di Gratitudine",
+            donazione_id,
+          }),
+        });
+        if (!resp.ok) {
+          const d = await resp.json();
+          throw new Error(d.error ?? "Errore creazione pagamento.");
+        }
+        const { id: checkoutId, checkout_reference } = await resp.json();
+        checkoutIdRef.current = checkoutId;
+        checkoutRefRef.current = checkout_reference;
+
+        // 4. Mostra widget SumUp
+        setShowPayment(true);
+        setLoading(false);
+
+        // 5. Monta widget SumUp (dopo render)
+        setTimeout(() => {
+          if (!window.SumUpCard || !widgetRef.current) return;
+          if (window.SumUpCard.unmount) {
+            try { window.SumUpCard.unmount("sumup-card-iscrizione"); } catch {}
+          }
+          window.SumUpCard.mount({
+            id: "sumup-card-iscrizione",
+            checkoutId,
+            email: email.trim().toLowerCase(),
+            locale: "it-IT",
+            onResponse: async (type: string, _body: any) => {
+              if (type === "success") {
+                // Conferma pagamento server-side
+                try {
+                  await fetch("/api/sumup-confirm", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      checkout_id: checkoutIdRef.current,
+                      checkout_reference: checkoutRefRef.current,
+                    }),
+                  });
+                } catch {}
+                navigate(
+                  `/iscrizione-successo?tappa=${tappa.giorno}&nome=${encodeURIComponent(nome.trim())}&tipo=donazione&importo=${donazione}`
+                );
+              } else if (type === "error") {
+                setErrore("Pagamento non riuscito. Riprova.");
+              }
+            },
+          });
+        }, 100);
+        return; // non eseguire finally setLoading(false) — già fatto sopra
       }
     } catch (ex: unknown) {
       setErrore(ex instanceof Error ? ex.message : "Errore imprevisto. Riprova.");
@@ -710,41 +783,81 @@ export default function Iscriviti() {
             )}
 
             {/* Frase emotiva */}
-            <p className="text-center font-body text-sm text-muted-foreground italic leading-relaxed max-w-md mx-auto">
-              Questo cammino nasce da una promessa fatta in un momento difficile. Oggi vogliamo trasformarlo in un gesto di speranza per tante altre persone.
-            </p>
+            {!showPayment && (
+              <p className="text-center font-body text-sm text-muted-foreground italic leading-relaxed max-w-md mx-auto">
+                Questo cammino nasce da una promessa fatta in un momento difficile. Oggi vogliamo trasformarlo in un gesto di speranza per tante altre persone.
+              </p>
+            )}
 
-            {/* Submit */}
-            <Button
-              type="submit"
-              disabled={loading}
-              variant="dona"
-              size="lg"
-              className="w-full"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Attendere…
-                </>
-              ) : opzione === "donazione" ? (
-                <>
-                  <Heart className="w-4 h-4 mr-2" />
-                  Partecipa e sostieni la ricerca · €{donazione}
-                </>
-              ) : (
-                <>
-                  <Footprints className="w-4 h-4 mr-2" />
-                  Partecipa al cammino
-                </>
-              )}
-            </Button>
+            {/* Submit — nascosto durante pagamento SumUp */}
+            {!showPayment && (
+              <>
+                <Button
+                  type="submit"
+                  disabled={loading || (opzione === "donazione" && !sdkReady)}
+                  variant="dona"
+                  size="lg"
+                  className="w-full"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Attendere…
+                    </>
+                  ) : opzione === "donazione" ? (
+                    <>
+                      <Heart className="w-4 h-4 mr-2" />
+                      Partecipa e sostieni la ricerca · €{donazione}
+                    </>
+                  ) : (
+                    <>
+                      <Footprints className="w-4 h-4 mr-2" />
+                      Partecipa al cammino
+                    </>
+                  )}
+                </Button>
 
-            <p className="text-center text-xs text-muted-foreground font-body">
-              {opzione === "donazione"
-                ? "Pagamento sicuro tramite Stripe. I tuoi dati sono protetti."
-                : "Nessun pagamento richiesto. Puoi donare in qualsiasi momento."}
-            </p>
+                <p className="text-center text-xs text-muted-foreground font-body">
+                  {opzione === "donazione"
+                    ? "Pagamento sicuro tramite SumUp. I tuoi dati sono protetti."
+                    : "Nessun pagamento richiesto. Puoi donare in qualsiasi momento."}
+                </p>
+              </>
+            )}
+
+            {/* Widget SumUp pagamento */}
+            {showPayment && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-card border border-border rounded-xl p-6 space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <h2 className="font-heading text-lg font-semibold text-foreground">
+                    Pagamento
+                  </h2>
+                  <span className="font-heading text-dona font-bold text-lg">€{donazione}</span>
+                </div>
+                <p className="text-muted-foreground font-body text-sm">
+                  Donazione di <strong className="text-foreground">{nome} {cognome}</strong> per il progetto 1000km Di Gratitudine
+                </p>
+
+                <div
+                  id="sumup-card-iscrizione"
+                  ref={widgetRef}
+                  className="min-h-[300px]"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => { setShowPayment(false); setErrore(null); }}
+                  className="inline-flex items-center gap-2 text-sm font-body text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Torna al modulo
+                </button>
+              </motion.div>
+            )}
           </motion.form>
         </div>
       </section>
