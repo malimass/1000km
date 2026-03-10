@@ -17,6 +17,9 @@ export type AdminSettings = {
   ytCn1: string; ytCn1Title: string; ytCn1Desc: string;
   ytCn2: string; ytCn2Title: string; ytCn2Desc: string;
   ytCn3: string; ytCn3Title: string; ytCn3Desc: string;
+  ytSl1: string; ytSl1Title: string; ytSl1Desc: string;
+  ytSl2: string; ytSl2Title: string; ytSl2Desc: string;
+  ytSl3: string; ytSl3Title: string; ytSl3Desc: string;
   shareTitle:     string;
   shareBody:      string;
   shareSocialTag: string;
@@ -35,6 +38,9 @@ const EMPTY: AdminSettings = {
   ytCn1: "", ytCn1Title: "", ytCn1Desc: "",
   ytCn2: "", ytCn2Title: "", ytCn2Desc: "",
   ytCn3: "", ytCn3Title: "", ytCn3Desc: "",
+  ytSl1: "", ytSl1Title: "", ytSl1Desc: "",
+  ytSl2: "", ytSl2Title: "", ytSl2Desc: "",
+  ytSl3: "", ytSl3Title: "", ytSl3Desc: "",
   shareTitle:     "",
   shareBody:      "",
   shareSocialTag: "",
@@ -54,6 +60,9 @@ const LS: Record<keyof AdminSettings, string> = {
   ytCn1: "gp_yt_cn_1", ytCn1Title: "gp_yt_cn_1_title", ytCn1Desc: "gp_yt_cn_1_desc",
   ytCn2: "gp_yt_cn_2", ytCn2Title: "gp_yt_cn_2_title", ytCn2Desc: "gp_yt_cn_2_desc",
   ytCn3: "gp_yt_cn_3", ytCn3Title: "gp_yt_cn_3_title", ytCn3Desc: "gp_yt_cn_3_desc",
+  ytSl1: "gp_yt_sl_1", ytSl1Title: "gp_yt_sl_1_title", ytSl1Desc: "gp_yt_sl_1_desc",
+  ytSl2: "gp_yt_sl_2", ytSl2Title: "gp_yt_sl_2_title", ytSl2Desc: "gp_yt_sl_2_desc",
+  ytSl3: "gp_yt_sl_3", ytSl3Title: "gp_yt_sl_3_title", ytSl3Desc: "gp_yt_sl_3_desc",
   shareTitle:     "gp_share_title",
   shareBody:      "gp_share_body",
   shareSocialTag: "gp_share_social_tag",
@@ -141,6 +150,33 @@ export async function loadSiteYtVideos(): Promise<[YtVideoData, YtVideoData, YtV
       { id: d.ytCn1 ?? "", titolo: d.ytCn1Title ?? "", descrizione: d.ytCn1Desc ?? "" },
       { id: d.ytCn2 ?? "", titolo: d.ytCn2Title ?? "", descrizione: d.ytCn2Desc ?? "" },
       { id: d.ytCn3 ?? "", titolo: d.ytCn3Title ?? "", descrizione: d.ytCn3Desc ?? "" },
+    ];
+  } catch { return null; }
+}
+
+// ─── Video San Luca (site_settings id=4, lettura pubblica) ───────────────────
+
+type SiteYtSanLucaData = {
+  ytSl1: string; ytSl1Title: string; ytSl1Desc: string;
+  ytSl2: string; ytSl2Title: string; ytSl2Desc: string;
+  ytSl3: string; ytSl3Title: string; ytSl3Desc: string;
+};
+
+export async function saveSiteYtSanLucaVideos(s: SiteYtSanLucaData): Promise<void> {
+  if (!getAuthToken()) return;
+  await apiFetch("/api/site-settings?id=4", { method: "POST", body: JSON.stringify(s) });
+}
+
+export async function loadSiteYtSanLucaVideos(): Promise<[YtVideoData, YtVideoData, YtVideoData] | null> {
+  try {
+    const res = await fetch("/api/site-settings?id=4");
+    if (!res.ok) return null;
+    const d = await res.json() as Record<string, string>;
+    if (!d || !d.ytSl1) return null;
+    return [
+      { id: d.ytSl1 ?? "", titolo: d.ytSl1Title ?? "", descrizione: d.ytSl1Desc ?? "" },
+      { id: d.ytSl2 ?? "", titolo: d.ytSl2Title ?? "", descrizione: d.ytSl2Desc ?? "" },
+      { id: d.ytSl3 ?? "", titolo: d.ytSl3Title ?? "", descrizione: d.ytSl3Desc ?? "" },
     ];
   } catch { return null; }
 }
