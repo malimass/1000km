@@ -340,6 +340,9 @@ export default function Percorso() {
       <section className="section-padding bg-secondary">
         <div className="container-narrow">
           <AnimatedSection>
+            <p className="text-center text-muted-foreground font-body text-base mb-6 max-w-2xl mx-auto">
+              1000 chilometri attraverso l'Italia. Ogni passo per sostenere la prevenzione e la ricerca contro il tumore al seno.
+            </p>
             <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-2 text-center">
               Mappa del percorso
             </h2>
@@ -461,15 +464,49 @@ export default function Percorso() {
         </section>
       )}
 
+      {/* Cammina con noi */}
+      <section className="section-padding bg-secondary">
+        <div className="container-narrow max-w-3xl mx-auto text-center">
+          <AnimatedSection>
+            <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-4">
+              Cammina con noi
+            </h2>
+            <div className="font-body text-muted-foreground text-base leading-relaxed space-y-4 max-w-2xl mx-auto mb-8">
+              <p>Il cammino dei 1000 km di Gratitudine non è solo una sfida sportiva.</p>
+              <p>È un viaggio fatto di incontri, condivisione e chilometri percorsi insieme.</p>
+              <p>Lungo il percorso, chiunque lo desideri può unirsi per qualche tratto, camminare insieme a noi e vivere da vicino lo spirito di questo progetto.</p>
+              <p>Se vi trovate lungo il tragitto, infilate le scarpe e fate qualche chilometro con noi.</p>
+              <p className="font-semibold text-foreground">Ogni passo condiviso rende questo cammino ancora più speciale.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button asChild variant="dona-outline" size="lg" className="text-base px-8">
+                <a href="#tappe">
+                  Scopri le tappe
+                </a>
+              </Button>
+              <Button asChild variant="dona" size="lg" className="text-base px-8">
+                <Link to="/iscriviti">
+                  <Heart className="w-4 h-4 mr-2" />
+                  Partecipa a una tappa
+                </Link>
+              </Button>
+            </div>
+          </AnimatedSection>
+        </div>
+      </section>
+
       {/* Timeline tappe */}
-      <section className="section-padding bg-background">
+      <section id="tappe" className="section-padding bg-background">
         <div className="container-narrow">
           <AnimatedSection>
             <h2 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-2 text-center">
               Le {savedTappe ? savedTappe.filter(t => t.tappaNum > 0).length : 14} tappe
             </h2>
-            <p className="text-center text-muted-foreground font-body text-sm mb-8">
-              Clicca sulla tappa per vederla sulla mappa · premi <strong>Partecipa</strong> per iscriverti
+            <p className="text-center text-muted-foreground font-body text-sm mb-2">
+              Clicca sulla tappa per vederla sulla mappa · premi <strong>Cammina con noi</strong> per iscriverti
+            </p>
+            <p className="text-center text-muted-foreground font-body text-base mb-8 max-w-xl mx-auto">
+              Vuoi camminare con noi? Scegli una tappa e unisciti al cammino per qualche chilometro.
             </p>
           </AnimatedSection>
           <div className="space-y-4 max-w-3xl mx-auto">
@@ -516,7 +553,7 @@ export default function Percorso() {
                         <Link to={`/iscriviti?tappa=${t.tappaNum}`}>
                           <Button size="sm" className="text-xs h-8 px-2 sm:px-3 bg-dona hover:bg-dona/90 text-white">
                             <UserPlus className="w-3.5 h-3.5 sm:mr-1" />
-                            <span className="hidden sm:inline">Partecipa</span>
+                            <span className="hidden sm:inline">Cammina con noi</span>
                           </Button>
                         </Link>
                       </div>
@@ -568,7 +605,7 @@ export default function Percorso() {
                         <Link to={`/iscriviti?tappa=${t.giorno}`}>
                           <Button size="sm" className="text-xs h-8 px-2 sm:px-3 bg-dona hover:bg-dona/90 text-white">
                             <UserPlus className="w-3.5 h-3.5 sm:mr-1" />
-                            <span className="hidden sm:inline">Partecipa</span>
+                            <span className="hidden sm:inline">Cammina con noi</span>
                           </Button>
                         </Link>
                       </div>
@@ -593,6 +630,15 @@ export default function Percorso() {
           </div>
         </section>
       )}
+
+      {/* Frase pre-diretta */}
+      <section className="py-10 bg-background">
+        <div className="container-narrow text-center">
+          <p className="font-body text-muted-foreground text-base max-w-2xl mx-auto leading-relaxed">
+            Dal <strong className="text-foreground">15 aprile</strong> al <strong className="text-foreground">1 maggio 2026</strong> il cammino attraverserà l'Italia. Se ti trovi lungo il percorso, puoi camminare con noi anche solo per qualche chilometro.
+          </p>
+        </div>
+      </section>
 
       {/* Sezione live tracking */}
       <LiveTrackingSection ltwUrl={ltwUrl} livePos1={livePos1} livePos2={livePos2} />
