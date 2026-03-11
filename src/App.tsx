@@ -9,6 +9,7 @@ import GoogleHead from "./components/GoogleHead";
 import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 import ProtectedCoachRoute from "./components/ProtectedCoachRoute";
 import NativeRedirect from "./components/NativeRedirect";
+import PageTracker from "./components/PageTracker";
 
 /**
  * Wrapper per lazy() che ricarica la pagina se il chunk JS non viene trovato
@@ -69,6 +70,7 @@ const App = () => (
       <BrowserRouter>
         <ScrollToTop />
         <GoogleHead />
+        <PageTracker />
         <Suspense fallback={<div className="min-h-screen bg-background" />}>
         <Routes>
           <Route path="/" element={<NativeRedirect><Index /></NativeRedirect>} />

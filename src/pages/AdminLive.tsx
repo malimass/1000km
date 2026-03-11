@@ -23,7 +23,7 @@ import {
   CheckCircle, Trash2, ExternalLink, Settings, ChevronDown, ChevronUp,
   Send, Facebook, Instagram, Camera, ImageIcon, X, Loader2, Video, LogOut,
   MapPin, Youtube, Navigation, Users, Upload, Share2, Map, Bell, TrendingUp,
-  Globe, Search, Plus, Shield,
+  Globe, Search, Plus, Shield, BarChart3, Monitor, Smartphone, Tablet,
 } from "lucide-react";
 
 const RouteMap = lazy(() => import("@/components/RouteMap"));
@@ -211,7 +211,7 @@ async function shareToTikTok(file: File, caption: string): Promise<{ ok: boolean
 }
 
 // ─── Tipi sezione ─────────────────────────────────────────────────────────────
-type Section = "live" | "social" | "notizie" | "raccolta" | "video" | "sostenitori" | "patrocini" | "share" | "settings" | "percorso";
+type Section = "live" | "social" | "notizie" | "raccolta" | "video" | "sostenitori" | "patrocini" | "share" | "settings" | "percorso" | "analisi";
 
 const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
   { key: "live",        label: "Live Tracking", icon: <MapPin className="w-4 h-4" /> },
@@ -224,6 +224,7 @@ const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
   { key: "share",       label: "Condivisione",  icon: <Share2 className="w-4 h-4" /> },
   { key: "settings",    label: "Impostazioni",  icon: <Settings className="w-4 h-4" /> },
   { key: "percorso",    label: "Crea Percorso", icon: <Map className="w-4 h-4" /> },
+  { key: "analisi",     label: "Analisi Sito",  icon: <BarChart3 className="w-4 h-4" /> },
 ];
 
 // ─── Componente principale ────────────────────────────────────────────────────
@@ -245,6 +246,11 @@ export default function AdminLive() {
   const [igImageUrl,  setIgImageUrl]  = useState("");
   const [cloudName,   setCloudName]   = useState("");
   const [cloudPreset, setCloudPreset] = useState("");
+
+  // ─ Analytics ─
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [analyticsRange, setAnalyticsRange] = useState("7d");
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   // ─ GPS Live ─
   const [runnerId,    setRunnerIdState] = useState<1 | 2>(() => {
@@ -474,6 +480,18 @@ export default function AdminLive() {
       lastAlertTimeRef.current = now;
     }
   }, [totalActiveRunners]);
+
+  // ─ Carica analytics quando si apre la sezione ─
+  useEffect(() => {
+    if (activeSection !== "analisi") return;
+    setAnalyticsLoading(true);
+    const jwt = localStorage.getItem("gp_jwt");
+    fetch(`/api/analytics?range=${analyticsRange}`, { headers: { Authorization: `Bearer ${jwt}` } })
+      .then(r => r.json())
+      .then(d => setAnalyticsData(d))
+      .catch(() => setAnalyticsData(null))
+      .finally(() => setAnalyticsLoading(false));
+  }, [activeSection, analyticsRange]);
 
   // ─ Foto handlers ─
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -2566,6 +2584,186 @@ export default function AdminLive() {
                 >
                   Salva impostazioni
                 </button>
+              </div>
+            )}
+
+            {/* ══ ANALISI SITO ══════════════════════════════════════════════ */}
+            {activeSection === "analisi" && (
+              <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-5">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-semibold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4" /> Analisi Sito
+                  </h2>
+                  <select
+                    value={analyticsRange}
+                    onChange={e => setAnalyticsRange(e.target.value)}
+                    className="text-xs border border-border rounded-lg px-2 py-1.5 bg-background text-foreground"
+                  >
+                    <option value="24h">Ultime 24h</option>
+                    <option value="7d">Ultimi 7 giorni</option>
+                    <option value="30d">Ultimi 30 giorni</option>
+                    <option value="90d">Ultimi 90 giorni</option>
+                  </select>
+                </div>
+
+                {analyticsLoading && (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+
+                {!analyticsLoading && analyticsData && (
+                  <>
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-background border border-border rounded-xl p-4 text-center">
+                        <p className="text-2xl font-bold text-foreground">{analyticsData.totalViews?.toLocaleString("it-IT") ?? 0}</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">Visite totali</p>
+                      </div>
+                      <div className="bg-background border border-border rounded-xl p-4 text-center">
+                        <p className="text-2xl font-bold text-foreground">{analyticsData.uniqueSessions?.toLocaleString("it-IT") ?? 0}</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">Sessioni uniche</p>
+                      </div>
+                    </div>
+
+                    {/* Daily chart (simple bar chart) */}
+                    {analyticsData.dailyViews?.length > 0 && (
+                      <div className="border border-border rounded-xl p-4 bg-background">
+                        <p className="text-xs font-bold text-foreground mb-3">Visite giornaliere</p>
+                        <div className="flex items-end gap-1 h-32">
+                          {(() => {
+                            const maxV = Math.max(...analyticsData.dailyViews.map((d: any) => d.views), 1);
+                            return analyticsData.dailyViews.map((d: any, i: number) => (
+                              <div key={i} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                                <span className="text-[9px] text-muted-foreground">{d.views}</span>
+                                <div
+                                  className="w-full bg-dona/80 rounded-t min-h-[2px]"
+                                  style={{ height: `${(d.views / maxV) * 100}%` }}
+                                  title={`${d.day}: ${d.views} visite`}
+                                />
+                                <span className="text-[8px] text-muted-foreground truncate w-full text-center">
+                                  {new Date(d.day).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })}
+                                </span>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Top pagine */}
+                    {analyticsData.topPages?.length > 0 && (
+                      <div className="border border-border rounded-xl p-4 bg-background">
+                        <p className="text-xs font-bold text-foreground mb-3">Pagine più visitate</p>
+                        <div className="space-y-2">
+                          {analyticsData.topPages.map((p: any, i: number) => {
+                            const maxV = analyticsData.topPages[0].views;
+                            return (
+                              <div key={i}>
+                                <div className="flex justify-between text-xs mb-0.5">
+                                  <span className="text-foreground font-mono truncate mr-2">{p.path}</span>
+                                  <span className="text-muted-foreground whitespace-nowrap">{p.views}</span>
+                                </div>
+                                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div className="h-full bg-dona/70 rounded-full" style={{ width: `${(p.views / maxV) * 100}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Device breakdown */}
+                    {analyticsData.deviceBreakdown?.length > 0 && (
+                      <div className="border border-border rounded-xl p-4 bg-background">
+                        <p className="text-xs font-bold text-foreground mb-3">Dispositivi</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          {analyticsData.deviceBreakdown.map((d: any) => (
+                            <div key={d.device} className="text-center">
+                              <div className="flex justify-center mb-1">
+                                {d.device === "mobile" ? <Smartphone className="w-5 h-5 text-dona" /> :
+                                 d.device === "tablet" ? <Tablet className="w-5 h-5 text-dona" /> :
+                                 d.device === "desktop" ? <Monitor className="w-5 h-5 text-dona" /> :
+                                 <Globe className="w-5 h-5 text-muted-foreground" />}
+                              </div>
+                              <p className="text-lg font-bold text-foreground">{d.count}</p>
+                              <p className="text-[10px] text-muted-foreground capitalize">{d.device}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Top referrer */}
+                    {analyticsData.topReferrers?.length > 0 && (
+                      <div className="border border-border rounded-xl p-4 bg-background">
+                        <p className="text-xs font-bold text-foreground mb-3">Provenienza (Referrer)</p>
+                        <div className="space-y-1.5">
+                          {analyticsData.topReferrers.map((r: any, i: number) => (
+                            <div key={i} className="flex justify-between text-xs">
+                              <span className="text-foreground truncate mr-2">{r.referrer}</span>
+                              <span className="text-muted-foreground">{r.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Top paesi */}
+                    {analyticsData.topCountries?.length > 0 && (
+                      <div className="border border-border rounded-xl p-4 bg-background">
+                        <p className="text-xs font-bold text-foreground mb-3">Paesi</p>
+                        <div className="flex flex-wrap gap-2">
+                          {analyticsData.topCountries.map((c: any, i: number) => (
+                            <span key={i} className="inline-flex items-center gap-1 bg-muted px-2.5 py-1 rounded-full text-xs font-medium text-foreground">
+                              {c.country ?? "?"} <span className="text-muted-foreground">{c.count}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Click recenti */}
+                    {analyticsData.recentClicks?.length > 0 && (
+                      <div className="border border-border rounded-xl p-4 bg-background">
+                        <p className="text-xs font-bold text-foreground mb-3">Click recenti</p>
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                          {analyticsData.recentClicks.map((c: any, i: number) => (
+                            <div key={i} className="flex justify-between text-xs">
+                              <span className="text-foreground truncate mr-2">
+                                <span className="font-mono text-muted-foreground">{c.path}</span>{" "}
+                                → {c.event_data}
+                              </span>
+                              <span className="text-muted-foreground whitespace-nowrap text-[10px]">
+                                {new Date(c.created_at).toLocaleString("it-IT", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Empty state */}
+                    {analyticsData.totalViews === 0 && (
+                      <div className="text-center py-8">
+                        <BarChart3 className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                        <p className="text-sm text-muted-foreground">
+                          Nessuna visita registrata nel periodo selezionato.
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Il tracking è attivo — i dati appariranno quando gli utenti visiteranno il sito.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {!analyticsLoading && !analyticsData && (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Errore nel caricamento dei dati analytics.
+                  </p>
+                )}
               </div>
             )}
 
