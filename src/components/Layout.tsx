@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, X, Heart, ChevronDown, LogIn } from "lucide-react";
+import { Menu, X, Heart, ChevronDown, LogIn, Facebook, Instagram } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
@@ -206,10 +206,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             <div>
-              <h4 className="font-heading text-sm font-bold mb-4 uppercase tracking-wider">Beneficenza</h4>
-              <p className="text-primary-foreground/70 text-sm font-body leading-relaxed">
+              <h4 className="font-heading text-sm font-bold mb-4 uppercase tracking-wider">Seguici</h4>
+              <p className="text-primary-foreground/70 text-sm font-body leading-relaxed mb-4">
                 Raccolta fondi solidale per la ricerca. Rendicontazione pubblica e trasparente.
               </p>
+              <div className="flex gap-3">
+                <a
+                  href="https://www.facebook.com/1000kmdigratitudine"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center w-9 h-9 rounded-full bg-primary-foreground/10 hover:bg-accent hover:text-primary transition-colors"
+                  aria-label="Facebook"
+                >
+                  <Facebook className="w-4 h-4" />
+                </a>
+                <a
+                  href="https://www.instagram.com/1000kmdigratitudine"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center w-9 h-9 rounded-full bg-primary-foreground/10 hover:bg-accent hover:text-primary transition-colors"
+                  aria-label="Instagram"
+                >
+                  <Instagram className="w-4 h-4" />
+                </a>
+              </div>
             </div>
           </div>
           <div className="mt-12 pt-8 border-t border-primary-foreground/10 text-center text-primary-foreground/50 text-xs font-body">
