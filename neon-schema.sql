@@ -379,6 +379,8 @@ CREATE TABLE IF NOT EXISTS page_views (
   screen_h    smallint,
   language    text,
   country     text,
+  city        text,
+  region      text,
   event_type  text             NOT NULL DEFAULT 'pageview',
   -- valori: 'pageview' | 'click'
   event_data  text,
