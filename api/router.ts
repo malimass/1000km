@@ -43,6 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/sumup-confirm") return await sumupConfirm(req, res);
     if (path === "/track") return await track(req, res);
     if (path === "/analytics") return await analytics(req, res);
+    if (path === "/analytics-live") return await analyticsLive(req, res);
     return res.status(404).json({ error: "Not found" });
   } catch (err: any) {
     console.error(err);
@@ -1280,13 +1281,15 @@ async function track(req: VercelRequest, res: VercelResponse) {
 
   const ua = (req.headers["user-agent"] ?? "").slice(0, 512);
   const country = (req.headers["x-vercel-ip-country"] as string) ?? null;
+  const city = (req.headers["x-vercel-ip-city"] as string) ?? null;
+  const region = (req.headers["x-vercel-ip-country-region"] as string) ?? null;
   const evType = event_type === "click" ? "click" : "pageview";
 
   await sql`
-    INSERT INTO page_views (session_id, path, referrer, user_agent, screen_w, screen_h, language, country, event_type, event_data)
+    INSERT INTO page_views (session_id, path, referrer, user_agent, screen_w, screen_h, language, country, city, region, event_type, event_data)
     VALUES (${session_id}, ${path.slice(0, 512)}, ${referrer?.slice(0, 1024) ?? null}, ${ua},
             ${screen_w ?? null}, ${screen_h ?? null}, ${language?.slice(0, 16) ?? null},
-            ${country}, ${evType}, ${event_data?.slice(0, 512) ?? null})
+            ${country}, ${city ? decodeURIComponent(city) : null}, ${region}, ${evType}, ${event_data?.slice(0, 512) ?? null})
   `;
   return res.json({ ok: true });
 }
@@ -1311,6 +1314,7 @@ async function analytics(req: VercelRequest, res: VercelResponse) {
     dailyViews,
     topReferrers,
     topCountries,
+    topCities,
     recentClicks,
     deviceBreakdown,
   ] = await Promise.all([
@@ -1338,6 +1342,11 @@ async function analytics(req: VercelRequest, res: VercelResponse) {
         FROM page_views WHERE event_type = 'pageview' AND country IS NOT NULL
         AND created_at > now() - ${interval}::interval
         GROUP BY country ORDER BY count DESC LIMIT 10`,
+    // Top città
+    sql`SELECT city, country, COUNT(*)::int AS count
+        FROM page_views WHERE event_type = 'pageview' AND city IS NOT NULL
+        AND created_at > now() - ${interval}::interval
+        GROUP BY city, country ORDER BY count DESC LIMIT 15`,
     // Click recenti
     sql`SELECT path, event_data, created_at
         FROM page_views WHERE event_type = 'click' AND created_at > now() - ${interval}::interval
@@ -1361,7 +1370,42 @@ async function analytics(req: VercelRequest, res: VercelResponse) {
     dailyViews,
     topReferrers,
     topCountries,
+    topCities,
     recentClicks,
     deviceBreakdown,
+  });
+}
+
+// ─── ANALYTICS LIVE (visitatori in tempo reale) ──────────────────────────────
+async function analyticsLive(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
+  const user = await requireAuth(req);
+  if (!user) return res.status(401).json({ error: "Non autenticato" });
+
+  const [count, activeSessions, activePages] = await Promise.all([
+    // Sessioni attive negli ultimi 5 minuti
+    sql`SELECT COUNT(DISTINCT session_id)::int AS count
+        FROM page_views WHERE created_at > now() - interval '5 minutes'`,
+    // Dettaglio sessioni attive con ultima pagina visitata
+    sql`SELECT DISTINCT ON (session_id)
+          session_id, path, country, city, created_at,
+          CASE WHEN screen_w IS NULL THEN 'unknown'
+               WHEN screen_w < 768 THEN 'mobile'
+               WHEN screen_w < 1024 THEN 'tablet'
+               ELSE 'desktop' END AS device
+        FROM page_views
+        WHERE created_at > now() - interval '5 minutes'
+        ORDER BY session_id, created_at DESC`,
+    // Pagine attive ora (aggregate)
+    sql`SELECT path, COUNT(DISTINCT session_id)::int AS visitors
+        FROM page_views
+        WHERE created_at > now() - interval '5 minutes'
+        GROUP BY path ORDER BY visitors DESC LIMIT 10`,
+  ]);
+
+  return res.json({
+    online: count[0]?.count ?? 0,
+    sessions: activeSessions,
+    activePages,
   });
 }

@@ -251,6 +251,7 @@ export default function AdminLive() {
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [analyticsRange, setAnalyticsRange] = useState("7d");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [liveVisitors, setLiveVisitors] = useState<any>(null);
 
   // ─ GPS Live ─
   const [runnerId,    setRunnerIdState] = useState<1 | 2>(() => {
@@ -492,6 +493,20 @@ export default function AdminLive() {
       .catch(() => setAnalyticsData(null))
       .finally(() => setAnalyticsLoading(false));
   }, [activeSection, analyticsRange]);
+
+  // ─ Poll visitatori live ogni 15s ─
+  useEffect(() => {
+    if (activeSection !== "analisi") return;
+    const jwt = localStorage.getItem("gp_jwt");
+    const fetchLive = () =>
+      fetch("/api/analytics-live", { headers: { Authorization: `Bearer ${jwt}` } })
+        .then(r => r.json())
+        .then(d => setLiveVisitors(d))
+        .catch(() => {});
+    fetchLive();
+    const timer = setInterval(fetchLive, 15_000);
+    return () => clearInterval(timer);
+  }, [activeSection]);
 
   // ─ Foto handlers ─
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -2606,6 +2621,56 @@ export default function AdminLive() {
                   </select>
                 </div>
 
+                {/* Visitatori LIVE */}
+                {liveVisitors && (
+                  <div className="border border-border rounded-xl p-4 bg-background">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+                      </span>
+                      <p className="text-xs font-bold text-foreground">
+                        {liveVisitors.online} {liveVisitors.online === 1 ? "visitatore" : "visitatori"} online ora
+                      </p>
+                    </div>
+                    {liveVisitors.sessions?.length > 0 && (
+                      <div className="space-y-1.5">
+                        {liveVisitors.sessions.map((s: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5 truncate">
+                              {s.device === "mobile" ? <Smartphone className="w-3 h-3 text-muted-foreground flex-shrink-0" /> :
+                               s.device === "tablet" ? <Tablet className="w-3 h-3 text-muted-foreground flex-shrink-0" /> :
+                               <Monitor className="w-3 h-3 text-muted-foreground flex-shrink-0" />}
+                              <span className="font-mono text-foreground truncate">{s.path}</span>
+                              {(s.city || s.country) && (
+                                <span className="text-muted-foreground">({s.city ? `${s.city}, ${s.country}` : s.country})</span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap ml-2">
+                              {new Date(s.created_at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {liveVisitors.activePages?.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <p className="text-[10px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">Pagine attive</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {liveVisitors.activePages.map((p: any, i: number) => (
+                            <span key={i} className="inline-flex items-center gap-1 bg-muted px-2 py-0.5 rounded-full text-[11px] font-mono text-foreground">
+                              {p.path} <span className="text-dona font-bold">{p.visitors}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {liveVisitors.online === 0 && (
+                      <p className="text-xs text-muted-foreground">Nessun visitatore negli ultimi 5 minuti</p>
+                    )}
+                  </div>
+                )}
+
                 {analyticsLoading && (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -2720,6 +2785,31 @@ export default function AdminLive() {
                               {c.country ?? "?"} <span className="text-muted-foreground">{c.count}</span>
                             </span>
                           ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Top città */}
+                    {analyticsData.topCities?.length > 0 && (
+                      <div className="border border-border rounded-xl p-4 bg-background">
+                        <p className="text-xs font-bold text-foreground mb-3">Top Città</p>
+                        <div className="space-y-2">
+                          {analyticsData.topCities.map((c: any, i: number) => {
+                            const maxV = analyticsData.topCities[0].count;
+                            return (
+                              <div key={i}>
+                                <div className="flex justify-between text-xs mb-0.5">
+                                  <span className="text-foreground">
+                                    {c.city}{c.country ? ` (${c.country})` : ""}
+                                  </span>
+                                  <span className="text-muted-foreground">{c.count}</span>
+                                </div>
+                                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div className="h-full bg-dona/70 rounded-full" style={{ width: `${(c.count / maxV) * 100}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
