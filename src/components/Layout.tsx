@@ -221,7 +221,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <Facebook className="w-4 h-4" />
                 </a>
                 <a
-                  href="https://www.instagram.com/direct/t/17842855413275050/"
+                  href="https://www.instagram.com/1000kmdigratitudine/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center w-9 h-9 rounded-full bg-primary-foreground/10 hover:bg-accent hover:text-primary transition-colors"
