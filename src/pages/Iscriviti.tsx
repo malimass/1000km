@@ -62,14 +62,17 @@ function TappeModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
           />
-          {/* Modal — bottom sheet su mobile, centrato su desktop */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 40 }}
-            transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="fixed z-50 inset-x-0 bottom-0 max-h-[85vh] rounded-t-2xl md:bottom-auto md:inset-x-auto md:top-1/2 md:left-1/2 md:max-h-[70vh] md:w-full md:max-w-lg md:rounded-2xl md:[transform:translate(-50%,-50%)] bg-card border border-border shadow-2xl flex flex-col overflow-hidden"
+          {/* Wrapper centraggio — flex su desktop, bottom-aligned su mobile */}
+          <div
+            className="fixed inset-0 z-50 flex items-end md:items-center md:justify-center pointer-events-none"
           >
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="pointer-events-auto w-full max-h-[85vh] rounded-t-2xl md:max-h-[70vh] md:max-w-lg md:rounded-2xl bg-card border border-border shadow-2xl flex flex-col overflow-hidden"
+            >
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
               <div>
@@ -112,6 +115,7 @@ function TappeModal({ open, onClose }: { open: boolean; onClose: () => void }) {
               ))}
             </div>
           </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
