@@ -365,6 +365,31 @@ CREATE TABLE IF NOT EXISTS saved_percorsi (
 CREATE INDEX IF NOT EXISTS saved_percorsi_user_idx ON saved_percorsi (user_id, created_at DESC);
 
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 18. PAGE VIEWS  (analytics visite, pagine, click)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS page_views (
+  id          bigserial        PRIMARY KEY,
+  session_id  text             NOT NULL,
+  path        text             NOT NULL,
+  referrer    text,
+  user_agent  text,
+  screen_w    smallint,
+  screen_h    smallint,
+  language    text,
+  country     text,
+  event_type  text             NOT NULL DEFAULT 'pageview',
+  -- valori: 'pageview' | 'click'
+  event_data  text,
+  created_at  timestamptz      NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS page_views_created_idx ON page_views (created_at DESC);
+CREATE INDEX IF NOT EXISTS page_views_path_idx ON page_views (path, created_at DESC);
+CREATE INDEX IF NOT EXISTS page_views_session_idx ON page_views (session_id);
+
+
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- FATTO!
 -- ───────────────────────────────────────────────

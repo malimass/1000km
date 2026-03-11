@@ -41,6 +41,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/donazioni") return await donazioni(req, res);
     if (path === "/sumup-checkout") return await sumupCheckout(req, res);
     if (path === "/sumup-confirm") return await sumupConfirm(req, res);
+    if (path === "/track") return await track(req, res);
+    if (path === "/analytics") return await analytics(req, res);
     return res.status(404).json({ error: "Not found" });
   } catch (err: any) {
     console.error(err);
@@ -1268,4 +1270,99 @@ async function traccarPosition(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.json({ ok: true });
+}
+
+// ─── TRACK (pageview / click — pubblico, no auth) ────────────────────────────
+async function track(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  const { session_id, path, referrer, screen_w, screen_h, language, event_type, event_data } = req.body ?? {};
+  if (!session_id || !path) return res.status(400).json({ error: "session_id e path richiesti" });
+
+  const ua = (req.headers["user-agent"] ?? "").slice(0, 512);
+  const country = (req.headers["x-vercel-ip-country"] as string) ?? null;
+  const evType = event_type === "click" ? "click" : "pageview";
+
+  await sql`
+    INSERT INTO page_views (session_id, path, referrer, user_agent, screen_w, screen_h, language, country, event_type, event_data)
+    VALUES (${session_id}, ${path.slice(0, 512)}, ${referrer?.slice(0, 1024) ?? null}, ${ua},
+            ${screen_w ?? null}, ${screen_h ?? null}, ${language?.slice(0, 16) ?? null},
+            ${country}, ${evType}, ${event_data?.slice(0, 512) ?? null})
+  `;
+  return res.json({ ok: true });
+}
+
+// ─── ANALYTICS (dashboard admin — richiede auth) ─────────────────────────────
+async function analytics(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
+  const user = await requireAuth(req, res);
+  if (!user) return;
+  if (user.role !== "admin") return res.status(403).json({ error: "admin only" });
+
+  const range = (req.query.range as string) ?? "7d";
+  let interval = "7 days";
+  if (range === "24h") interval = "1 day";
+  else if (range === "30d") interval = "30 days";
+  else if (range === "90d") interval = "90 days";
+
+  // Query parallele
+  const [
+    totalViews,
+    uniqueSessions,
+    topPages,
+    dailyViews,
+    topReferrers,
+    topCountries,
+    recentClicks,
+    deviceBreakdown,
+  ] = await Promise.all([
+    // Totale visite
+    sql`SELECT COUNT(*)::int AS count FROM page_views
+        WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval`,
+    // Sessioni uniche
+    sql`SELECT COUNT(DISTINCT session_id)::int AS count FROM page_views
+        WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval`,
+    // Top pagine
+    sql`SELECT path, COUNT(*)::int AS views
+        FROM page_views WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval
+        GROUP BY path ORDER BY views DESC LIMIT 20`,
+    // Visite giornaliere
+    sql`SELECT date_trunc('day', created_at)::date AS day, COUNT(*)::int AS views
+        FROM page_views WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval
+        GROUP BY day ORDER BY day`,
+    // Top referrer
+    sql`SELECT referrer, COUNT(*)::int AS count
+        FROM page_views WHERE event_type = 'pageview' AND referrer IS NOT NULL AND referrer != ''
+        AND created_at > now() - ${interval}::interval
+        GROUP BY referrer ORDER BY count DESC LIMIT 10`,
+    // Top paesi
+    sql`SELECT country, COUNT(*)::int AS count
+        FROM page_views WHERE event_type = 'pageview' AND country IS NOT NULL
+        AND created_at > now() - ${interval}::interval
+        GROUP BY country ORDER BY count DESC LIMIT 10`,
+    // Click recenti
+    sql`SELECT path, event_data, created_at
+        FROM page_views WHERE event_type = 'click' AND created_at > now() - ${interval}::interval
+        ORDER BY created_at DESC LIMIT 30`,
+    // Device breakdown (mobile vs desktop via screen width)
+    sql`SELECT
+          CASE WHEN screen_w IS NULL THEN 'unknown'
+               WHEN screen_w < 768 THEN 'mobile'
+               WHEN screen_w < 1024 THEN 'tablet'
+               ELSE 'desktop' END AS device,
+          COUNT(*)::int AS count
+        FROM page_views WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval
+        GROUP BY device ORDER BY count DESC`,
+  ]);
+
+  return res.json({
+    range,
+    totalViews: totalViews[0]?.count ?? 0,
+    uniqueSessions: uniqueSessions[0]?.count ?? 0,
+    topPages,
+    dailyViews,
+    topReferrers,
+    topCountries,
+    recentClicks,
+    deviceBreakdown,
+  });
 }
