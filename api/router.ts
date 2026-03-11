@@ -1294,9 +1294,8 @@ async function track(req: VercelRequest, res: VercelResponse) {
 // ─── ANALYTICS (dashboard admin — richiede auth) ─────────────────────────────
 async function analytics(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
-  const user = await requireAuth(req, res);
-  if (!user) return;
-  if (user.role !== "admin") return res.status(403).json({ error: "admin only" });
+  const user = await requireAuth(req);
+  if (!user) return res.status(401).json({ error: "Non autenticato" });
 
   const range = (req.query.range as string) ?? "7d";
   let interval = "7 days";
