@@ -2,5 +2,11 @@
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/router" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/pending-reminders",
+      "schedule": "0 9 * * *"
+    }
   ]
 }
