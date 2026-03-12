@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import Stripe from "stripe";
 import { sql } from "./_lib/db.js";
 import { signToken, requireAuth } from "./_lib/auth.js";
-import { sendThankYouEmail, sendPendingReminderEmail } from "./_lib/email.js";
+import { sendThankYouEmail, sendPendingReminderEmail, REMINDER_SCHEDULE } from "./_lib/email.js";
 
 function getPath(req: VercelRequest): string {
   const url = req.url ?? "";
@@ -461,6 +461,7 @@ async function donazioni(req: VercelRequest, res: VercelResponse) {
         progetto      text             NOT NULL DEFAULT 'Sostieni Komen Italia',
         stato         text             NOT NULL DEFAULT 'pendente',
         checkout_ref  text,
+        reminder_count smallint         NOT NULL DEFAULT 0,
         reminded_at   timestamptz,
         created_at    timestamptz      DEFAULT now()
       )
@@ -612,26 +613,35 @@ async function cronPendingReminders(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: "Non autorizzato" });
   }
 
-  // Find donations pending for more than 2 days that haven't been reminded yet
-  const pending = await sql`
-    SELECT id, nome, email, importo_euro, progetto
-    FROM donazioni
-    WHERE stato = 'pendente'
-      AND created_at < now() - interval '2 days'
-      AND reminded_at IS NULL
-    LIMIT 50
-  `;
-
+  // Schedule: 1° dopo 2gg, 2° dopo 7gg, 3° dopo 14gg, 4° (ultimo) dopo 28gg
+  // reminder_count tracks how many reminders have been sent (0–4)
   let sent = 0;
-  for (const don of pending) {
-    await sendPendingReminderEmail({
-      to: don.email,
-      nome: don.nome,
-      importo: Number(don.importo_euro),
-      progetto: don.progetto,
-    });
-    await sql`UPDATE donazioni SET reminded_at = now() WHERE id = ${don.id}`;
-    sent++;
+
+  for (const step of REMINDER_SCHEDULE) {
+    const pending = await sql`
+      SELECT id, nome, email, importo_euro, progetto, reminder_count
+      FROM donazioni
+      WHERE stato = 'pendente'
+        AND reminder_count = ${step.level - 1}
+        AND created_at < now() - make_interval(days => ${step.afterDays})
+      LIMIT 50
+    `;
+
+    for (const don of pending) {
+      await sendPendingReminderEmail({
+        to: don.email,
+        nome: don.nome,
+        importo: Number(don.importo_euro),
+        progetto: don.progetto,
+        reminderLevel: step.level,
+      });
+      await sql`
+        UPDATE donazioni
+        SET reminder_count = ${step.level}, reminded_at = now()
+        WHERE id = ${don.id}
+      `;
+      sent++;
+    }
   }
 
   return res.json({ ok: true, reminders_sent: sent });
