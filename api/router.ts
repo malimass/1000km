@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import Stripe from "stripe";
 import { sql } from "./_lib/db.js";
 import { signToken, requireAuth } from "./_lib/auth.js";
+import { sendThankYouEmail, sendPendingReminderEmail } from "./_lib/email.js";
 
 function getPath(req: VercelRequest): string {
   const url = req.url ?? "";
@@ -41,6 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/donazioni") return await donazioni(req, res);
     if (path === "/sumup-checkout") return await sumupCheckout(req, res);
     if (path === "/sumup-confirm") return await sumupConfirm(req, res);
+    if (path === "/cron/pending-reminders") return await cronPendingReminders(req, res);
     if (path === "/track") return await track(req, res);
     if (path === "/analytics") return await analytics(req, res);
     if (path === "/analytics-live") return await analyticsLive(req, res);
@@ -409,7 +411,9 @@ async function raccoltaFondi(req: VercelRequest, res: VercelResponse) {
     const [totals] = await sql`
       SELECT COALESCE(SUM(importo_euro), 0) AS importo_euro,
              COUNT(*)::int                   AS donatori
-      FROM donazioni WHERE stato = 'completata'
+      FROM donazioni
+      WHERE stato = 'completata'
+        AND progetto != 'Sponsor Sostenitori del Cammino'
     `;
     const [meta] = await sql`
       SELECT target_euro FROM raccolta_fondi WHERE id = 1 LIMIT 1
@@ -457,6 +461,7 @@ async function donazioni(req: VercelRequest, res: VercelResponse) {
         progetto      text             NOT NULL DEFAULT 'Sostieni Komen Italia',
         stato         text             NOT NULL DEFAULT 'pendente',
         checkout_ref  text,
+        reminded_at   timestamptz,
         created_at    timestamptz      DEFAULT now()
       )
     `;
@@ -564,16 +569,27 @@ async function sumupConfirm(req: VercelRequest, res: VercelResponse) {
     const [don] = await sql`
       UPDATE donazioni SET stato = 'completata'
       WHERE checkout_ref = ${ref} AND stato != 'completata'
-      RETURNING importo_euro
+      RETURNING importo_euro, nome, email, progetto
     `;
     if (don) {
-      await sql`
-        UPDATE raccolta_fondi
-        SET importo_euro = importo_euro + ${don.importo_euro},
-            donatori     = donatori + 1,
-            updated_at   = now()
-        WHERE id = 1
-      `;
+      // Only update raccolta_fondi counter for actual donations (not sostenitori)
+      if (don.progetto !== "Sponsor Sostenitori del Cammino") {
+        await sql`
+          UPDATE raccolta_fondi
+          SET importo_euro = importo_euro + ${don.importo_euro},
+              donatori     = donatori + 1,
+              updated_at   = now()
+          WHERE id = 1
+        `;
+      }
+
+      // Send thank-you email (fire-and-forget)
+      sendThankYouEmail({
+        to: don.email,
+        nome: don.nome,
+        importo: Number(don.importo_euro),
+        progetto: don.progetto,
+      }).catch(() => {});
     }
   }
 
@@ -582,6 +598,43 @@ async function sumupConfirm(req: VercelRequest, res: VercelResponse) {
     status: "PAID",
     transaction_id: txn?.id ?? checkout.transaction_id,
   });
+}
+
+// ─── CRON: PROMEMORIA DONAZIONI PENDENTI ────────────────────────────────────
+
+async function cronPendingReminders(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") return res.status(405).end();
+
+  // Protect with a shared secret (set CRON_SECRET env var)
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = req.headers.authorization;
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ error: "Non autorizzato" });
+  }
+
+  // Find donations pending for more than 2 days that haven't been reminded yet
+  const pending = await sql`
+    SELECT id, nome, email, importo_euro, progetto
+    FROM donazioni
+    WHERE stato = 'pendente'
+      AND created_at < now() - interval '2 days'
+      AND reminded_at IS NULL
+    LIMIT 50
+  `;
+
+  let sent = 0;
+  for (const don of pending) {
+    await sendPendingReminderEmail({
+      to: don.email,
+      nome: don.nome,
+      importo: Number(don.importo_euro),
+      progetto: don.progetto,
+    });
+    await sql`UPDATE donazioni SET reminded_at = now() WHERE id = ${don.id}`;
+    sent++;
+  }
+
+  return res.json({ ok: true, reminders_sent: sent });
 }
 
 // ─── ADMIN SETTINGS ──────────────────────────────────────────────────────────
