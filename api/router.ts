@@ -42,6 +42,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/donazioni") return await donazioni(req, res);
     if (path === "/sumup-checkout") return await sumupCheckout(req, res);
     if (path === "/sumup-confirm") return await sumupConfirm(req, res);
+    if (path === "/paypal-create-order") return await paypalCreateOrder(req, res);
+    if (path === "/paypal-capture-order") return await paypalCaptureOrder(req, res);
     if (path === "/cron/pending-reminders") return await cronPendingReminders(req, res);
     if (path === "/track") return await track(req, res);
     if (path === "/analytics") return await analytics(req, res);
@@ -1471,4 +1473,143 @@ async function analyticsLive(req: VercelRequest, res: VercelResponse) {
     sessions: activeSessions,
     activePages,
   });
+}
+
+// ─── PAYPAL ──────────────────────────────────────────────────────────────────
+
+const PAYPAL_BASE = process.env.PAYPAL_ENV === "live"
+  ? "https://api-m.paypal.com"
+  : "https://api-m.sandbox.paypal.com";
+
+async function getPayPalAccessToken(): Promise<string> {
+  const clientId = process.env.PAYPAL_CLIENT_ID;
+  const secret = process.env.PAYPAL_CLIENT_SECRET;
+  if (!clientId || !secret) throw new Error("PayPal non configurato");
+
+  const resp = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Authorization": "Basic " + Buffer.from(`${clientId}:${secret}`).toString("base64"),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
+
+  if (!resp.ok) throw new Error("Errore autenticazione PayPal");
+  const data = await resp.json();
+  return data.access_token;
+}
+
+async function paypalCreateOrder(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") return res.status(405).end();
+
+  const { donazione_id, amount } = req.body ?? {};
+  if (!donazione_id || !amount) {
+    return res.status(400).json({ error: "donazione_id e amount richiesti" });
+  }
+
+  try {
+    const accessToken = await getPayPalAccessToken();
+
+    const resp = await fetch(`${PAYPAL_BASE}/v2/checkout/orders`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        intent: "CAPTURE",
+        purchase_units: [{
+          reference_id: String(donazione_id),
+          amount: {
+            currency_code: "EUR",
+            value: Number(amount).toFixed(2),
+          },
+          description: "Donazione 1000 km di Gratitudine — Komen Italia",
+        }],
+      }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      console.error("PayPal create order error:", err);
+      return res.status(502).json({ error: "Errore creazione ordine PayPal" });
+    }
+
+    const order = await resp.json();
+
+    // Save PayPal order ID on the donation
+    await sql`
+      UPDATE donazioni SET checkout_ref = ${order.id}
+      WHERE id = ${donazione_id}
+    `;
+
+    return res.json({ id: order.id });
+  } catch (err: any) {
+    console.error("PayPal create order exception:", err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+async function paypalCaptureOrder(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") return res.status(405).end();
+
+  const { order_id } = req.body ?? {};
+  if (!order_id) return res.status(400).json({ error: "order_id richiesto" });
+
+  try {
+    const accessToken = await getPayPalAccessToken();
+
+    const resp = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${order_id}/capture`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      console.error("PayPal capture error:", err);
+      return res.status(502).json({ error: "Errore cattura pagamento PayPal" });
+    }
+
+    const capture = await resp.json();
+
+    if (capture.status !== "COMPLETED") {
+      return res.status(400).json({ error: "Pagamento non completato", status: capture.status });
+    }
+
+    // Update donazione → completata (idempotent via checkout_ref)
+    const [don] = await sql`
+      UPDATE donazioni SET stato = 'completata'
+      WHERE checkout_ref = ${order_id} AND stato != 'completata'
+      RETURNING importo_euro, nome, email, progetto
+    `;
+
+    if (don) {
+      if (don.progetto !== "Sponsor Sostenitori del Cammino") {
+        await sql`
+          UPDATE raccolta_fondi
+          SET importo_euro = importo_euro + ${don.importo_euro},
+              donatori     = donatori + 1,
+              updated_at   = now()
+          WHERE id = 1
+        `;
+      }
+
+      // Send thank-you email (fire-and-forget)
+      sendThankYouEmail({
+        to: don.email,
+        nome: don.nome,
+        importo: Number(don.importo_euro),
+        progetto: don.progetto,
+      }).catch(() => {});
+    }
+
+    return res.json({ ok: true, status: "COMPLETED" });
+  } catch (err: any) {
+    console.error("PayPal capture exception:", err);
+    return res.status(500).json({ error: err.message });
+  }
 }
