@@ -6,6 +6,7 @@ import AnimatedSection from "@/components/AnimatedSection";
 import { motion } from "framer-motion";
 import { loadSosteniPage, type SosteniPage, SOSTENI_DEFAULTS } from "@/lib/sostenitori";
 import { getDominantColor } from "@/lib/dominantColor";
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
 declare global {
   interface Window { SumUpCard: any; }
@@ -27,6 +28,7 @@ function useSumUpSdk() {
 const PROGETTO_SPONSOR = "Sponsor Sostenitori del Cammino";
 
 type SponsorStep = "intro" | "form" | "pagamento" | "completato";
+type PayMethod = "card" | "paypal";
 
 export default function Sostenitori() {
   const [page, setPage] = useState<SosteniPage>(SOSTENI_DEFAULTS);
@@ -54,6 +56,8 @@ export default function Sostenitori() {
   const [azienda, setAzienda] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [payMethod, setPayMethod] = useState<PayMethod>("card");
+  const [donazioneId, setDonazioneId] = useState<number | null>(null);
   const widgetRef = useRef<HTMLDivElement>(null);
   const checkoutIdRef = useRef("");
   const checkoutRefRef = useRef("");
@@ -84,63 +88,69 @@ export default function Sostenitori() {
         throw new Error(d.error ?? "Errore nel salvataggio");
       }
       const { donazione_id } = await donRes.json();
+      setDonazioneId(donazione_id);
 
-      // 2. Crea checkout SumUp
-      const resp = await fetch("/api/sumup-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: finalAmount,
-          nome: azienda.trim() || nome.trim(),
-          cognome: cognome.trim(),
-          email: email.trim(),
-          progetto: PROGETTO_SPONSOR,
-          donazione_id,
-        }),
-      });
-      if (!resp.ok) {
-        const d = await resp.json();
-        throw new Error(d.error ?? "Errore creazione pagamento");
-      }
-
-      const { id: checkoutId, checkout_reference } = await resp.json();
-      checkoutIdRef.current = checkoutId;
-      checkoutRefRef.current = checkout_reference;
-
-      // 3. Step pagamento
-      setSponsorStep("pagamento");
-      setSaving(false);
-
-      // 4. Monta widget
-      setTimeout(() => {
-        if (!window.SumUpCard || !widgetRef.current) return;
-        if (window.SumUpCard.unmount) {
-          try { window.SumUpCard.unmount("sumup-sponsor-card"); } catch {}
-        }
-        window.SumUpCard.mount({
-          id: "sumup-sponsor-card",
-          checkoutId,
-          email: email.trim(),
-          locale: "it-IT",
-          onResponse: async (type: string, body: any) => {
-            if (type === "success") {
-              try {
-                await fetch("/api/sumup-confirm", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    checkout_id: checkoutIdRef.current,
-                    checkout_reference: checkoutRefRef.current,
-                  }),
-                });
-              } catch {}
-              setSponsorStep("completato");
-            } else if (type === "error") {
-              setError(body?.message ?? "Pagamento non riuscito. Riprova.");
-            }
-          },
+      if (payMethod === "paypal") {
+        setSponsorStep("pagamento");
+        setSaving(false);
+      } else {
+        // 2. Crea checkout SumUp
+        const resp = await fetch("/api/sumup-checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: finalAmount,
+            nome: azienda.trim() || nome.trim(),
+            cognome: cognome.trim(),
+            email: email.trim(),
+            progetto: PROGETTO_SPONSOR,
+            donazione_id,
+          }),
         });
-      }, 100);
+        if (!resp.ok) {
+          const d = await resp.json();
+          throw new Error(d.error ?? "Errore creazione pagamento");
+        }
+
+        const { id: checkoutId, checkout_reference } = await resp.json();
+        checkoutIdRef.current = checkoutId;
+        checkoutRefRef.current = checkout_reference;
+
+        // 3. Step pagamento
+        setSponsorStep("pagamento");
+        setSaving(false);
+
+        // 4. Monta widget
+        setTimeout(() => {
+          if (!window.SumUpCard || !widgetRef.current) return;
+          if (window.SumUpCard.unmount) {
+            try { window.SumUpCard.unmount("sumup-sponsor-card"); } catch {}
+          }
+          window.SumUpCard.mount({
+            id: "sumup-sponsor-card",
+            checkoutId,
+            email: email.trim(),
+            locale: "it-IT",
+            onResponse: async (type: string, body: any) => {
+              if (type === "success") {
+                try {
+                  await fetch("/api/sumup-confirm", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      checkout_id: checkoutIdRef.current,
+                      checkout_reference: checkoutRefRef.current,
+                    }),
+                  });
+                } catch {}
+                setSponsorStep("completato");
+              } else if (type === "error") {
+                setError(body?.message ?? "Pagamento non riuscito. Riprova.");
+              }
+            },
+          });
+        }, 100);
+      }
     } catch (err: any) {
       setError(err.message ?? "Errore di rete. Riprova.");
       setSaving(false);
@@ -155,6 +165,8 @@ export default function Sostenitori() {
     setEmail("");
     setAzienda("");
     setError("");
+    setPayMethod("card");
+    setDonazioneId(null);
   }
 
   return (
@@ -281,6 +293,39 @@ export default function Sostenitori() {
                     </div>
                   </div>
 
+                  {/* Scelta metodo di pagamento */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Metodo di pagamento</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setPayMethod("card")}
+                        className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors ${
+                          payMethod === "card"
+                            ? "border-dona bg-dona/10 text-foreground"
+                            : "border-border hover:border-dona/50 text-muted-foreground"
+                        }`}
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        <span className="font-body text-sm font-medium">Carta</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPayMethod("paypal")}
+                        className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors ${
+                          payMethod === "paypal"
+                            ? "border-[#0070ba] bg-[#0070ba]/10 text-foreground"
+                            : "border-border hover:border-[#0070ba]/50 text-muted-foreground"
+                        }`}
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z"/>
+                        </svg>
+                        <span className="font-body text-sm font-medium">PayPal</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {error && <p className="text-red-500 text-sm font-body">{error}</p>}
 
                   <div className="flex gap-3 pt-2">
@@ -291,7 +336,7 @@ export default function Sostenitori() {
                     <Button
                       type="submit" variant="dona" size="lg"
                       className="flex-1 shadow-[0_0_30px_hsl(340_82%_52%/0.25)]"
-                      disabled={saving || !nome.trim() || !email.trim() || finalAmount <= 0 || !sdkReady}
+                      disabled={saving || !nome.trim() || !email.trim() || finalAmount <= 0 || (payMethod === "card" && !sdkReady)}
                     >
                       {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CreditCard className="w-4 h-4 mr-2" />}
                       Procedi al pagamento
@@ -312,7 +357,62 @@ export default function Sostenitori() {
                     Sponsorizzazione di <strong className="text-foreground">{azienda || nome} {cognome}</strong>
                     {" — "}<strong className="text-dona">{PROGETTO_SPONSOR}</strong>
                   </p>
-                  <div id="sumup-sponsor-card" ref={widgetRef} className="min-h-[300px] mb-6" />
+
+                  {payMethod === "card" ? (
+                    <div id="sumup-sponsor-card" ref={widgetRef} className="min-h-[300px] mb-6" />
+                  ) : (
+                    <div className="mb-6">
+                      <PayPalScriptProvider options={{
+                        clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "",
+                        currency: "EUR",
+                        intent: "capture",
+                      }}>
+                        <PayPalButtons
+                          style={{ layout: "vertical", color: "blue", shape: "rect", label: "donate", height: 50 }}
+                          createOrder={async () => {
+                            const resp = await fetch("/api/paypal-create-order", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                donazione_id: donazioneId,
+                                amount: finalAmount,
+                              }),
+                            });
+                            if (!resp.ok) {
+                              const d = await resp.json();
+                              throw new Error(d.error ?? "Errore creazione ordine PayPal");
+                            }
+                            const { id } = await resp.json();
+                            return id;
+                          }}
+                          onApprove={async (data) => {
+                            try {
+                              const resp = await fetch("/api/paypal-capture-order", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ order_id: data.orderID }),
+                              });
+                              if (resp.ok) {
+                                setSponsorStep("completato");
+                              } else {
+                                const d = await resp.json();
+                                setError(d.error ?? "Errore conferma pagamento PayPal");
+                              }
+                            } catch {
+                              setError("Errore di rete durante la conferma.");
+                            }
+                          }}
+                          onError={() => {
+                            setError("Pagamento PayPal non riuscito. Riprova.");
+                          }}
+                          onCancel={() => {
+                            setError("Pagamento annullato.");
+                          }}
+                        />
+                      </PayPalScriptProvider>
+                    </div>
+                  )}
+
                   {error && <p className="text-red-500 text-sm font-body mb-4">{error}</p>}
                   <Button type="button" variant="outline" size="sm" onClick={() => { setSponsorStep("form"); setError(""); }}>
                     <ArrowLeft className="w-4 h-4 mr-2" />
