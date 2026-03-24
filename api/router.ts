@@ -1503,12 +1503,21 @@ async function getPayPalAccessToken(): Promise<string> {
 async function paypalCreateOrder(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).end();
 
-  const { donazione_id, amount } = req.body ?? {};
-  if (!donazione_id || !amount) {
-    return res.status(400).json({ error: "donazione_id e amount richiesti" });
+  const { donazione_id } = req.body ?? {};
+  if (!donazione_id) {
+    return res.status(400).json({ error: "donazione_id richiesto" });
   }
 
   try {
+    // Importo dalla donazione nel DB (ignora il frontend per sicurezza)
+    const [don] = await sql`
+      SELECT importo_euro FROM donazioni WHERE id = ${donazione_id} AND stato = 'pendente'
+    `;
+    if (!don) {
+      return res.status(404).json({ error: "Donazione non trovata o già completata" });
+    }
+    const amount = Number(don.importo_euro);
+
     const accessToken = await getPayPalAccessToken();
 
     const resp = await fetch(`${PAYPAL_BASE}/v2/checkout/orders`, {
@@ -1523,7 +1532,7 @@ async function paypalCreateOrder(req: VercelRequest, res: VercelResponse) {
           reference_id: String(donazione_id),
           amount: {
             currency_code: "EUR",
-            value: Number(amount).toFixed(2),
+            value: amount.toFixed(2),
           },
           description: "Donazione 1000 km di Gratitudine — Komen Italia",
         }],
@@ -1547,7 +1556,7 @@ async function paypalCreateOrder(req: VercelRequest, res: VercelResponse) {
     return res.json({ id: order.id });
   } catch (err: any) {
     console.error("PayPal create order exception:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: "Errore interno. Riprova." });
   }
 }
 
@@ -1580,6 +1589,16 @@ async function paypalCaptureOrder(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Pagamento non completato", status: capture.status });
     }
 
+    // Verifica che l'importo catturato corrisponda alla donazione nel DB
+    const capturedAmount = capture.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value;
+    const [donCheck] = await sql`
+      SELECT importo_euro FROM donazioni WHERE checkout_ref = ${order_id} AND stato = 'pendente'
+    `;
+    if (donCheck && capturedAmount && Number(capturedAmount) !== Number(donCheck.importo_euro)) {
+      console.error(`PayPal amount mismatch: captured=${capturedAmount}, expected=${donCheck.importo_euro}`);
+      return res.status(400).json({ error: "Importo pagamento non corrispondente" });
+    }
+
     // Update donazione → completata (idempotent via checkout_ref)
     const [don] = await sql`
       UPDATE donazioni SET stato = 'completata'
@@ -1610,6 +1629,6 @@ async function paypalCaptureOrder(req: VercelRequest, res: VercelResponse) {
     return res.json({ ok: true, status: "COMPLETED" });
   } catch (err: any) {
     console.error("PayPal capture exception:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: "Errore interno. Riprova." });
   }
 }
