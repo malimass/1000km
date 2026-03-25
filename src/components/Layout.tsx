@@ -194,6 +194,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   { to: "/sostenitori",  label: "Sostenitori del cammino" },
                   { to: "/patrocini",    label: "Patrocini istituzionali" },
                   { to: "/contatti",     label: "Contatti" },
+                  { to: "/trasparenza",  label: "Trasparenza" },
                   { to: "/privacy",      label: "Privacy Policy" },
                 ] as const).map(({ to, label }) => (
                   <Link
