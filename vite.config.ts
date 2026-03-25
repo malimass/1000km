@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => ({
         clientsClaim: true,
         // Tutte le richieste di navigazione ricevono sempre index.html fresco
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/assets\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/assets\//, /\.pdf$/],
         // I file JS/CSS in /assets/ scadono dopo 1 giorno max
         runtimeCaching: [
           {
