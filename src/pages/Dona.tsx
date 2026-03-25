@@ -95,6 +95,7 @@ export default function Dona() {
   const [nome, setNome]           = useState("");
   const [cognome, setCognome]     = useState("");
   const [email, setEmail]         = useState("");
+  const [privacy, setPrivacy]     = useState(false);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
   const [payMethod, setPayMethod] = useState<PayMethod>("card");
@@ -107,7 +108,7 @@ export default function Dona() {
   const checkoutIdRef = useRef<string>("");
   const checkoutRefRef = useRef<string>("");
 
-  const formReady = nome.trim().length > 0 && email.trim().length > 0 && finalAmount > 0;
+  const formReady = nome.trim().length > 0 && email.trim().length > 0 && finalAmount > 0 && privacy;
 
   // ── Salva donazione e vai al pagamento ──
   async function handlePay(method: PayMethod) {
@@ -222,6 +223,7 @@ export default function Dona() {
     setCognome("");
     setEmail("");
     setError("");
+    setPrivacy(false);
     setPayMethod("card");
     setDonazioneId(null);
   }
@@ -463,10 +465,27 @@ export default function Dona() {
                     />
                   </div>
 
+                  {/* Consenso privacy */}
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="privacy-dona"
+                      checked={privacy}
+                      onChange={e => setPrivacy(e.target.checked)}
+                      className="mt-1 rounded border-input accent-dona"
+                    />
+                    <label htmlFor="privacy-dona" className="text-sm font-body text-muted-foreground leading-relaxed">
+                      Acconsento al trattamento dei dati personali ai sensi del GDPR.{" "}
+                      <Link to="/privacy" target="_blank" className="text-dona hover:underline">
+                        Leggi l'informativa sulla privacy
+                      </Link> *
+                    </label>
+                  </div>
+
                   {/* Metodo di pagamento — cliccando si procede direttamente */}
                   <div className="space-y-2">
                     <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                      {formReady ? "Scegli come donare" : "Compila i dati per procedere"}
+                      {formReady ? "Scegli come donare" : "Compila i dati e accetta la privacy per procedere"}
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                       <button

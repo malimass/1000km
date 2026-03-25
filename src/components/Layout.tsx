@@ -194,6 +194,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   { to: "/sostenitori",  label: "Sostenitori del cammino" },
                   { to: "/patrocini",    label: "Patrocini istituzionali" },
                   { to: "/contatti",     label: "Contatti" },
+                  { to: "/privacy",      label: "Privacy Policy" },
                 ] as const).map(({ to, label }) => (
                   <Link
                     key={to}
@@ -232,8 +233,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
           </div>
-          <div className="mt-12 pt-8 border-t border-primary-foreground/10 text-center text-primary-foreground/50 text-xs font-body">
-            © 2026 1000kmdigratitudine. Tutti i diritti riservati.
+          <div className="mt-12 pt-8 border-t border-primary-foreground/10 text-center text-primary-foreground/50 text-xs font-body space-y-1">
+            <p>© 2026 Associazione 1000 KM di Gratitudine — C.F. 91477340375</p>
+            <p>Via Nerio Nannetti 2/3 — 40069 Zola Predosa (BO)</p>
+            <p><Link to="/privacy" className="hover:text-accent transition-colors underline">Privacy Policy</Link></p>
           </div>
         </div>
       </footer>

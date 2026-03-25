@@ -87,8 +87,9 @@ export default function Contatti() {
                     onChange={(e) => setForm({ ...form, privacy: e.target.checked })}
                     className="mt-1 rounded border-input"
                   />
-                  <label className="text-sm font-body text-muted-foreground">
-                    Acconsento al trattamento dei dati personali ai sensi del GDPR. *
+                  <label className="text-sm font-body text-muted-foreground leading-relaxed">
+                    Acconsento al trattamento dei dati personali ai sensi del GDPR.{" "}
+                    <Link to="/privacy" target="_blank" className="text-dona hover:underline">Leggi l'informativa</Link> *
                   </label>
                 </div>
                 {errors.privacy && <p className="text-destructive text-xs font-body">{errors.privacy}</p>}
