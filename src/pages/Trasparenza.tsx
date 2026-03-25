@@ -79,7 +79,7 @@ export default function Trasparenza() {
                   <FileText className="w-5 h-5 text-muted-foreground group-hover:text-dona transition-colors" />
                   <div>
                     <span className="font-body text-sm font-semibold text-foreground block">Atto Costitutivo e Statuto</span>
-                    <span className="font-body text-xs text-muted-foreground">PDF — Registrato il 13/02/2026</span>
+                    <span className="font-body text-xs text-muted-foreground">Registrato il 13/02/2026</span>
                   </div>
                 </div>
                 <Download className="w-4 h-4 text-muted-foreground group-hover:text-dona transition-colors" />
