@@ -107,10 +107,12 @@ export default function Dona() {
   const checkoutIdRef = useRef<string>("");
   const checkoutRefRef = useRef<string>("");
 
+  const formReady = nome.trim().length > 0 && email.trim().length > 0 && finalAmount > 0;
+
   // ── Salva donazione e vai al pagamento ──
-  async function handlePay(e: React.FormEvent) {
-    e.preventDefault();
-    if (!nome.trim() || !email.trim() || finalAmount <= 0) return;
+  async function handlePay(method: PayMethod) {
+    if (!formReady) return;
+    setPayMethod(method);
     setSaving(true);
     setError("");
 
@@ -425,7 +427,7 @@ export default function Dona() {
                   Progetto: <strong className="text-foreground">{progetto}</strong>
                 </p>
 
-                <form onSubmit={handlePay} className="space-y-4">
+                <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-muted-foreground mb-1">Nome *</label>
@@ -461,35 +463,47 @@ export default function Dona() {
                     />
                   </div>
 
-                  {/* Scelta metodo di pagamento */}
+                  {/* Metodo di pagamento — cliccando si procede direttamente */}
                   <div className="space-y-2">
-                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Metodo di pagamento</label>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                      {formReady ? "Scegli come donare" : "Compila i dati per procedere"}
+                    </label>
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         type="button"
-                        onClick={() => setPayMethod("card")}
-                        className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors ${
-                          payMethod === "card"
-                            ? "border-dona bg-dona/10 text-foreground"
-                            : "border-border hover:border-dona/50 text-muted-foreground"
+                        disabled={!formReady || saving || !sdkReady}
+                        onClick={() => handlePay("card")}
+                        className={`flex items-center justify-center gap-2 p-4 rounded-lg border-2 font-body text-sm font-semibold transition-all ${
+                          formReady
+                            ? "border-dona bg-dona/10 text-dona hover:bg-dona hover:text-white cursor-pointer shadow-sm hover:shadow-md"
+                            : "border-border text-muted-foreground/50 cursor-not-allowed opacity-60"
                         }`}
                       >
-                        <CreditCard className="w-4 h-4" />
-                        <span className="font-body text-sm font-medium">Carta</span>
+                        {saving && payMethod === "card" ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <CreditCard className="w-4 h-4" />
+                        )}
+                        <span>Carta</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => setPayMethod("paypal")}
-                        className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 transition-colors ${
-                          payMethod === "paypal"
-                            ? "border-[#0070ba] bg-[#0070ba]/10 text-foreground"
-                            : "border-border hover:border-[#0070ba]/50 text-muted-foreground"
+                        disabled={!formReady || saving}
+                        onClick={() => handlePay("paypal")}
+                        className={`flex items-center justify-center gap-2 p-4 rounded-lg border-2 font-body text-sm font-semibold transition-all ${
+                          formReady
+                            ? "border-[#0070ba] bg-[#0070ba]/10 text-[#0070ba] hover:bg-[#0070ba] hover:text-white cursor-pointer shadow-sm hover:shadow-md"
+                            : "border-border text-muted-foreground/50 cursor-not-allowed opacity-60"
                         }`}
                       >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z"/>
-                        </svg>
-                        <span className="font-body text-sm font-medium">PayPal</span>
+                        {saving && payMethod === "paypal" ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 0 1 .923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z"/>
+                          </svg>
+                        )}
+                        <span>PayPal</span>
                       </button>
                     </div>
                   </div>
@@ -498,33 +512,19 @@ export default function Dona() {
                     <p className="text-red-500 text-sm font-body">{error}</p>
                   )}
 
-                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <div className="pt-2">
                     <Button
                       type="button"
                       variant="outline"
                       size="lg"
-                      className="flex-1"
+                      className="w-full sm:w-auto"
                       onClick={() => setStep("importo")}
                     >
                       <ArrowLeft className="w-4 h-4 mr-2" />
                       Indietro
                     </Button>
-                    <Button
-                      type="submit"
-                      variant="dona"
-                      size="lg"
-                      className="flex-1 shadow-[0_0_30px_hsl(340_82%_52%/0.25)]"
-                      disabled={saving || !nome.trim() || !email.trim() || (payMethod === "card" && !sdkReady)}
-                    >
-                      {saving ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <CreditCard className="w-4 h-4 mr-2" />
-                      )}
-                      Procedi al pagamento
-                    </Button>
                   </div>
-                </form>
+                </div>
               </div>
             </AnimatedSection>
           )}
