@@ -359,7 +359,7 @@ export default function Dona() {
                     <motion.button
                       key={tier.value}
                       type="button"
-                      onClick={() => { setSelected(tier.value); setCustomAmt(""); }}
+                      onClick={() => { setSelected(tier.value); setCustomAmt(""); setStep("dati"); }}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.97 }}
                       className={`rounded-xl border-2 p-5 text-left transition-colors flex items-start gap-4 ${
@@ -404,12 +404,12 @@ export default function Dona() {
                 <Button
                   variant="dona"
                   size="lg"
-                  className="w-full shadow-[0_0_30px_hsl(340_82%_52%/0.25)]"
-                  disabled={finalAmount <= 0}
+                  className={`w-full shadow-[0_0_30px_hsl(340_82%_52%/0.25)] transition-opacity ${selected ? "opacity-0 pointer-events-none h-0 p-0 m-0 overflow-hidden" : ""}`}
+                  disabled={!customAmt || Number(customAmt) <= 0}
                   onClick={() => setStep("dati")}
                 >
                   <Heart className="w-4 h-4 mr-2" />
-                  Avanti — {finalAmount > 0 ? `€ ${finalAmount}` : "Scegli un importo"}
+                  Avanti — {customAmt && Number(customAmt) > 0 ? `€ ${customAmt}` : "Inserisci un importo"}
                 </Button>
               </div>
             </AnimatedSection>
