@@ -238,15 +238,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </footer>
 
-      {/* Mobile sticky DONA */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 p-3 pb-safe bg-primary/95 backdrop-blur-sm border-t border-primary-foreground/10">
-        <Button asChild variant="dona" size="lg" className="w-full">
-          <Link to="/dona">
-            <Heart className="w-4 h-4 mr-2" />
-            DONA ORA
-          </Link>
-        </Button>
-      </div>
+      {/* Mobile sticky DONA — nascosto sulla pagina /dona */}
+      {location.pathname !== "/dona" && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 p-3 pb-safe bg-primary/95 backdrop-blur-sm border-t border-primary-foreground/10">
+          <Button asChild variant="dona" size="lg" className="w-full">
+            <Link to="/dona">
+              <Heart className="w-4 h-4 mr-2" />
+              DONA ORA
+            </Link>
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

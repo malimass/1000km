@@ -692,7 +692,6 @@ export default function Dona() {
 
         </div>
       </section>
-      <div className="h-16 lg:hidden" />
     </Layout>
   );
 }
