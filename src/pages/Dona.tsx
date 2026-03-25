@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Heart, ArrowLeft, Shield, Users, Check, Loader2, CreditCard, Landmark, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -136,7 +136,7 @@ export default function Dona() {
       const { donazione_id } = await donRes.json();
       setDonazioneId(donazione_id);
 
-      if (payMethod === "paypal") {
+      if (method === "paypal") {
         // Per PayPal: vai direttamente allo step pagamento, i pulsanti PayPal gestiranno il resto
         setStep("pagamento");
         setSaving(false);
@@ -229,7 +229,7 @@ export default function Dona() {
   return (
     <Layout>
       {/* Hero */}
-      <section className="relative min-h-[45vh] flex items-center justify-center bg-primary overflow-hidden py-16">
+      <section className="relative min-h-[35vh] md:min-h-[45vh] flex items-center justify-center bg-primary overflow-hidden py-12 md:py-16">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_hsl(340_82%_52%/0.15)_0%,_transparent_70%)]" />
         <div className="relative text-center px-4">
           <motion.div
@@ -394,7 +394,7 @@ export default function Dona() {
                       placeholder="Importo libero"
                       value={customAmt}
                       onChange={e => { setCustomAmt(e.target.value); setSelected(null); }}
-                      className="w-full pl-8 pr-3 py-2.5 rounded-lg border border-border bg-background text-foreground font-body text-sm focus:border-dona focus:ring-1 focus:ring-dona outline-none"
+                      className="w-full pl-8 pr-3 py-2.5 rounded-lg border border-border bg-background text-foreground font-body text-base sm:text-sm focus:border-dona focus:ring-1 focus:ring-dona outline-none"
                     />
                   </div>
                 </div>
@@ -436,7 +436,7 @@ export default function Dona() {
                         type="text"
                         value={nome}
                         onChange={e => setNome(e.target.value)}
-                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground font-body text-sm focus:border-dona focus:ring-1 focus:ring-dona outline-none"
+                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground font-body text-base sm:text-sm focus:border-dona focus:ring-1 focus:ring-dona outline-none"
                         placeholder="Mario"
                       />
                     </div>
@@ -446,7 +446,7 @@ export default function Dona() {
                         type="text"
                         value={cognome}
                         onChange={e => setCognome(e.target.value)}
-                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground font-body text-sm focus:border-dona focus:ring-1 focus:ring-dona outline-none"
+                        className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground font-body text-base sm:text-sm focus:border-dona focus:ring-1 focus:ring-dona outline-none"
                         placeholder="Rossi"
                       />
                     </div>
@@ -458,7 +458,7 @@ export default function Dona() {
                       type="email"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground font-body text-sm focus:border-dona focus:ring-1 focus:ring-dona outline-none"
+                      className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground font-body text-base sm:text-sm focus:border-dona focus:ring-1 focus:ring-dona outline-none"
                       placeholder="mario@email.com"
                     />
                   </div>
