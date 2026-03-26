@@ -1382,7 +1382,7 @@ export default function PercorsoBuilder() {
               </LayersControl>
               <MapFit coords={route.coords} />
               <Polyline positions={route.coords} color="#ef4444" weight={3} opacity={0.85} />
-              {tappe.map((t) => {
+              {tappe.map((t, i) => {
                 const isStart = t.tappaNum === 0, isEnd = i === tappe.length - 1;
                 const color   = isStart ? "#22c55e" : isEnd ? "#ef4444" : "#f97316";
                 const lbl     = isStart ? "P" : isEnd ? "A" : String(t.tappaNum);
