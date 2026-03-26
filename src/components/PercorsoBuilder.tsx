@@ -1383,7 +1383,7 @@ export default function PercorsoBuilder() {
               <MapFit coords={route.coords} />
               <Polyline positions={route.coords} color="#ef4444" weight={3} opacity={0.85} />
               {tappe.map((t) => {
-                const isStart = t.tappaNum === 0, isEnd = t.label === "Arrivo";
+                const isStart = t.tappaNum === 0, isEnd = i === tappe.length - 1;
                 const color   = isStart ? "#22c55e" : isEnd ? "#ef4444" : "#f97316";
                 const lbl     = isStart ? "P" : isEnd ? "A" : String(t.tappaNum);
                 return (
@@ -1447,7 +1447,7 @@ export default function PercorsoBuilder() {
               {tappe.map((t, i) => {
                 const nextKm = tappe[i + 1]?.kmProgr ?? t.kmProgr;
                 const segKm  = i < tappe.length - 1 ? (nextKm - t.kmProgr).toFixed(1) : "—";
-                const isStart = t.tappaNum === 0, isEnd = t.label === "Arrivo";
+                const isStart = t.tappaNum === 0, isEnd = i === tappe.length - 1;
                 return (
                   <div key={`${t.tappaNum}-${t.lat}`} className="flex items-center gap-3 px-4 py-2.5">
                     <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
