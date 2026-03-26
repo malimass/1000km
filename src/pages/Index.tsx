@@ -100,7 +100,7 @@ const Index = () => {
           </motion.div>
 
           {/* Countdown */}
-          <Countdown targetDate="2026-04-15T06:00:00" className="mb-6" />
+          <Countdown targetDate="2026-04-15T05:00:00" className="mb-6" />
 
           <motion.p
             initial={{ opacity: 0 }}

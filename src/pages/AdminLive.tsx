@@ -30,7 +30,7 @@ const RouteMap = lazy(() => import("@/components/RouteMap"));
 const PercorsoBuilder = lazy(() => import("@/components/PercorsoBuilder"));
 
 // ─── Costanti ────────────────────────────────────────────────────────────────
-const CAMMINO_START = new Date("2026-04-15T06:00:00");
+const CAMMINO_START = new Date("2026-04-15T05:00:00");
 
 const HASHTAGS =
   "#1000kmdigratitudine #gratitudepath #camminodigratitudine " +

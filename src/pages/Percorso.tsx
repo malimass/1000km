@@ -30,8 +30,8 @@ const RouteMap3D = lazy(() => import("@/components/RouteMap3D"));
 // Fallback usato solo se non è stato salvato nulla tramite /admin-live
 const LOCATOWEB_FALLBACK = "";
 
-const CAMMINO_START = new Date("2026-04-15T06:00:00");
-const CAMMINO_END   = new Date("2026-05-01T18:00:00");
+const CAMMINO_START = new Date("2026-04-15T05:00:00");
+const CAMMINO_END   = new Date("2026-05-01T15:00:00");
 
 function LiveTrackingSection({
   ltwUrl,
