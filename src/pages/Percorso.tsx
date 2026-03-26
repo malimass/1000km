@@ -1,13 +1,14 @@
 import { lazy, Suspense, useState, useRef, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getLtwUrl, setLtwUrl } from "@/lib/ltwStore";
-import { Heart, MapPin, Radio, Navigation, Users, UserPlus } from "lucide-react";
+import { Heart, MapPin, Radio, Navigation, Users, UserPlus, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
 import percorsoHero from "@/assets/percorso-hero.jpg";
 import { motion } from "framer-motion";
 import { tappe } from "@/lib/tappe";
+import { downloadTappaGpx, downloadFullRouteGpx } from "@/lib/gpxExport";
 import {
   loadAllLivePositions, subscribeLivePosition, type LivePosition,
   loadRoutePositions, subscribeRoutePositions, todaySessionId,
@@ -508,6 +509,19 @@ export default function Percorso() {
             <p className="text-center text-muted-foreground font-body text-base mb-8 max-w-xl mx-auto">
               Vuoi camminare con noi? Scegli una tappa e unisciti al cammino per qualche chilometro.
             </p>
+            {savedCoords && savedCoords.length > 0 && (
+              <div className="flex justify-center mb-6">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => downloadFullRouteGpx(savedCoords)}
+                >
+                  <Download className="w-4 h-4" />
+                  Scarica percorso completo (GPX)
+                </Button>
+              </div>
+            )}
           </AnimatedSection>
           <div className="space-y-4 max-w-3xl mx-auto">
             {savedTappe ? (
@@ -548,8 +562,18 @@ export default function Percorso() {
                           )}
                         </div>
                       </button>
-                      <div className="flex-shrink-0 flex items-center gap-2">
+                      <div className="flex-shrink-0 flex items-center gap-1 sm:gap-2">
                         <MapPin className={`w-4 h-4 transition-colors hidden sm:block ${isSelected ? "text-dona" : "text-muted-foreground/30"}`} />
+                        {savedCoords && savedCoords.length > 0 && (
+                          <button
+                            type="button"
+                            title="Scarica GPX"
+                            onClick={(e) => { e.stopPropagation(); downloadTappaGpx(savedCoords, savedTappe!, i); }}
+                            className="h-8 w-8 flex items-center justify-center rounded-md border border-border hover:border-dona hover:bg-dona/10 text-muted-foreground hover:text-dona transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <Link to={`/iscriviti?tappa=${t.tappaNum}`}>
                           <Button size="sm" className="text-xs h-8 px-2 sm:px-3 bg-dona hover:bg-dona/90 text-white">
                             <UserPlus className="w-3.5 h-3.5 sm:mr-1" />
