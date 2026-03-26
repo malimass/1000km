@@ -25,9 +25,10 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   Search, Navigation, Loader2, MapPin, Route, RotateCcw, Copy, CheckCircle2,
-  AlertCircle, Save, Trash2, FolderOpen, Map as MapIcon, Plus, Minus,
+  AlertCircle, Save, Trash2, FolderOpen, Map as MapIcon, Plus, Minus, Download,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { downloadTappaGpx, downloadFullRouteGpx } from "@/lib/gpxExport";
 
 const ElevationProfile = lazy(() => import("@/components/ElevationProfile"));
 const RouteMap3D = lazy(() => import("@/components/RouteMap3D"));
@@ -1435,6 +1436,10 @@ export default function PercorsoBuilder() {
                     : <><Copy className="w-3 h-3" /> Copia coordinate</>
                   }
                 </button>
+                <button onClick={() => downloadFullRouteGpx(route!.coords)}
+                  className="text-[10px] text-dona hover:opacity-80 flex items-center gap-1 transition-colors">
+                  <Download className="w-3 h-3" /> Scarica GPX
+                </button>
               </div>
             </div>
 
@@ -1458,6 +1463,16 @@ export default function PercorsoBuilder() {
                     <span className="text-[10px] font-mono text-muted-foreground shrink-0">
                       {t.lat.toFixed(4)},{t.lng.toFixed(4)}
                     </span>
+                    {!isEnd && i < tappe.length - 1 && (
+                      <button
+                        type="button"
+                        title={`Scarica GPX tappa ${isStart ? 1 : t.tappaNum}`}
+                        onClick={() => downloadTappaGpx(route!.coords, tappe, i)}
+                        className="w-6 h-6 flex items-center justify-center rounded border border-border hover:border-dona hover:bg-dona/10 text-muted-foreground hover:text-dona transition-colors shrink-0"
+                      >
+                        <Download className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 );
               })}
