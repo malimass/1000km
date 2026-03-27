@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { useSEO } from "@/hooks/use-seo";
 import { Heart, ArrowLeft, Shield, Users, Check, Loader2, CreditCard, Landmark, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
@@ -77,6 +78,10 @@ type Step = "importo" | "dati" | "pagamento" | "completato";
 type PayMethod = "card" | "paypal";
 
 export default function Dona() {
+  useSEO({
+    title: "Dona — Sostieni il cammino solidale",
+    description: "Fai una donazione per sostenere il cammino di 1000 km e la raccolta fondi per Komen Italia. Ogni euro conta nella lotta contro i tumori al seno.",
+  });
   const [raccolta, setRaccolta] = useState<RaccoltaFondi | null>(null);
   const sdkReady = useSumUpSdk();
 

@@ -1,6 +1,8 @@
 import { useLocation } from "react-router-dom";
+import { useSEO } from "@/hooks/use-seo";
 
 const NotFound = () => {
+  useSEO({ title: "Pagina non trovata", noindex: true });
   const location = useLocation();
 
   return (

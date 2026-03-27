@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { Bell, Megaphone, MapPin, Heart, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { useSEO } from "@/hooks/use-seo";
 import { motion, AnimatePresence } from "framer-motion";
 import NativeLayout from "@/components/NativeLayout";
 import Layout from "@/components/Layout";
@@ -89,6 +90,10 @@ function NotiziaCard({ n }: { n: Notizia }) {
 // ─── Componente principale ────────────────────────────────────────────────────
 
 export default function Notizie() {
+  useSEO({
+    title: "Notizie e aggiornamenti",
+    description: "Tutte le notizie e gli aggiornamenti dal cammino solidale di 1000 km di Gratitudine. Segui il viaggio da Bologna a Terranova Sappo Minulio.",
+  });
   const [notizie, setNotizie] = useState<Notizia[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<Categoria | "tutte">("tutte");

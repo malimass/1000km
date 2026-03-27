@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useSEO } from "@/hooks/use-seo";
 import { Heart, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
@@ -42,19 +43,10 @@ function VideoEmbed({ videoId, titolo }: { videoId: string; titolo: string }) {
 export default function SanLuca() {
   const [video, setVideo] = useState<YtVideoData>(DEFAULT_VIDEO);
 
-  useEffect(() => {
-    document.title = "Santuario della Madonna di San Luca Bologna | Storia, Miracoli e Cammino dei 1000 km";
-    const meta = document.querySelector('meta[name="description"]');
-    if (meta) {
-      meta.setAttribute("content", "Scopri la storia del Santuario della Madonna di San Luca a Bologna, i miracoli e il suo ruolo come punto di partenza del cammino solidale dei 1000 km di Gratitudine.");
-    }
-    return () => {
-      document.title = "1000kmdigratitudine – Cammino solidale Bologna-Calabria 2026";
-      if (meta) {
-        meta.setAttribute("content", "1000 km di gratitudine: un cammino di fede da Bologna a Terranova Sappo Minulio. Un pellegrinaggio solidale per la ricerca contro i tumori al seno.");
-      }
-    };
-  }, []);
+  useSEO({
+    title: "Santuario della Madonna di San Luca Bologna — Storia, Miracoli e Cammino",
+    description: "Scopri la storia del Santuario della Madonna di San Luca a Bologna, i miracoli e il suo ruolo come punto di partenza del cammino solidale dei 1000 km di Gratitudine.",
+  });
 
   useEffect(() => {
     loadSiteYtSanLucaVideos().then(source => {

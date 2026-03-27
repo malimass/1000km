@@ -9,6 +9,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Heart, MapPin, Users, Ribbon, ArrowRight, Footprints } from "lucide-react";
+import { useSEO } from "@/hooks/use-seo";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { tappe } from "@/lib/tappe";
@@ -54,6 +55,10 @@ const stagger = {
 };
 
 export default function Partecipa() {
+  useSEO({
+    title: "Partecipa a una tappa",
+    description: "Cammina con noi per una o più tappe del cammino solidale di 1000 km. Scegli la tappa, iscriviti e sostieni Komen Italia nella lotta contro i tumori al seno.",
+  });
   return (
     <Layout>
       {/* ── Hero ────────────────────────────────────────────────────────────── */}

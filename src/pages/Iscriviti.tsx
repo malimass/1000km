@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useSEO } from "@/hooks/use-seo";
 import { ArrowLeft, Heart, Users, Loader2, AlertCircle, CheckCircle2, Check, Footprints, MapPin, X, ArrowRight, CreditCard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Layout from "@/components/Layout";
@@ -335,6 +336,10 @@ function LandingPage() {
 
 
 export default function Iscriviti() {
+  useSEO({
+    title: "Iscriviti a una tappa",
+    description: "Iscriviti gratuitamente o con una donazione a una delle 16 tappe del cammino solidale di 1000 km di Gratitudine.",
+  });
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const sdkReady = useSumUpSdk();

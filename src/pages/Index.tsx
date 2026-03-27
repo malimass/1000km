@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Heart, Cross, FlaskConical, MapPin, Users, Share2, ArrowRight, Shield, Clock } from "lucide-react";
+import { useSEO } from "@/hooks/use-seo";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -17,6 +18,10 @@ function formatEuro(n: number): string {
 }
 
 const Index = () => {
+  useSEO({
+    title: "1000 km di Gratitudine — Cammino solidale Bologna-Calabria 2026",
+    description: "Un cammino di 1000 km da Bologna a Terranova Sappo Minulio per la ricerca contro i tumori al seno. Dona, partecipa a una tappa o segui il percorso in tempo reale.",
+  });
   const heroRef = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({
     target: heroRef,

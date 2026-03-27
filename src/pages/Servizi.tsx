@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { Phone, HelpCircle, Truck, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { useSEO } from "@/hooks/use-seo";
 import { motion, AnimatePresence } from "framer-motion";
 import NativeLayout from "@/components/NativeLayout";
 import Layout from "@/components/Layout";
@@ -212,6 +213,10 @@ function ServizioSectionCard({ section }: { section: ServizioSection }) {
 // ─── Componente principale ────────────────────────────────────────────────────
 
 export default function Servizi() {
+  useSEO({
+    title: "Servizi e informazioni pratiche",
+    description: "Informazioni pratiche per chi partecipa al cammino: logistica, numeri utili, FAQ e tutto ciò che serve per prepararsi.",
+  });
   const [page, setPage] = useState<ServiziPage>(FALLBACK);
 
   useEffect(() => {

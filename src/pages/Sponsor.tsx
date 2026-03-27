@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Heart, Eye, Award, Download, ArrowRight } from "lucide-react";
+import { useSEO } from "@/hooks/use-seo";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -34,6 +35,10 @@ const pacchetti = [
 ];
 
 export default function Sponsor() {
+  useSEO({
+    title: "Diventa Sponsor",
+    description: "Sostieni il cammino solidale 1000 km di Gratitudine come sponsor. Visibilità su web, social e durante l'evento per la tua azienda.",
+  });
   const [form, setForm] = useState({ azienda: "", referente: "", email: "", messaggio: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);

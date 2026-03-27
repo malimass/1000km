@@ -45,6 +45,7 @@ export default defineConfig(({ mode }) => ({
         name: "1000km di Gratitudine",
         short_name: "1000km",
         description: "Cammino solidale Bologna-Calabria 2026",
+        lang: "it",
         theme_color: "#ffffff",
         background_color: "#ffffff",
         display: "standalone",

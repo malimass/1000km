@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { Heart, Check, Loader2, CreditCard, ArrowLeft, Handshake } from "lucide-react";
+import { useSEO } from "@/hooks/use-seo";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -31,6 +32,10 @@ type SponsorStep = "intro" | "form" | "pagamento" | "completato";
 type PayMethod = "card" | "paypal";
 
 export default function Sostenitori() {
+  useSEO({
+    title: "I Sostenitori del Cammino",
+    description: "Le aziende e le persone che sostengono il cammino solidale di 1000 km di Gratitudine. Diventa anche tu sostenitore.",
+  });
   const [page, setPage] = useState<SosteniPage>(SOSTENI_DEFAULTS);
   const [colors, setColors] = useState<Record<string, string>>({});
   const sdkReady = useSumUpSdk();

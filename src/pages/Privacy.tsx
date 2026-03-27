@@ -1,8 +1,14 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, Shield } from "lucide-react";
+import { useSEO } from "@/hooks/use-seo";
 import Layout from "@/components/Layout";
 
 export default function Privacy() {
+  useSEO({
+    title: "Privacy Policy",
+    description: "Informativa sulla privacy e sul trattamento dei dati personali del sito 1000 km di Gratitudine.",
+    noindex: true,
+  });
   return (
     <Layout>
       <section className="section-padding bg-background">

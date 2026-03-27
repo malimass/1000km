@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Heart, Mail } from "lucide-react";
+import { useSEO } from "@/hooks/use-seo";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -15,6 +16,10 @@ const contactSchema = z.object({
 });
 
 export default function Contatti() {
+  useSEO({
+    title: "Contatti",
+    description: "Contatta il team di 1000 km di Gratitudine per informazioni sul cammino solidale, sulle tappe, sulla raccolta fondi o per proposte di collaborazione.",
+  });
   const [form, setForm] = useState({ nome: "", email: "", oggetto: "", messaggio: "", privacy: false });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);

@@ -1,4 +1,5 @@
 import { useSearchParams, Link } from "react-router-dom";
+import { useSEO } from "@/hooks/use-seo";
 import { CheckCircle2, Heart, ArrowLeft, Share2 } from "lucide-react";
 import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
@@ -6,6 +7,11 @@ import { Button } from "@/components/ui/button";
 import { tappe } from "@/lib/tappe";
 
 export default function IscrizioneSuccesso() {
+  useSEO({
+    title: "Iscrizione confermata",
+    description: "La tua iscrizione al cammino solidale di 1000 km di Gratitudine è stata confermata.",
+    noindex: true,
+  });
   const [searchParams] = useSearchParams();
 
   const tappaNum = parseInt(searchParams.get("tappa") ?? "0");

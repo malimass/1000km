@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState, useRef, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useSEO } from "@/hooks/use-seo";
 import { getLtwUrl, setLtwUrl } from "@/lib/ltwStore";
 import { Heart, MapPin, Radio, Navigation, Users, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -161,6 +162,10 @@ function LiveTrackingSection({
 }
 
 export default function Percorso() {
+  useSEO({
+    title: "Il Percorso — Mappa live e tappe",
+    description: "Segui in tempo reale il cammino di 1000 km da Bologna a Terranova Sappo Minulio. Mappa interattiva, posizione GPS dei runner e dettaglio delle 16 tappe.",
+  });
   // Indice del waypoint selezionato (tappa i → waypoint i+1, cioè la destinazione)
   const [selectedWaypoint, setSelectedWaypoint] = useState<number | null>(null);
   const [mapView, setMapView] = useState<"2d" | "3d">("2d");

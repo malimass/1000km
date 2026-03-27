@@ -1,9 +1,14 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, FileText, Download, Building2, Users, Heart } from "lucide-react";
+import { useSEO } from "@/hooks/use-seo";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
 
 export default function Trasparenza() {
+  useSEO({
+    title: "Trasparenza",
+    description: "Bilancio, documenti e rendiconti del progetto 1000 km di Gratitudine. Piena trasparenza su come vengono utilizzati i fondi raccolti.",
+  });
   return (
     <Layout>
       <section className="section-padding bg-background">

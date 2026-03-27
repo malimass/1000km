@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useSEO } from "@/hooks/use-seo";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Layout from "@/components/Layout";
@@ -10,19 +11,10 @@ import { loadPatrociniPage, type Patrocinio } from "@/lib/patrocini";
 export default function Patrocini() {
   const [items, setItems] = useState<Patrocinio[]>([]);
 
-  useEffect(() => {
-    document.title = "Patrocini istituzionali | 1000 km di Gratitudine";
-    const meta = document.querySelector('meta[name="description"]');
-    if (meta) {
-      meta.setAttribute("content", "Scopri gli enti e le istituzioni che hanno concesso il patrocinio morale al progetto solidale 1000 km di Gratitudine.");
-    }
-    return () => {
-      document.title = "1000kmdigratitudine – Cammino solidale Bologna-Calabria 2026";
-      if (meta) {
-        meta.setAttribute("content", "1000 km di gratitudine: un cammino di fede da Bologna a Terranova Sappo Minulio. Un pellegrinaggio solidale per la ricerca contro i tumori al seno.");
-      }
-    };
-  }, []);
+  useSEO({
+    title: "Patrocini istituzionali",
+    description: "Scopri gli enti e le istituzioni che hanno concesso il patrocinio morale al progetto solidale 1000 km di Gratitudine.",
+  });
 
   useEffect(() => {
     loadPatrociniPage().then(p => setItems(p.items));

@@ -14,6 +14,7 @@ import { Heart, LogIn, Loader2, User, Mail, Lock, Eye, EyeOff, Footprints, Dumbb
 import { motion } from "framer-motion";
 import { signInUser, signUpUser, getCurrentUser, signOutUser, listCoaches, saveAthleteProfile } from "@/lib/auth";
 import { trackEvent } from "@/components/PageTracker";
+import { useSEO } from "@/hooks/use-seo";
 
 // ─── Redirect per ruolo ────────────────────────────────────────────────────────
 
@@ -26,6 +27,11 @@ function redirectForRole(role: string | undefined): string {
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function Accedi() {
+  useSEO({
+    title: "Accedi",
+    description: "Accedi o registrati come atleta o coach per partecipare al cammino solidale di 1000 km di Gratitudine.",
+    noindex: true,
+  });
   const navigate = useNavigate();
   const [tab, setTab] = useState<"login" | "register">("login");
   const [role, setRole] = useState<"athlete" | "coach">("athlete");
