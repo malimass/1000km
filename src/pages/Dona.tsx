@@ -7,6 +7,7 @@ import AnimatedSection from "@/components/AnimatedSection";
 import { motion } from "framer-motion";
 import { loadRaccoltaFondi, subscribeRaccoltaFondi, type RaccoltaFondi } from "@/lib/notizie";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+import { trackEvent } from "@/components/PageTracker";
 
 declare global {
   interface Window { SumUpCard: any; }
@@ -201,6 +202,7 @@ export default function Dona() {
                 } catch {
                   // Conferma fallita, ma il pagamento è ok — verrà riconciliato
                 }
+                trackEvent("donazione", `sumup:€${finalAmount}`);
                 setStep("completato");
               } else if (type === "error") {
                 setError(body?.message ?? "Pagamento non riuscito. Riprova.");
@@ -608,6 +610,7 @@ export default function Dona() {
                                 importo_euro: prev.importo_euro + finalAmount,
                                 donatori: prev.donatori + 1,
                               } : prev);
+                              trackEvent("donazione", `paypal:€${finalAmount}`);
                               setStep("completato");
                             } else {
                               const d = await resp.json();

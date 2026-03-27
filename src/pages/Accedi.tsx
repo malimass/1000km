@@ -13,6 +13,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Heart, LogIn, Loader2, User, Mail, Lock, Eye, EyeOff, Footprints, Dumbbell, Target, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { signInUser, signUpUser, getCurrentUser, signOutUser, listCoaches, saveAthleteProfile } from "@/lib/auth";
+import { trackEvent } from "@/components/PageTracker";
 
 // ─── Redirect per ruolo ────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ export default function Accedi() {
 
     // Imposta flag localStorage per le route protette
     if (user.role === "coach") localStorage.setItem("gp_coach_auth", "1");
+    trackEvent("login", user.role ?? "user");
     navigate(redirectForRole(user.role), { replace: true });
   }
 
@@ -112,6 +114,7 @@ export default function Accedi() {
 
     // Imposta flag localStorage per le route protette
     if (user.role === "coach") localStorage.setItem("gp_coach_auth", "1");
+    trackEvent("registrazione", user.role ?? "user");
     navigate(redirectForRole(user.role), { replace: true });
   }
 

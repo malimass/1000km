@@ -48,6 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/track") return await track(req, res);
     if (path === "/analytics") return await analytics(req, res);
     if (path === "/analytics-live") return await analyticsLive(req, res);
+    if (path === "/analytics-journeys") return await analyticsJourneys(req, res);
     return res.status(404).json({ error: "Not found" });
   } catch (err: any) {
     console.error(err);
@@ -1338,21 +1339,23 @@ async function traccarPosition(req: VercelRequest, res: VercelResponse) {
   return res.json({ ok: true });
 }
 
-// ─── TRACK (pageview / click — pubblico, no auth) ────────────────────────────
+// ─── TRACK (pageview / click / event — pubblico, no auth) ─────────────────────
+const ALLOWED_EVENTS = new Set(["pageview", "page_leave", "click", "donazione", "iscrizione", "login", "registrazione"]);
+
 async function track(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
-  const { session_id, path, referrer, screen_w, screen_h, language, event_type, event_data } = req.body ?? {};
+  const { visitor_id, session_id, path, referrer, screen_w, screen_h, language, event_type, event_data } = req.body ?? {};
   if (!session_id || !path) return res.status(400).json({ error: "session_id e path richiesti" });
 
   const ua = (req.headers["user-agent"] ?? "").slice(0, 512);
   const country = (req.headers["x-vercel-ip-country"] as string) ?? null;
   const city = (req.headers["x-vercel-ip-city"] as string) ?? null;
   const region = (req.headers["x-vercel-ip-country-region"] as string) ?? null;
-  const evType = event_type === "click" ? "click" : "pageview";
+  const evType = ALLOWED_EVENTS.has(event_type) ? event_type : "pageview";
 
   await sql`
-    INSERT INTO page_views (session_id, path, referrer, user_agent, screen_w, screen_h, language, country, city, region, event_type, event_data)
-    VALUES (${session_id}, ${path.slice(0, 512)}, ${referrer?.slice(0, 1024) ?? null}, ${ua},
+    INSERT INTO page_views (visitor_id, session_id, path, referrer, user_agent, screen_w, screen_h, language, country, city, region, event_type, event_data)
+    VALUES (${visitor_id?.slice(0, 64) ?? null}, ${session_id}, ${path.slice(0, 512)}, ${referrer?.slice(0, 1024) ?? null}, ${ua},
             ${screen_w ?? null}, ${screen_h ?? null}, ${language?.slice(0, 16) ?? null},
             ${country}, ${city ? decodeURIComponent(city) : null}, ${region}, ${evType}, ${event_data?.slice(0, 512) ?? null})
   `;
@@ -1375,6 +1378,8 @@ async function analytics(req: VercelRequest, res: VercelResponse) {
   const [
     totalViews,
     uniqueSessions,
+    uniqueVisitors,
+    returningVisitors,
     topPages,
     dailyViews,
     topReferrers,
@@ -1382,6 +1387,9 @@ async function analytics(req: VercelRequest, res: VercelResponse) {
     topCities,
     recentClicks,
     deviceBreakdown,
+    avgDuration,
+    conversions,
+    bounceRate,
   ] = await Promise.all([
     // Totale visite
     sql`SELECT COUNT(*)::int AS count FROM page_views
@@ -1389,6 +1397,15 @@ async function analytics(req: VercelRequest, res: VercelResponse) {
     // Sessioni uniche
     sql`SELECT COUNT(DISTINCT session_id)::int AS count FROM page_views
         WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval`,
+    // Visitatori unici (visitor_id persistente)
+    sql`SELECT COUNT(DISTINCT visitor_id)::int AS count FROM page_views
+        WHERE event_type = 'pageview' AND visitor_id IS NOT NULL AND created_at > now() - ${interval}::interval`,
+    // Visitatori ricorrenti (visitor_id con sessioni in periodi diversi)
+    sql`SELECT COUNT(*)::int AS count FROM (
+          SELECT visitor_id FROM page_views
+          WHERE event_type = 'pageview' AND visitor_id IS NOT NULL AND created_at > now() - ${interval}::interval
+          GROUP BY visitor_id HAVING COUNT(DISTINCT session_id) > 1
+        ) sub`,
     // Top pagine
     sql`SELECT path, COUNT(*)::int AS views
         FROM page_views WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval
@@ -1425,12 +1442,38 @@ async function analytics(req: VercelRequest, res: VercelResponse) {
           COUNT(*)::int AS count
         FROM page_views WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval
         GROUP BY device ORDER BY count DESC`,
+    // Tempo medio per pagina (secondi)
+    sql`SELECT ROUND(AVG(event_data::int))::int AS avg_seconds
+        FROM page_views WHERE event_type = 'page_leave' AND event_data ~ '^[0-9]+$'
+        AND created_at > now() - ${interval}::interval`,
+    // Conversioni (donazioni, iscrizioni, registrazioni)
+    sql`SELECT event_type, COUNT(*)::int AS count, event_data
+        FROM page_views
+        WHERE event_type IN ('donazione', 'iscrizione', 'registrazione', 'login')
+        AND created_at > now() - ${interval}::interval
+        GROUP BY event_type, event_data ORDER BY count DESC`,
+    // Bounce rate (sessioni con una sola pageview)
+    sql`SELECT
+          COUNT(*)::int AS total_sessions,
+          COUNT(*) FILTER (WHERE pv_count = 1)::int AS bounce_sessions
+        FROM (
+          SELECT session_id, COUNT(*)::int AS pv_count
+          FROM page_views WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval
+          GROUP BY session_id
+        ) sub`,
   ]);
+
+  const totalSessions = bounceRate[0]?.total_sessions ?? 0;
+  const bounceSessions = bounceRate[0]?.bounce_sessions ?? 0;
 
   return res.json({
     range,
     totalViews: totalViews[0]?.count ?? 0,
     uniqueSessions: uniqueSessions[0]?.count ?? 0,
+    uniqueVisitors: uniqueVisitors[0]?.count ?? 0,
+    returningVisitors: returningVisitors[0]?.count ?? 0,
+    bounceRate: totalSessions > 0 ? Math.round((bounceSessions / totalSessions) * 100) : 0,
+    avgDuration: avgDuration[0]?.avg_seconds ?? 0,
     topPages,
     dailyViews,
     topReferrers,
@@ -1438,6 +1481,7 @@ async function analytics(req: VercelRequest, res: VercelResponse) {
     topCities,
     recentClicks,
     deviceBreakdown,
+    conversions,
   });
 }
 
@@ -1473,6 +1517,36 @@ async function analyticsLive(req: VercelRequest, res: VercelResponse) {
     sessions: activeSessions,
     activePages,
   });
+}
+
+// ─── ANALYTICS JOURNEYS (percorsi utente per sessione) ────────────────────────
+async function analyticsJourneys(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
+  const user = await requireAuth(req);
+  if (!user) return res.status(401).json({ error: "Non autenticato" });
+
+  const limit = Math.min(parseInt((req.query.limit as string) ?? "20", 10), 50);
+
+  // Ultime sessioni con il loro percorso pagine
+  const sessions = await sql`
+    SELECT session_id, visitor_id, country, city,
+           CASE WHEN screen_w IS NULL THEN 'unknown'
+                WHEN screen_w < 768 THEN 'mobile'
+                WHEN screen_w < 1024 THEN 'tablet'
+                ELSE 'desktop' END AS device,
+           MIN(created_at) AS started_at,
+           MAX(created_at) AS ended_at,
+           json_agg(json_build_object(
+             'path', path, 'event_type', event_type, 'event_data', event_data, 'at', created_at
+           ) ORDER BY created_at) AS events
+    FROM page_views
+    WHERE created_at > now() - interval '7 days'
+    GROUP BY session_id, visitor_id, country, city, device
+    ORDER BY started_at DESC
+    LIMIT ${limit}
+  `;
+
+  return res.json({ sessions });
 }
 
 // ─── PAYPAL ──────────────────────────────────────────────────────────────────

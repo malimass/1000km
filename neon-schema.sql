@@ -371,6 +371,7 @@ CREATE INDEX IF NOT EXISTS saved_percorsi_user_idx ON saved_percorsi (user_id, c
 
 CREATE TABLE IF NOT EXISTS page_views (
   id          bigserial        PRIMARY KEY,
+  visitor_id  text,            -- persistente (localStorage) — identifica visitatori ricorrenti
   session_id  text             NOT NULL,
   path        text             NOT NULL,
   referrer    text,
@@ -382,7 +383,7 @@ CREATE TABLE IF NOT EXISTS page_views (
   city        text,
   region      text,
   event_type  text             NOT NULL DEFAULT 'pageview',
-  -- valori: 'pageview' | 'click'
+  -- valori: 'pageview' | 'page_leave' | 'click' | 'donazione' | 'iscrizione' | 'login' | 'registrazione'
   event_data  text,
   created_at  timestamptz      NOT NULL DEFAULT now()
 );
@@ -390,6 +391,7 @@ CREATE TABLE IF NOT EXISTS page_views (
 CREATE INDEX IF NOT EXISTS page_views_created_idx ON page_views (created_at DESC);
 CREATE INDEX IF NOT EXISTS page_views_path_idx ON page_views (path, created_at DESC);
 CREATE INDEX IF NOT EXISTS page_views_session_idx ON page_views (session_id);
+CREATE INDEX IF NOT EXISTS page_views_visitor_idx ON page_views (visitor_id);
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════

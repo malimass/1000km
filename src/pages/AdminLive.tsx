@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { clearAuthToken } from "@/lib/api";
 import { getLtwUrl, setLtwUrl, clearLtwUrl } from "@/lib/ltwStore";
 import { tappe } from "@/lib/tappe";
-import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, saveSiteYtSanLucaVideos, saveSiteShareSettings, SHARE_DEFAULTS, loadGoogleSettings, saveGoogleSettings, type AdminSettings } from "@/lib/adminSettings";
+import { loadSettings, saveSettings as saveSettingsDB, saveSiteYtVideos, saveSiteYtSanLucaVideos, saveSiteShareSettings, SHARE_DEFAULTS, type AdminSettings } from "@/lib/adminSettings";
 import { loadSosteniPage, saveSosteniPage, type Sostenitore, type SosteniPage } from "@/lib/sostenitori";
 import { loadPatrociniPage, savePatrociniPage, type Patrocinio, type PatrociniPage } from "@/lib/patrocini";
 import {
@@ -252,6 +252,8 @@ export default function AdminLive() {
   const [analyticsRange, setAnalyticsRange] = useState("7d");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [liveVisitors, setLiveVisitors] = useState<any>(null);
+  const [journeys, setJourneys] = useState<any[]>([]);
+  const [journeysOpen, setJourneysOpen] = useState(false);
 
   // ─ GPS Live ─
   const [runnerId,    setRunnerIdState] = useState<1 | 2>(() => {
@@ -323,11 +325,6 @@ export default function AdminLive() {
   const [shareHashtags,  setShareHashtags]  = useState("");
   const [shareUrl,       setShareUrl]       = useState("");
   const [shareSaved,     setShareSaved]     = useState(false);
-
-  // ─ Google Analytics / Search Console ─
-  const [gaId,             setGaId]             = useState("");
-  const [gscVerification,  setGscVerification]  = useState("");
-  const [googleSaved,      setGoogleSaved]      = useState(false);
 
   // ─ Auto-post sui social all'avvio GPS ─
   const [autoPostOnStart, setAutoPostOnStart] = useState(false);
@@ -427,10 +424,6 @@ export default function AdminLive() {
       setAutoPostOnStart(s.autoPostOnStart === "true");
       setSettingsLoading(false);
     });
-    loadGoogleSettings().then(g => {
-      setGaId(g.gaId);
-      setGscVerification(g.gscVerification);
-    });
     loadSosteniPage().then(p => {
       setSosteniTitle(p.title);
       setSosteniIntro(p.intro);
@@ -508,6 +501,16 @@ export default function AdminLive() {
     return () => clearInterval(timer);
   }, [activeSection]);
 
+  // ─ Carica journeys quando aperto ─
+  useEffect(() => {
+    if (!journeysOpen || activeSection !== "analisi") return;
+    const jwt = localStorage.getItem("gp_jwt");
+    fetch("/api/analytics-journeys?limit=20", { headers: { Authorization: `Bearer ${jwt}` } })
+      .then(r => r.json())
+      .then(d => setJourneys(d.sessions ?? []))
+      .catch(() => setJourneys([]));
+  }, [journeysOpen, activeSection]);
+
   // ─ Foto handlers ─
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -564,13 +567,6 @@ export default function AdminLive() {
   // ─ Impostazioni social ─
   async function handleSaveSettings() {
     await saveSettingsDB(buildAdminSettings());
-  }
-
-  // ─ Google Analytics / Search Console ─
-  async function handleSaveGoogleSettings() {
-    await saveGoogleSettings({ gaId: gaId.trim(), gscVerification: gscVerification.trim() });
-    setGoogleSaved(true);
-    setTimeout(() => setGoogleSaved(false), 2500);
   }
 
   // ─ Video YouTube ─
@@ -2479,55 +2475,6 @@ export default function AdminLive() {
                   ⚙️ Impostazioni social
                 </h2>
 
-                {/* Google Analytics + Search Console */}
-                <div className="border border-border rounded-lg p-4 space-y-3 bg-background">
-                  <p className="text-xs font-bold text-foreground">Google Analytics + Search Console</p>
-                  <Field
-                    label="Google Analytics ID"
-                    value={gaId}
-                    onChange={setGaId}
-                    placeholder="G-XXXXXXXXXX"
-                    hint="Lo trovi su analytics.google.com → Amministrazione → Stream dati → ID misurazione"
-                  />
-                  <Field
-                    label="Google Search Console — codice di verifica"
-                    value={gscVerification}
-                    onChange={setGscVerification}
-                    placeholder="abc123def456…"
-                    hint="Search Console → Impostazioni → Verifica proprietà → Tag HTML → copia solo il valore content"
-                  />
-                  <button
-                    onClick={handleSaveGoogleSettings}
-                    className="w-full bg-dona text-white rounded-lg py-2 text-sm font-semibold hover:bg-dona/90 transition-opacity"
-                  >
-                    {googleSaved ? "✓ Salvato!" : "Salva Google Settings"}
-                  </button>
-                  <details className="mt-2">
-                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                      Come configurare Google Analytics →
-                    </summary>
-                    <ol className="mt-2 text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                      <li>Vai su <a href="https://analytics.google.com" target="_blank" rel="noreferrer" className="underline text-dona">analytics.google.com</a></li>
-                      <li><strong>Amministrazione</strong> (ingranaggio) → <strong>Crea proprietà</strong></li>
-                      <li>Nome: "1000km di Gratitudine", fuso orario Italia, EUR</li>
-                      <li><strong>Stream dati → Web</strong> → inserisci l'URL del sito</li>
-                      <li>Copia l'<strong>ID misurazione</strong> (inizia con <code className="bg-muted px-1 rounded">G-</code>)</li>
-                    </ol>
-                  </details>
-                  <details>
-                    <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                      Come configurare Search Console →
-                    </summary>
-                    <ol className="mt-2 text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                      <li>Vai su <a href="https://search.google.com/search-console" target="_blank" rel="noreferrer" className="underline text-dona">search.google.com/search-console</a></li>
-                      <li>Aggiungi proprietà → <strong>Prefisso URL</strong> → inserisci l'URL del sito</li>
-                      <li>Metodo di verifica: <strong>Tag HTML</strong></li>
-                      <li>Copia solo il valore dell'attributo <code className="bg-muted px-1 rounded">content="…"</code></li>
-                      <li>Incollalo qui e salva — poi clicca <strong>Verifica</strong> in Search Console</li>
-                    </ol>
-                  </details>
-                </div>
-
                 <div className="border-t border-border pt-4" />
 
                 {/* Meta */}
@@ -2686,10 +2633,49 @@ export default function AdminLive() {
                         <p className="text-[11px] text-muted-foreground mt-1">Visite totali</p>
                       </div>
                       <div className="bg-background border border-border rounded-xl p-4 text-center">
+                        <p className="text-2xl font-bold text-foreground">{analyticsData.uniqueVisitors?.toLocaleString("it-IT") ?? analyticsData.uniqueSessions?.toLocaleString("it-IT") ?? 0}</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">Visitatori unici</p>
+                      </div>
+                      <div className="bg-background border border-border rounded-xl p-4 text-center">
+                        <p className="text-2xl font-bold text-foreground">{analyticsData.returningVisitors?.toLocaleString("it-IT") ?? 0}</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">Visitatori ricorrenti</p>
+                      </div>
+                      <div className="bg-background border border-border rounded-xl p-4 text-center">
+                        <p className="text-2xl font-bold text-foreground">{analyticsData.bounceRate ?? 0}%</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">Bounce rate</p>
+                      </div>
+                      <div className="bg-background border border-border rounded-xl p-4 text-center">
                         <p className="text-2xl font-bold text-foreground">{analyticsData.uniqueSessions?.toLocaleString("it-IT") ?? 0}</p>
-                        <p className="text-[11px] text-muted-foreground mt-1">Sessioni uniche</p>
+                        <p className="text-[11px] text-muted-foreground mt-1">Sessioni</p>
+                      </div>
+                      <div className="bg-background border border-border rounded-xl p-4 text-center">
+                        <p className="text-2xl font-bold text-foreground">
+                          {analyticsData.avgDuration ? `${Math.floor(analyticsData.avgDuration / 60)}:${String(analyticsData.avgDuration % 60).padStart(2, "0")}` : "—"}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-1">Tempo medio/pag</p>
                       </div>
                     </div>
+
+                    {/* Conversioni */}
+                    {analyticsData.conversions?.length > 0 && (
+                      <div className="border border-border rounded-xl p-4 bg-background">
+                        <p className="text-xs font-bold text-foreground mb-3">Conversioni</p>
+                        <div className="space-y-2">
+                          {analyticsData.conversions.map((c: any, i: number) => (
+                            <div key={i} className="flex justify-between items-center text-xs">
+                              <span className="text-foreground">
+                                <span className="inline-flex items-center gap-1">
+                                  {c.event_type === "donazione" ? "💰" : c.event_type === "iscrizione" ? "📝" : c.event_type === "registrazione" ? "👤" : "🔑"}
+                                  {" "}{c.event_type}
+                                </span>
+                                {c.event_data && <span className="text-muted-foreground ml-1.5 font-mono">{c.event_data}</span>}
+                              </span>
+                              <span className="text-dona font-bold">{c.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Daily chart (simple bar chart) */}
                     {analyticsData.dailyViews?.length > 0 && (
@@ -2833,6 +2819,59 @@ export default function AdminLive() {
                         </div>
                       </div>
                     )}
+
+                    {/* Percorsi utente (journeys) */}
+                    <div className="border border-border rounded-xl p-4 bg-background">
+                      <button
+                        onClick={() => setJourneysOpen(o => !o)}
+                        className="w-full flex justify-between items-center text-xs font-bold text-foreground"
+                      >
+                        <span>Percorsi utente (ultimi 7gg)</span>
+                        <ChevronDown className={`w-4 h-4 transition-transform ${journeysOpen ? "rotate-180" : ""}`} />
+                      </button>
+                      {journeysOpen && (
+                        <div className="mt-3 space-y-3 max-h-96 overflow-y-auto">
+                          {journeys.length === 0 && (
+                            <p className="text-xs text-muted-foreground text-center py-4">Nessun percorso registrato.</p>
+                          )}
+                          {journeys.map((s: any, i: number) => (
+                            <div key={i} className="border border-border rounded-lg p-3 space-y-1.5">
+                              <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+                                <span className="flex items-center gap-1.5">
+                                  {s.device === "mobile" ? <Smartphone className="w-3 h-3" /> :
+                                   s.device === "tablet" ? <Tablet className="w-3 h-3" /> :
+                                   <Monitor className="w-3 h-3" />}
+                                  {s.city && <span>{s.city}{s.country ? ` (${s.country})` : ""}</span>}
+                                </span>
+                                <span>{new Date(s.started_at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1 items-center">
+                                {(s.events as any[])
+                                  .filter((e: any) => e.event_type === "pageview")
+                                  .map((e: any, j: number, arr: any[]) => (
+                                    <span key={j} className="flex items-center gap-1">
+                                      <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded text-foreground">{e.path}</span>
+                                      {j < arr.length - 1 && <span className="text-[10px] text-muted-foreground">→</span>}
+                                    </span>
+                                  ))}
+                              </div>
+                              {(s.events as any[]).some((e: any) => ["donazione", "iscrizione", "registrazione"].includes(e.event_type)) && (
+                                <div className="flex flex-wrap gap-1.5 mt-1">
+                                  {(s.events as any[])
+                                    .filter((e: any) => ["donazione", "iscrizione", "registrazione"].includes(e.event_type))
+                                    .map((e: any, j: number) => (
+                                      <span key={j} className="text-[10px] bg-dona/10 text-dona px-2 py-0.5 rounded-full font-medium">
+                                        {e.event_type === "donazione" ? "💰" : e.event_type === "iscrizione" ? "📝" : "👤"}
+                                        {" "}{e.event_type}{e.event_data ? ` (${e.event_data})` : ""}
+                                      </span>
+                                    ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
                     {/* Empty state */}
                     {analyticsData.totalViews === 0 && (

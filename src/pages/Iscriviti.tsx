@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import AnimatedSection from "@/components/AnimatedSection";
 import { apiFetch } from "@/lib/api";
 import { tappe } from "@/lib/tappe";
+import { trackEvent } from "@/components/PageTracker";
 
 declare global {
   interface Window { SumUpCard: any; }
@@ -401,6 +402,7 @@ export default function Iscriviti() {
           const d = await res.json();
           throw new Error(d.error ?? "Errore durante l'iscrizione.");
         }
+        trackEvent("iscrizione", `gratuita:tappa${tappa.giorno}`);
         navigate(
           `/iscrizione-successo?tappa=${tappa.giorno}&nome=${encodeURIComponent(nome.trim())}&tipo=gratuita`
         );
@@ -491,6 +493,7 @@ export default function Iscriviti() {
                     }),
                   });
                 } catch {}
+                trackEvent("iscrizione", `donazione:€${donazione}:tappa${tappa.giorno}`);
                 navigate(
                   `/iscrizione-successo?tappa=${tappa.giorno}&nome=${encodeURIComponent(nome.trim())}&tipo=donazione&importo=${donazione}`
                 );
