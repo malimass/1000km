@@ -254,6 +254,7 @@ export default function AdminLive() {
   const [liveVisitors, setLiveVisitors] = useState<any>(null);
   const [journeys, setJourneys] = useState<any[]>([]);
   const [journeysOpen, setJourneysOpen] = useState(false);
+  const [funnelData, setFunnelData] = useState<any>(null);
 
   // ─ GPS Live ─
   const [runnerId,    setRunnerIdState] = useState<1 | 2>(() => {
@@ -475,15 +476,18 @@ export default function AdminLive() {
     }
   }, [totalActiveRunners]);
 
-  // ─ Carica analytics quando si apre la sezione ─
+  // ─ Carica analytics + funnel quando si apre la sezione ─
   useEffect(() => {
     if (activeSection !== "analisi") return;
     setAnalyticsLoading(true);
     const jwt = localStorage.getItem("gp_jwt");
-    fetch(`/api/analytics?range=${analyticsRange}`, { headers: { Authorization: `Bearer ${jwt}` } })
-      .then(r => r.json())
-      .then(d => setAnalyticsData(d))
-      .catch(() => setAnalyticsData(null))
+    const headers = { Authorization: `Bearer ${jwt}` };
+    Promise.all([
+      fetch(`/api/analytics?range=${analyticsRange}`, { headers }).then(r => r.json()),
+      fetch(`/api/analytics-funnel?range=${analyticsRange}`, { headers }).then(r => r.json()),
+    ])
+      .then(([analytics, funnel]) => { setAnalyticsData(analytics); setFunnelData(funnel); })
+      .catch(() => { setAnalyticsData(null); setFunnelData(null); })
       .finally(() => setAnalyticsLoading(false));
   }, [activeSection, analyticsRange]);
 
@@ -2674,6 +2678,146 @@ export default function AdminLive() {
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {/* ── Funnel di conversione ── */}
+                    {funnelData?.funnel && (funnelData.funnel.visitedDona > 0 || funnelData.funnel.visitedIscriviti > 0) && (
+                      <div className="border border-border rounded-xl p-4 bg-background">
+                        <p className="text-xs font-bold text-foreground mb-3">Funnel di conversione</p>
+                        <div className="space-y-3">
+                          {/* Funnel Dona */}
+                          {funnelData.funnel.visitedDona > 0 && (() => {
+                            const f = funnelData.funnel;
+                            const steps = [
+                              { label: "Sessioni totali", value: f.totalSessions, pct: 100 },
+                              { label: "Visita /dona", value: f.visitedDona, pct: Math.round((f.visitedDona / f.totalSessions) * 100) },
+                              { label: "Donazione completata", value: f.completedDona, pct: Math.round((f.completedDona / f.totalSessions) * 100) },
+                            ];
+                            return (
+                              <div>
+                                <p className="text-[10px] font-semibold text-dona mb-2">💰 Donazioni</p>
+                                {steps.map((s, i) => (
+                                  <div key={i} className="mb-1.5">
+                                    <div className="flex justify-between text-[10px] mb-0.5">
+                                      <span className="text-foreground">{s.label}</span>
+                                      <span className="text-muted-foreground">{s.value} ({s.pct}%)</span>
+                                    </div>
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                      <div className="h-full bg-dona/70 rounded-full transition-all" style={{ width: `${s.pct}%` }} />
+                                    </div>
+                                  </div>
+                                ))}
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                  Drop-off: <span className="font-bold text-foreground">{f.donaDropOff}%</span> visita /dona ma non completa
+                                </p>
+                              </div>
+                            );
+                          })()}
+                          {/* Funnel Iscrizioni */}
+                          {funnelData.funnel.visitedIscriviti > 0 && (() => {
+                            const f = funnelData.funnel;
+                            const steps = [
+                              { label: "Sessioni totali", value: f.totalSessions, pct: 100 },
+                              { label: "Visita /iscriviti", value: f.visitedIscriviti, pct: Math.round((f.visitedIscriviti / f.totalSessions) * 100) },
+                              { label: "Iscrizione completata", value: f.completedIscriviti, pct: Math.round((f.completedIscriviti / f.totalSessions) * 100) },
+                            ];
+                            return (
+                              <div className={funnelData.funnel.visitedDona > 0 ? "border-t border-border pt-3" : ""}>
+                                <p className="text-[10px] font-semibold text-dona mb-2">📝 Iscrizioni</p>
+                                {steps.map((s, i) => (
+                                  <div key={i} className="mb-1.5">
+                                    <div className="flex justify-between text-[10px] mb-0.5">
+                                      <span className="text-foreground">{s.label}</span>
+                                      <span className="text-muted-foreground">{s.value} ({s.pct}%)</span>
+                                    </div>
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                      <div className="h-full bg-dona/70 rounded-full transition-all" style={{ width: `${s.pct}%` }} />
+                                    </div>
+                                  </div>
+                                ))}
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                  Drop-off: <span className="font-bold text-foreground">{f.iscrivitiDropOff}%</span> visita /iscriviti ma non completa
+                                </p>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Conversione per referrer ── */}
+                    {funnelData?.conversionByReferrer?.length > 0 && (
+                      <div className="border border-border rounded-xl p-4 bg-background">
+                        <p className="text-xs font-bold text-foreground mb-3">Conversione per provenienza</p>
+                        <div className="space-y-2">
+                          {funnelData.conversionByReferrer.map((r: any, i: number) => {
+                            const rate = r.sessions > 0 ? Math.round((r.conversions / r.sessions) * 100) : 0;
+                            return (
+                              <div key={i}>
+                                <div className="flex justify-between text-[10px] mb-0.5">
+                                  <span className="text-foreground truncate mr-2">{r.referrer}</span>
+                                  <span className="text-muted-foreground whitespace-nowrap">
+                                    {r.conversions}/{r.sessions} ({rate}%)
+                                  </span>
+                                </div>
+                                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${rate > 0 ? "bg-green-500/70" : "bg-dona/40"}`}
+                                    style={{ width: `${Math.max(rate, 2)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Percorsi più frequenti ── */}
+                    {funnelData?.topPaths?.length > 0 && (
+                      <div className="border border-border rounded-xl p-4 bg-background">
+                        <p className="text-xs font-bold text-foreground mb-3">Percorsi più frequenti</p>
+                        <div className="space-y-1.5">
+                          {funnelData.topPaths.map((p: any, i: number) => (
+                            <div key={i} className="flex justify-between text-[10px]">
+                              <span className="text-foreground font-mono truncate mr-2">{p.path_seq}</span>
+                              <span className="text-muted-foreground whitespace-nowrap font-bold">{p.count}x</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Pagine di ingresso / uscita ── */}
+                    {(funnelData?.entryPages?.length > 0 || funnelData?.exitPages?.length > 0) && (
+                      <div className="grid grid-cols-2 gap-3">
+                        {funnelData?.entryPages?.length > 0 && (
+                          <div className="border border-border rounded-xl p-4 bg-background">
+                            <p className="text-[10px] font-bold text-foreground mb-2">Pagine di ingresso</p>
+                            <div className="space-y-1">
+                              {funnelData.entryPages.slice(0, 8).map((p: any, i: number) => (
+                                <div key={i} className="flex justify-between text-[9px]">
+                                  <span className="text-foreground font-mono truncate mr-1">{p.path}</span>
+                                  <span className="text-muted-foreground">{p.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {funnelData?.exitPages?.length > 0 && (
+                          <div className="border border-border rounded-xl p-4 bg-background">
+                            <p className="text-[10px] font-bold text-foreground mb-2">Pagine di uscita</p>
+                            <div className="space-y-1">
+                              {funnelData.exitPages.slice(0, 8).map((p: any, i: number) => (
+                                <div key={i} className="flex justify-between text-[9px]">
+                                  <span className="text-foreground font-mono truncate mr-1">{p.path}</span>
+                                  <span className="text-muted-foreground">{p.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

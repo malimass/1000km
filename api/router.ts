@@ -49,6 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (path === "/analytics") return await analytics(req, res);
     if (path === "/analytics-live") return await analyticsLive(req, res);
     if (path === "/analytics-journeys") return await analyticsJourneys(req, res);
+    if (path === "/analytics-funnel") return await analyticsFunnel(req, res);
     return res.status(404).json({ error: "Not found" });
   } catch (err: any) {
     console.error(err);
@@ -1547,6 +1548,130 @@ async function analyticsJourneys(req: VercelRequest, res: VercelResponse) {
   `;
 
   return res.json({ sessions });
+}
+
+// ─── ANALYTICS FUNNEL (metriche aggregate per decisioni) ──────────────────────
+async function analyticsFunnel(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
+  const user = await requireAuth(req);
+  if (!user) return res.status(401).json({ error: "Non autenticato" });
+
+  const range = (req.query.range as string) ?? "7d";
+  let interval = "7 days";
+  if (range === "24h") interval = "1 day";
+  else if (range === "30d") interval = "30 days";
+  else if (range === "90d") interval = "90 days";
+
+  const [
+    entryPages,
+    exitPages,
+    topPaths,
+    funnelDona,
+    conversionByReferrer,
+  ] = await Promise.all([
+    // ── Pagine di ingresso (prima pageview di ogni sessione) ──
+    sql`SELECT path, COUNT(*)::int AS count
+        FROM (
+          SELECT DISTINCT ON (session_id) session_id, path
+          FROM page_views
+          WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval
+          ORDER BY session_id, created_at ASC
+        ) first_pages
+        GROUP BY path ORDER BY count DESC LIMIT 10`,
+
+    // ── Pagine di uscita (ultima pageview di ogni sessione) ──
+    sql`SELECT path, COUNT(*)::int AS count
+        FROM (
+          SELECT DISTINCT ON (session_id) session_id, path
+          FROM page_views
+          WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval
+          ORDER BY session_id, created_at DESC
+        ) last_pages
+        GROUP BY path ORDER BY count DESC LIMIT 10`,
+
+    // ── Percorsi più frequenti (top sequenze di 2-3 pagine) ──
+    sql`WITH session_pages AS (
+          SELECT session_id,
+                 array_agg(path ORDER BY created_at) AS pages
+          FROM page_views
+          WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval
+          GROUP BY session_id
+        ),
+        pairs AS (
+          SELECT pages[1] || ' → ' || pages[2] AS path_seq, 2 AS depth
+          FROM session_pages WHERE array_length(pages, 1) >= 2
+          UNION ALL
+          SELECT pages[1] || ' → ' || pages[2] || ' → ' || pages[3], 3
+          FROM session_pages WHERE array_length(pages, 1) >= 3
+        )
+        SELECT path_seq, COUNT(*)::int AS count
+        FROM pairs
+        GROUP BY path_seq HAVING COUNT(*) >= 2
+        ORDER BY count DESC LIMIT 15`,
+
+    // ── Funnel donazione: visite /dona → completamento ──
+    sql`SELECT
+          (SELECT COUNT(DISTINCT session_id)::int FROM page_views
+           WHERE event_type = 'pageview' AND created_at > now() - ${interval}::interval) AS total_sessions,
+          (SELECT COUNT(DISTINCT session_id)::int FROM page_views
+           WHERE event_type = 'pageview' AND path = '/dona'
+           AND created_at > now() - ${interval}::interval) AS visited_dona,
+          (SELECT COUNT(DISTINCT session_id)::int FROM page_views
+           WHERE event_type = 'donazione'
+           AND created_at > now() - ${interval}::interval) AS completed_dona,
+          (SELECT COUNT(DISTINCT session_id)::int FROM page_views
+           WHERE event_type = 'pageview' AND path = '/iscriviti'
+           AND created_at > now() - ${interval}::interval) AS visited_iscriviti,
+          (SELECT COUNT(DISTINCT session_id)::int FROM page_views
+           WHERE event_type = 'iscrizione'
+           AND created_at > now() - ${interval}::interval) AS completed_iscriviti`,
+
+    // ── Tasso conversione per referrer ──
+    sql`WITH ref_sessions AS (
+          SELECT DISTINCT ON (session_id) session_id, referrer
+          FROM page_views
+          WHERE event_type = 'pageview' AND referrer IS NOT NULL AND referrer != ''
+          AND created_at > now() - ${interval}::interval
+          ORDER BY session_id, created_at ASC
+        ),
+        ref_conversions AS (
+          SELECT DISTINCT session_id
+          FROM page_views
+          WHERE event_type IN ('donazione', 'iscrizione')
+          AND created_at > now() - ${interval}::interval
+        )
+        SELECT
+          r.referrer,
+          COUNT(DISTINCT r.session_id)::int AS sessions,
+          COUNT(DISTINCT c.session_id)::int AS conversions
+        FROM ref_sessions r
+        LEFT JOIN ref_conversions c ON r.session_id = c.session_id
+        GROUP BY r.referrer
+        ORDER BY sessions DESC LIMIT 10`,
+  ]);
+
+  const f = funnelDona[0] ?? {};
+
+  return res.json({
+    range,
+    entryPages,
+    exitPages,
+    topPaths,
+    funnel: {
+      totalSessions: f.total_sessions ?? 0,
+      visitedDona: f.visited_dona ?? 0,
+      completedDona: f.completed_dona ?? 0,
+      donaDropOff: (f.visited_dona ?? 0) > 0
+        ? Math.round(((f.visited_dona - (f.completed_dona ?? 0)) / f.visited_dona) * 100)
+        : 0,
+      visitedIscriviti: f.visited_iscriviti ?? 0,
+      completedIscriviti: f.completed_iscriviti ?? 0,
+      iscrivitiDropOff: (f.visited_iscriviti ?? 0) > 0
+        ? Math.round(((f.visited_iscriviti - (f.completed_iscriviti ?? 0)) / f.visited_iscriviti) * 100)
+        : 0,
+    },
+    conversionByReferrer,
+  });
 }
 
 // ─── PAYPAL ──────────────────────────────────────────────────────────────────
