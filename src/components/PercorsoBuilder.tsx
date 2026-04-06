@@ -1053,8 +1053,8 @@ export default function PercorsoBuilder() {
 
   const totalKm = route ? Math.round(route.distanceM / 100) / 10 : null;
   const nTappe  = tappaMode === "custom"
-    ? (tappe.length > 1 ? tappe.length - 1 : null)
-    : (totalKm && kmPerTappa ? Math.ceil(totalKm / kmPerTappa) + 1 : null);
+    ? (tappe.length > 2 ? tappe.length - 2 : tappe.length > 0 ? tappe.length - 1 : null)
+    : (totalKm && kmPerTappa ? Math.ceil(totalKm / kmPerTappa) : null);
 
   // ── Dropdown suggerimenti ─────────────────────────────────────────────────
   function SuggDropdown({ suggestions, onSelect }: { suggestions: Suggestion[]; onSelect: (d: string) => void }) {
