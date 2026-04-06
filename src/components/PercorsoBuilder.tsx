@@ -130,9 +130,9 @@ function splitByKm(coords: [number, number][], kmPerTappa: number): TappaPoint[]
   if (coords.length < 2 || kmPerTappa <= 0) return [];
   const stepM = kmPerTappa * 1000;
   const pts: TappaPoint[] = [];
-  pts.push({ tappaNum: 0, lat: coords[0][0], lng: coords[0][1], kmProgr: 0, label: "Partenza" });
+  pts.push({ tappaNum: 1, lat: coords[0][0], lng: coords[0][1], kmProgr: 0, label: "Tappa 1 — Partenza" });
 
-  let cumM = 0, next = stepM, tappaNum = 1;
+  let cumM = 0, next = stepM, tappaNum = 2;
   for (let i = 1; i < coords.length; i++) {
     const segM   = haversineM(coords[i - 1], coords[i]);
     const segEnd = cumM + segM;
@@ -158,9 +158,9 @@ function splitByKm(coords: [number, number][], kmPerTappa: number): TappaPoint[]
 function splitByCustomKm(coords: [number, number][], kmArray: number[]): TappaPoint[] {
   if (coords.length < 2 || !kmArray.length) return [];
   const pts: TappaPoint[] = [];
-  pts.push({ tappaNum: 0, lat: coords[0][0], lng: coords[0][1], kmProgr: 0, label: "Partenza" });
+  pts.push({ tappaNum: 1, lat: coords[0][0], lng: coords[0][1], kmProgr: 0, label: "Tappa 1 — Partenza" });
 
-  let cumM = 0, tappaIdx = 0, tappaNum = 1;
+  let cumM = 0, tappaIdx = 0, tappaNum = 2;
   let nextM = (kmArray[0] ?? 70) * 1000;
 
   for (let i = 1; i < coords.length; i++) {
@@ -307,7 +307,7 @@ async function enrichTappeWithNames(tappe: TappaPoint[]): Promise<TappaPoint[]> 
       const name = names[j];
       if (name) {
         if (idx === 0) {
-          enriched[idx] = { ...enriched[idx], label: `Partenza - ${name}` };
+          enriched[idx] = { ...enriched[idx], label: `Tappa 1 — Partenza - ${name}` };
         } else if (idx === enriched.length - 1) {
           enriched[idx] = { ...enriched[idx], label: `Arrivo - ${name}` };
         } else {
@@ -1053,8 +1053,8 @@ export default function PercorsoBuilder() {
 
   const totalKm = route ? Math.round(route.distanceM / 100) / 10 : null;
   const nTappe  = tappaMode === "custom"
-    ? (tappe.length > 2 ? tappe.length - 2 : tappe.length > 0 ? tappe.length - 1 : null)
-    : (totalKm && kmPerTappa ? Math.ceil(totalKm / kmPerTappa) : null);
+    ? (tappe.length > 1 ? tappe.length - 1 : null)
+    : (totalKm && kmPerTappa ? Math.ceil(totalKm / kmPerTappa) + 1 : null);
 
   // ── Dropdown suggerimenti ─────────────────────────────────────────────────
   function SuggDropdown({ suggestions, onSelect }: { suggestions: Suggestion[]; onSelect: (d: string) => void }) {
@@ -1383,9 +1383,9 @@ export default function PercorsoBuilder() {
               <MapFit coords={route.coords} />
               <Polyline positions={route.coords} color="#ef4444" weight={3} opacity={0.85} />
               {tappe.map((t, i) => {
-                const isStart = t.tappaNum === 0, isEnd = i === tappe.length - 1;
+                const isStart = i === 0, isEnd = i === tappe.length - 1;
                 const color   = isStart ? "#22c55e" : isEnd ? "#ef4444" : "#f97316";
-                const lbl     = isStart ? "P" : isEnd ? "A" : String(t.tappaNum);
+                const lbl     = isEnd ? "A" : String(t.tappaNum);
                 return (
                   <Marker key={`${t.tappaNum}-${t.lat}`} position={[t.lat, t.lng]} icon={makeIcon(color, lbl)}>
                     <Popup>
@@ -1447,12 +1447,12 @@ export default function PercorsoBuilder() {
               {tappe.map((t, i) => {
                 const nextKm = tappe[i + 1]?.kmProgr ?? t.kmProgr;
                 const segKm  = i < tappe.length - 1 ? (nextKm - t.kmProgr).toFixed(1) : "—";
-                const isStart = t.tappaNum === 0, isEnd = i === tappe.length - 1;
+                const isStart = i === 0, isEnd = i === tappe.length - 1;
                 return (
                   <div key={`${t.tappaNum}-${t.lat}`} className="flex items-center gap-3 px-4 py-2.5">
                     <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
                       style={{ background: isStart ? "#22c55e" : isEnd ? "#ef4444" : "#f97316" }}>
-                      {isStart ? "P" : isEnd ? "A" : t.tappaNum}
+                      {isEnd ? "A" : t.tappaNum}
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-foreground">{t.label}</p>
@@ -1466,7 +1466,7 @@ export default function PercorsoBuilder() {
                     {!isEnd && i < tappe.length - 1 && (
                       <button
                         type="button"
-                        title={`Scarica GPX tappa ${isStart ? 1 : t.tappaNum}`}
+                        title={`Scarica GPX tappa ${t.tappaNum}`}
                         onClick={() => downloadTappaGpx(route!.coords, tappe, i)}
                         className="w-6 h-6 flex items-center justify-center rounded border border-border hover:border-dona hover:bg-dona/10 text-muted-foreground hover:text-dona transition-colors shrink-0"
                       >
