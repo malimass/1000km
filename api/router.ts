@@ -11,6 +11,21 @@ function getPath(req: VercelRequest): string {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // ── CORS: accetta sia www che non-www ─────────────────────────────────────
+  const allowedOrigins = [
+    "https://1000kmdigratitudine.it",
+    "https://www.1000kmdigratitudine.it",
+  ];
+  const origin = req.headers.origin ?? "";
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  if (req.method === "OPTIONS") return res.status(204).end();
+
   const path = getPath(req);
   try {
     if (path === "/auth/login") return await authLogin(req, res);
