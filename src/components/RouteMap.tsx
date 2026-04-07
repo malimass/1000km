@@ -266,7 +266,7 @@ export default function RouteMap({
         center={center}
         zoom={6}
         zoomControl={false}
-        scrollWheelZoom={isFullscreen}
+        scrollWheelZoom={true}
         style={{ height: "100%", width: "100%" }}
       >
         <MapController selectedIndex={selectedIndex} waypoints={waypoints} />
