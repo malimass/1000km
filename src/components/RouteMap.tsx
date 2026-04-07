@@ -414,7 +414,8 @@ export default function RouteMap({
           const isSelected = i === selectedIndex;
           // iscritti[i] mappa tappa_numero = waypoint index (1..14)
           const count = iscritti[i] ?? 0;
-          const dayNum = 15 + i; // 15 aprile + offset
+          const d = new Date(2026, 3, 15 + i); // 15 aprile 2026 + offset
+          const dayNum = d.getDate();
           const isStart = i === 0;
           const isEnd = i === waypoints.length - 1;
           const color = isStart ? "#ef4444" : isEnd ? "#22c55e" : "#f97316";
