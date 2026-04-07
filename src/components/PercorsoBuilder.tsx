@@ -134,13 +134,19 @@ function tappaDate(dayIndex: number): string {
   return d.toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
 }
 
+function tappaDay(dayIndex: number): number {
+  const d = new Date(PARTENZA_DATE);
+  d.setDate(d.getDate() + dayIndex);
+  return d.getDate();
+}
+
 // ─── Split percorso in tappe ──────────────────────────────────────────────────
 
 function splitByKm(coords: [number, number][], kmPerTappa: number): TappaPoint[] {
   if (coords.length < 2 || kmPerTappa <= 0) return [];
   const stepM = kmPerTappa * 1000;
   const pts: TappaPoint[] = [];
-  pts.push({ tappaNum: 1, lat: coords[0][0], lng: coords[0][1], kmProgr: 0, label: "Tappa 1 — Partenza" });
+  pts.push({ tappaNum: 1, lat: coords[0][0], lng: coords[0][1], kmProgr: 0, label: `Giorno ${tappaDay(0)} — Partenza` });
 
   let cumM = 0, next = stepM, tappaNum = 2;
   for (let i = 1; i < coords.length; i++) {
@@ -150,14 +156,14 @@ function splitByKm(coords: [number, number][], kmPerTappa: number): TappaPoint[]
       const t   = segM > 0 ? (next - cumM) / segM : 0;
       const lat = coords[i - 1][0] + t * (coords[i][0] - coords[i - 1][0]);
       const lng = coords[i - 1][1] + t * (coords[i][1] - coords[i - 1][1]);
-      pts.push({ tappaNum, lat, lng, kmProgr: next / 1000, label: `Tappa ${tappaNum}` });
+      pts.push({ tappaNum, lat, lng, kmProgr: next / 1000, label: `Giorno ${tappaDay(tappaNum - 1)}` });
       next += stepM;
       tappaNum++;
     }
     cumM += segM;
   }
   const last = coords[coords.length - 1];
-  pts.push({ tappaNum, lat: last[0], lng: last[1], kmProgr: Math.round(cumM / 100) / 10, label: "Arrivo" });
+  pts.push({ tappaNum, lat: last[0], lng: last[1], kmProgr: Math.round(cumM / 100) / 10, label: `Giorno ${tappaDay(tappaNum - 1)} — Arrivo` });
   return pts;
 }
 
@@ -168,7 +174,7 @@ function splitByKm(coords: [number, number][], kmPerTappa: number): TappaPoint[]
 function splitByCustomKm(coords: [number, number][], kmArray: number[]): TappaPoint[] {
   if (coords.length < 2 || !kmArray.length) return [];
   const pts: TappaPoint[] = [];
-  pts.push({ tappaNum: 1, lat: coords[0][0], lng: coords[0][1], kmProgr: 0, label: "Tappa 1 — Partenza" });
+  pts.push({ tappaNum: 1, lat: coords[0][0], lng: coords[0][1], kmProgr: 0, label: `Giorno ${tappaDay(0)} — Partenza` });
 
   let cumM = 0, tappaIdx = 0, tappaNum = 2;
   let nextM = (kmArray[0] ?? 70) * 1000;
@@ -180,7 +186,7 @@ function splitByCustomKm(coords: [number, number][], kmArray: number[]): TappaPo
       const t   = segM > 0 ? (nextM - cumM) / segM : 0;
       const lat = coords[i - 1][0] + t * (coords[i][0] - coords[i - 1][0]);
       const lng = coords[i - 1][1] + t * (coords[i][1] - coords[i - 1][1]);
-      pts.push({ tappaNum, lat, lng, kmProgr: nextM / 1000, label: `Tappa ${tappaNum}` });
+      pts.push({ tappaNum, lat, lng, kmProgr: nextM / 1000, label: `Giorno ${tappaDay(tappaNum - 1)}` });
       tappaIdx++;
       tappaNum++;
       // Usa il prossimo km dall'array, o ripeti l'ultimo valore
@@ -190,7 +196,7 @@ function splitByCustomKm(coords: [number, number][], kmArray: number[]): TappaPo
     cumM += segM;
   }
   const last = coords[coords.length - 1];
-  pts.push({ tappaNum, lat: last[0], lng: last[1], kmProgr: Math.round(cumM / 100) / 10, label: "Arrivo" });
+  pts.push({ tappaNum, lat: last[0], lng: last[1], kmProgr: Math.round(cumM / 100) / 10, label: `Giorno ${tappaDay(tappaNum - 1)} — Arrivo` });
   return pts;
 }
 
@@ -1393,7 +1399,7 @@ export default function PercorsoBuilder() {
               {tappe.map((t, i) => {
                 const isStart = i === 0, isEnd = i === tappe.length - 1;
                 const color   = isStart ? "#ef4444" : isEnd ? "#22c55e" : "#f97316";
-                const lbl     = isEnd ? "A" : String(t.tappaNum);
+                const lbl     = isEnd ? "A" : String(tappaDay(i));
                 return (
                   <Marker key={`${t.tappaNum}-${t.lat}`} position={[t.lat, t.lng]} icon={makeIcon(color, lbl)}>
                     <Popup>
@@ -1461,7 +1467,7 @@ export default function PercorsoBuilder() {
                   <div key={`${t.tappaNum}-${t.lat}`} className="flex items-center gap-3 px-4 py-2.5">
                     <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
                       style={{ background: isStart ? "#ef4444" : isEnd ? "#22c55e" : "#f97316" }}>
-                      {isEnd ? "A" : t.tappaNum}
+                      {isEnd ? "A" : tappaDay(i)}
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-foreground">{t.label}</p>
