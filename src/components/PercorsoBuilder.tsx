@@ -1052,9 +1052,7 @@ export default function PercorsoBuilder() {
   }
 
   const totalKm = route ? Math.round(route.distanceM / 100) / 10 : null;
-  const nTappe  = tappaMode === "custom"
-    ? (tappe.length > 2 ? tappe.length - 2 : tappe.length > 0 ? tappe.length - 1 : null)
-    : (totalKm && kmPerTappa ? Math.ceil(totalKm / kmPerTappa) : null);
+  const nTappe  = tappe.length > 1 ? tappe.length - 1 : null;
 
   // ── Dropdown suggerimenti ─────────────────────────────────────────────────
   function SuggDropdown({ suggestions, onSelect }: { suggestions: Suggestion[]; onSelect: (d: string) => void }) {
@@ -1384,7 +1382,7 @@ export default function PercorsoBuilder() {
               <Polyline positions={route.coords} color="#ef4444" weight={3} opacity={0.85} />
               {tappe.map((t, i) => {
                 const isStart = i === 0, isEnd = i === tappe.length - 1;
-                const color   = isStart ? "#22c55e" : isEnd ? "#ef4444" : "#f97316";
+                const color   = isStart ? "#ef4444" : isEnd ? "#22c55e" : "#f97316";
                 const lbl     = isEnd ? "A" : String(t.tappaNum);
                 return (
                   <Marker key={`${t.tappaNum}-${t.lat}`} position={[t.lat, t.lng]} icon={makeIcon(color, lbl)}>
@@ -1451,7 +1449,7 @@ export default function PercorsoBuilder() {
                 return (
                   <div key={`${t.tappaNum}-${t.lat}`} className="flex items-center gap-3 px-4 py-2.5">
                     <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                      style={{ background: isStart ? "#22c55e" : isEnd ? "#ef4444" : "#f97316" }}>
+                      style={{ background: isStart ? "#ef4444" : isEnd ? "#22c55e" : "#f97316" }}>
                       {isEnd ? "A" : t.tappaNum}
                     </span>
                     <div className="flex-1 min-w-0">

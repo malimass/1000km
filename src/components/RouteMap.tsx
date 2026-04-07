@@ -178,8 +178,8 @@ function makeIconWithCount(color: string, size: number, count: number) {
   });
 }
 
-const startIcon = makeIcon("#22c55e", 16);
-const endIcon   = makeIcon("#e11d48", 16);
+const startIcon = makeIcon("#ef4444", 16);
+const endIcon   = makeIcon("#22c55e", 16);
 const midIcon   = makeIcon("#f97316", 10);
 const midIconSel = makeIcon("#f97316", 14);
 
