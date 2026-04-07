@@ -56,11 +56,11 @@ const defaultLabels = [
   "Scalea", "Paola", "Pizzo Calabro", "Rosarno", "Terranova Sappo Minulio",
 ];
 
-const defaultDates = [
-  "18 apr", "18 apr", "19 apr", "20 apr", "21 apr",
-  "22 apr", "23 apr", "24 apr", "25 apr", "26 apr",
-  "27 apr", "28 apr", "29 apr", "30 apr", "1 mag",
-];
+/** Genera la data per la tappa i-esima: 15 aprile 2026 + i giorni */
+function tappaDateLabel(i: number): string {
+  const d = new Date(2026, 3, 15 + i);
+  return d.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
+}
 
 const defaultKm = [
   0, 55, 125, 215, 280, 365, 440, 530, 620, 690,
@@ -235,10 +235,8 @@ export default function RouteMap({
   const km = publishedTappe
     ? publishedTappe.map(t => Math.round(t.kmProgr))
     : defaultKm;
-  // Per le date: usare default se disponibili, altrimenti stringa vuota
-  const dates = publishedTappe
-    ? publishedTappe.map((_, i) => defaultDates[i] ?? "")
-    : defaultDates;
+  // Date calcolate dinamicamente: 15 aprile + indice
+  const dates = waypoints.map((_, i) => tappaDateLabel(i));
   // Per la polyline: se ci sono coords pubblicate usale, altrimenti unisci waypoints
   const routeLine: [number, number][] = publishedCoords ?? waypoints;
   // Considera un corridore "live" solo se is_active E aggiornato negli ultimi 5 min
