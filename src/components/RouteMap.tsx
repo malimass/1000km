@@ -152,6 +152,23 @@ function makeIcon(color: string, size = 10) {
   });
 }
 
+function makeLabelIcon(color: string, label: string, size = 28) {
+  return divIcon({
+    className: "",
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      background:${color};color:#fff;
+      border:2px solid white;
+      border-radius:50%;
+      box-shadow:0 2px 6px rgba(0,0,0,0.4);
+      display:flex;align-items:center;justify-content:center;
+      font-size:11px;font-weight:700;font-family:sans-serif;
+    ">${label}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
 function makeIconWithCount(color: string, size: number, count: number) {
   return divIcon({
     className: "",
@@ -397,16 +414,18 @@ export default function RouteMap({
           const isSelected = i === selectedIndex;
           // iscritti[i] mappa tappa_numero = waypoint index (1..14)
           const count = iscritti[i] ?? 0;
+          const dayNum = 15 + i; // 15 aprile + offset
+          const isStart = i === 0;
+          const isEnd = i === waypoints.length - 1;
+          const color = isStart ? "#ef4444" : isEnd ? "#22c55e" : "#f97316";
+          const label = isEnd ? "A" : String(dayNum);
+          const size = isSelected ? 32 : 28;
 
           let icon;
-          if (i === 0) {
-            icon = startIcon;
-          } else if (i === waypoints.length - 1) {
-            icon = endIcon;
-          } else if (count > 0) {
-            icon = makeIconWithCount("#f97316", isSelected ? 14 : 10, count);
+          if (count > 0 && !isStart && !isEnd) {
+            icon = makeIconWithCount(color, isSelected ? 14 : 10, count);
           } else {
-            icon = isSelected ? midIconSel : midIcon;
+            icon = makeLabelIcon(color, label, size);
           }
 
           return (
