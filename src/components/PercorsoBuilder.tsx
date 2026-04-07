@@ -124,6 +124,16 @@ function haversineM(a: [number, number], b: [number, number]): number {
   return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
+// ─── Data tappa (15 aprile 2026 + offset giorni) ─────────────────────────────
+
+const PARTENZA_DATE = new Date(2026, 3, 15); // 15 aprile 2026
+
+function tappaDate(dayIndex: number): string {
+  const d = new Date(PARTENZA_DATE);
+  d.setDate(d.getDate() + dayIndex);
+  return d.toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
+}
+
 // ─── Split percorso in tappe ──────────────────────────────────────────────────
 
 function splitByKm(coords: [number, number][], kmPerTappa: number): TappaPoint[] {
@@ -965,8 +975,8 @@ export default function PercorsoBuilder() {
   // ── Copia tappe negli appunti ─────────────────────────────────────────────
   async function copyTappe() {
     if (!tappe.length) return;
-    const text = tappe.map(t =>
-      `${t.label} — ${t.kmProgr.toFixed(1)} km — ${t.lat.toFixed(5)},${t.lng.toFixed(5)}`
+    const text = tappe.map((t, i) =>
+      `${t.label} — ${tappaDate(i)} — ${t.kmProgr.toFixed(1)} km — ${t.lat.toFixed(5)},${t.lng.toFixed(5)}`
     ).join("\n");
     await navigator.clipboard.writeText(text);
     setCopied(true);
@@ -1388,6 +1398,7 @@ export default function PercorsoBuilder() {
                   <Marker key={`${t.tappaNum}-${t.lat}`} position={[t.lat, t.lng]} icon={makeIcon(color, lbl)}>
                     <Popup>
                       <strong>{t.label}</strong><br />
+                      <span className="text-xs text-gray-600">{tappaDate(i)}</span><br />
                       Km progressivi: <strong>{t.kmProgr.toFixed(1)}</strong><br />
                       <span className="text-xs text-gray-500">{t.lat.toFixed(5)}, {t.lng.toFixed(5)}</span>
                     </Popup>
@@ -1455,7 +1466,7 @@ export default function PercorsoBuilder() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-foreground">{t.label}</p>
                       <p className="text-[10px] text-muted-foreground">
-                        km {t.kmProgr.toFixed(1)}{!isEnd && ` · prossima: ${segKm} km`}
+                        {tappaDate(i)} · km {t.kmProgr.toFixed(1)}{!isEnd && ` · prossima: ${segKm} km`}
                       </p>
                     </div>
                     <span className="text-[10px] font-mono text-muted-foreground shrink-0">
