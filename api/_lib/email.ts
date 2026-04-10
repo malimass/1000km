@@ -147,3 +147,49 @@ export async function sendPendingReminderEmail(opts: {
     console.error(`Errore invio email promemoria livello ${opts.reminderLevel}:`, err);
   }
 }
+
+// ─── Email di conferma iscrizione tappa ──────────────────────────────────────
+
+export async function sendIscrizioneEmail(opts: {
+  to: string;
+  nome: string;
+  tappa: string;
+  data: string;
+  haDonato: boolean;
+}) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("RESEND_API_KEY non configurata — email iscrizione non inviata");
+    return;
+  }
+
+  const donaBlock = opts.haDonato
+    ? `<p>Grazie anche per la tua generosa donazione! Il tuo contributo andrà interamente a <strong>Komen Italia — Comitato Emilia Romagna</strong> per la prevenzione e la ricerca contro il tumore al seno.</p>`
+    : `
+      <p>Se desideri supportare la causa, puoi fare una donazione in qualsiasi momento. Ogni contributo, grande o piccolo, fa la differenza nella lotta contro il tumore al seno.</p>
+      <p style="text-align:center;margin:24px 0;">
+        <a href="https://www.1000kmdigratitudine.it/dona" style="background:#e11d73;color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:bold;">Dona ora</a>
+      </p>
+    `;
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+      <h1 style="color:#e11d73;font-size:24px;">Grazie, ${opts.nome}!</h1>
+      <p>La tua iscrizione alla tappa <strong>${opts.tappa}</strong> del <strong>${opts.data}</strong> è stata confermata con successo.</p>
+      <p>Ti aspettiamo per camminare insieme! Preparati per un'esperienza unica di solidarietà e gratitudine.</p>
+      ${donaBlock}
+      <hr style="border:none;border-top:1px solid #eee;margin:24px 0;" />
+      <p style="color:#888;font-size:12px;">1000 km di Gratitudine — Un cammino di fede, gratitudine e speranza.</p>
+    </div>
+  `;
+
+  try {
+    await resend.emails.send({
+      from: FROM,
+      to: opts.to,
+      subject: `Iscrizione confermata — ${opts.tappa}`,
+      html,
+    });
+  } catch (err) {
+    console.error("Errore invio email iscrizione:", err);
+  }
+}

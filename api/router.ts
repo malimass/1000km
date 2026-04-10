@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import Stripe from "stripe";
 import { sql } from "./_lib/db.js";
 import { signToken, requireAuth } from "./_lib/auth.js";
-import { sendThankYouEmail, sendPendingReminderEmail, REMINDER_SCHEDULE } from "./_lib/email.js";
+import { sendThankYouEmail, sendPendingReminderEmail, sendIscrizioneEmail, REMINDER_SCHEDULE } from "./_lib/email.js";
 
 function getPath(req: VercelRequest): string {
   const url = req.url ?? "";
@@ -855,6 +855,33 @@ async function iscrizioni(req: VercelRequest, res: VercelResponse) {
          ${donazione_euro ?? 0}, ${pagamento_stato ?? "gratuito"}, ${stripe_session_id ?? null})
       RETURNING id
     `;
+    // Email di conferma iscrizione (non blocca la risposta)
+    const TAPPE_INFO: Record<number, { tratta: string; data: string }> = {
+      1:  { tratta: "Bologna → Faenza",                  data: "15 aprile" },
+      2:  { tratta: "Faenza → Rimini",                   data: "16 aprile" },
+      3:  { tratta: "Rimini → Ancona",                   data: "17 aprile" },
+      4:  { tratta: "Ancona → Porto San Giorgio",        data: "18 aprile" },
+      5:  { tratta: "Porto San Giorgio → Pescara",       data: "19 aprile" },
+      6:  { tratta: "Pescara → Vasto",                   data: "20 aprile" },
+      7:  { tratta: "Vasto → Campobasso",                data: "21 aprile" },
+      8:  { tratta: "Campobasso → Avellino",             data: "22 aprile" },
+      9:  { tratta: "Avellino → Sala Consilina",         data: "23 aprile" },
+      10: { tratta: "Sala Consilina → Scalea",           data: "24 aprile" },
+      11: { tratta: "Scalea → Paola",                    data: "25 aprile" },
+      12: { tratta: "Paola → Pizzo Calabro",             data: "26 aprile" },
+      13: { tratta: "Pizzo Calabro → Rosarno",           data: "27 aprile" },
+      14: { tratta: "Rosarno → Terranova Sappo Minulio", data: "28 aprile" },
+    };
+    const info = TAPPE_INFO[tappa_numero as number];
+    if (info) {
+      sendIscrizioneEmail({
+        to: email,
+        nome,
+        tappa: info.tratta,
+        data: info.data,
+        haDonato: (donazione_euro ?? 0) > 0,
+      }).catch(() => {});
+    }
     return res.status(201).json({ id: (rows[0] as any).id });
   }
   if (req.method === "PATCH") {
