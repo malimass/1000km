@@ -21,4 +21,5 @@ export const tappe: Tappa[] = [
   { giorno: 12, da: "Paola",             a: "Pizzo Calabro",           km: 65,  data: "26 aprile" },
   { giorno: 13, da: "Pizzo Calabro",     a: "Rosarno",                 km: 65,  data: "27 aprile" },
   { giorno: 14, da: "Rosarno",           a: "Terranova Sappo Minulio", km: 40,  data: "28 aprile" },
+  { giorno: 15, da: "Taurianova",        a: "Terranova Sappo Minulio", km: 10,  data: "1 maggio" },
 ];

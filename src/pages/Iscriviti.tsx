@@ -94,27 +94,40 @@ function TappeModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             </div>
             {/* Lista tappe scrollabile */}
             <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-6 space-y-2">
-              {tappe.map(t => (
+              {tappe.map(t => {
+                const isArrivo = t.giorno === 15;
+                return (
                 <Link
                   key={t.giorno}
                   to={`/iscriviti?tappa=${t.giorno}`}
                   onClick={onClose}
-                  className="flex items-center gap-3 rounded-xl border border-border bg-background p-4 hover:border-dona/50 active:border-dona active:bg-dona/5 transition-all group"
+                  className={`flex items-center gap-3 rounded-xl border p-4 transition-all group ${
+                    isArrivo
+                      ? "border-accent/30 bg-accent/5 hover:border-accent/60 active:border-accent active:bg-accent/10"
+                      : "border-border bg-background hover:border-dona/50 active:border-dona active:bg-dona/5"
+                  }`}
                 >
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-dona/10 text-dona flex items-center justify-center font-heading font-bold text-sm">
-                    {String(t.giorno).padStart(2, "0")}
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-heading font-bold text-sm ${
+                    isArrivo ? "bg-accent/15 text-accent" : "bg-dona/10 text-dona"
+                  }`}>
+                    {isArrivo ? "A" : String(t.giorno).padStart(2, "0")}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-body text-sm font-semibold text-foreground truncate">
                       {t.da} → {t.a}
                     </p>
                     <p className="font-body text-xs text-muted-foreground mt-0.5">
-                      {t.data} · {t.km} km
+                      {isArrivo ? "Iscriviti e percorri gli ultimi km con noi!" : `${t.data} · ${t.km} km`}
                     </p>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-dona group-active:text-dona transition-colors shrink-0" />
+                  <ArrowRight className={`w-4 h-4 transition-colors shrink-0 ${
+                    isArrivo
+                      ? "text-muted-foreground group-hover:text-accent group-active:text-accent"
+                      : "text-muted-foreground group-hover:text-dona group-active:text-dona"
+                  }`} />
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </motion.div>
           </div>

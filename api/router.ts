@@ -871,6 +871,7 @@ async function iscrizioni(req: VercelRequest, res: VercelResponse) {
       12: { tratta: "Paola → Pizzo Calabro",             data: "26 aprile" },
       13: { tratta: "Pizzo Calabro → Rosarno",           data: "27 aprile" },
       14: { tratta: "Rosarno → Terranova Sappo Minulio", data: "28 aprile" },
+      15: { tratta: "Taurianova → Terranova Sappo Minulio", data: "1 maggio" },
     };
     const info = TAPPE_INFO[tappa_numero as number];
     if (info) {
