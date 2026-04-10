@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS admin_settings (
 
 CREATE TABLE IF NOT EXISTS iscrizioni (
   id                uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
-  tappa_numero      int           NOT NULL CHECK (tappa_numero BETWEEN 1 AND 14),
+  tappa_numero      int           NOT NULL CHECK (tappa_numero BETWEEN 1 AND 15),
   nome              text          NOT NULL,
   cognome           text          NOT NULL,
   email             text          NOT NULL,
