@@ -56,9 +56,11 @@ const defaultLabels = [
   "Scalea", "Paola", "Pizzo Calabro", "Rosarno", "Terranova Sappo Minulio",
 ];
 
-/** Genera la data per la tappa i-esima: 15 aprile 2026 + i giorni */
+/** Genera la data per la tappa i-esima: 15 aprile 2026 + i giorni (max 1 maggio) */
 function tappaDateLabel(i: number): string {
   const d = new Date(2026, 3, 15 + i);
+  const arrivo = new Date(2026, 4, 1); // 1 maggio 2026
+  if (d > arrivo) d.setTime(arrivo.getTime());
   return d.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 }
 
@@ -413,6 +415,8 @@ export default function RouteMap({
           // iscritti[i] mappa tappa_numero = waypoint index (1..14)
           const count = iscritti[i] ?? 0;
           const d = new Date(2026, 3, 15 + i); // 15 aprile 2026 + offset
+          const arrivo = new Date(2026, 4, 1);
+          if (d > arrivo) d.setTime(arrivo.getTime());
           const dayNum = d.getDate();
           const isStart = i === 0;
           const isEnd = i === waypoints.length - 1;
